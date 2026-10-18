@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sky Watch</title>
+<meta name="description" content="Hour-by-hour night sky forecast for astrophotography with a Seestar S50.">
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sky Watch">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Apply red mode before first paint so the screen never flashes white/blue at night.
+  try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3a9 9 0 0 0 0 18a6 9 0 0 1 0-18z" fill="currentColor"/></svg>
+    <h1>Sky Watch</h1>
+  </div>
+  <div class="controls">
+    <button id="unitsBtn" class="btn" type="button" aria-label="Switch units">°C</button>
+    <button id="refreshBtn" class="btn" type="button" aria-label="Refresh">↻</button>
+    <button id="redBtn" class="btn red-btn" type="button" aria-pressed="false">Red mode</button>
+  </div>
+</header>
+
+<main>
+  <section class="card loc">
+    <div class="loc-row">
+      <select id="spotSelect" aria-label="Location"></select>
+      <button id="gpsBtn" class="btn" type="button">📍 GPS</button>
+    </div>
+    <div class="loc-row">
+      <input id="searchInput" type="search" placeholder="Search a place (e.g. Salmon Arm)" autocomplete="off">
+      <button id="saveBtn" class="btn" type="button">Save spot</button>
+      <button id="removeBtn" class="btn ghost" type="button">Remove</button>
+    </div>
+    <ul id="searchResults" class="results" hidden></ul>
+    <p id="locLabel" class="muted small"></p>
+  </section>
+
+  <p id="status" class="status" role="status"></p>
+
+  <section class="card" id="tonightCard" hidden>
+    <h2>Tonight</h2>
+    <div id="tonight" class="tonight"></div>
+  </section>
+
+  <section class="card" id="hoursCard" hidden>
+    <h2>Next 12 hours</h2>
+    <div id="strip" class="strip"></div>
+    <div id="hours"></div>
+    <p class="muted small">Score is a rough guide combining clouds, rain odds, wind, dew, seeing, darkness and moonlight. Tap an hour to see each source.</p>
+  </section>
+
+  <section class="card" id="moonCard" hidden>
+    <h2>Moon</h2>
+    <div id="moonInfo" class="moon-info"></div>
+    <h3>Moon's path tonight</h3>
+    <div id="moonPath" class="moonpath"></div>
+  </section>
+
+  <section class="card" id="planetsCard" hidden>
+    <h2>Planets tonight</h2>
+    <div id="planets"></div>
+  </section>
+
+  <section class="card" id="targetsCard" hidden>
+    <h2>Good Seestar targets tonight</h2>
+    <p class="muted small">Objects that climb above 30° during full darkness, best first. Times are when each is highest.</p>
+    <div id="targets"></div>
+  </section>
+
+  <section class="card" id="sourcesCard" hidden>
+    <h2>Data sources</h2>
+    <ul id="sources" class="sources"></ul>
+  </section>
+</main>
+
+<footer class="foot muted small">
+  <span id="updated"></span>
+  <span>Sky Watch <span id="ver"></span></span>
+</footer>
+
+<script src="astronomy.browser.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
