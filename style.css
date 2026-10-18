@@ -405,9 +405,9 @@ html.red .tag-comet { color: var(--accent); border-color: var(--line2); }
 .top-it .th img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .3s; }
 .top-it .th.ok img { opacity: 1; }
 .top-it .rk {
-  position: absolute; left: 4px; top: 4px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
-  background: #1747b0; color: #fff; border: 1.5px solid rgba(255,255,255,.85);
-  font-size: .9rem; font-weight: 800; line-height: 21px; font-style: normal; text-align: center;
+  position: absolute; left: 4px; top: 4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: #13804c; color: #fff; border: 1px solid rgba(255,255,255,.7);
+  font-size: .72rem; font-weight: 800; line-height: 16px; font-style: normal; text-align: center;
   font-variant-numeric: tabular-nums; box-shadow: 0 1px 4px rgba(0,0,0,.7);
 }
 html.red .top-it .th img { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(.5); }
