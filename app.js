@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.19';
+const VERSION = 'v3.20';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -814,9 +814,16 @@ function cloudShape(seed) {
   for (let i = 0; i < 2; i++) { const r = 0.06 + rnd() * 0.05; B.push([0.2 + rnd() * 0.6, -0.08 - rnd() * 0.25, r]); }
   const er = 0.07 + rnd() * 0.03, er2 = 0.065 + rnd() * 0.03;
   B.push([0.1 + er, -er * 0.9, er], [0.9 - er2, -er2 * 0.9, er2], [0.32 + rnd() * 0.08, -0.08, 0.1 + rnd() * 0.03], [0.6 + rnd() * 0.08, -0.08, 0.1 + rnd() * 0.03], [0.48 + rnd() * 0.06, -0.1, 0.13]);
-  let x1 = 1, x2 = 0, y1 = 0;
-  for (const [x, y, r] of B) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
-  return { B, x1, x2, y1, ox: rnd() * 100, oy: rnd() * 100 };
+  const ox = rnd() * 100, oy = rnd() * 100;
+  // Puffy underside: a row of rounded lobes hanging below the base, uneven in size and drop.
+  const nb = 3 + Math.floor(rnd() * 2);
+  for (let i = 0; i < nb; i++) {
+    const r = 0.085 + rnd() * 0.045, x = 0.2 + (0.6 * (i + 0.5)) / nb + (rnd() - 0.5) * 0.06;
+    B.push([x, -r * 0.2 + rnd() * 0.03, r]);
+  }
+  let x1 = 1, x2 = 0, y1 = 0, y2 = 0;
+  for (const [x, y, r] of B) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); y2 = Math.max(y2, y + r); }
+  return { B, x1, x2, y1, y2, ox, oy };
 }
 const NOISE_T = Float32Array.from({ length: 65536 }, (_, i) => { const n = Math.sin((i & 255) * 127.1 + (i >> 8) * 311.7) * 43758.5453; return n - Math.floor(n); });
 function noise2(x, y) {
@@ -826,7 +833,7 @@ function noise2(x, y) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 function drawCloud(img, W, Hc, px, py, sc, shape, cols, alpha) {
-  const { B, x1, x2, y1, ox, oy } = shape;
+  const { B, x1, x2, y1, y2, ox, oy } = shape;
   const dens = (ux, uy, oct = 4) => {
     let m = 0;
     for (const [cx, cy, r] of B) { const q = ((ux - cx) ** 2 + (uy - cy) ** 2) / (r * r); if (q < 1.6) m = Math.max(m, 1 - q * 0.62); }
@@ -837,14 +844,14 @@ function drawCloud(img, W, Hc, px, py, sc, shape, cols, alpha) {
     return d;
   };
   const X0 = Math.max(0, Math.floor(px + (x1 - 0.06) * sc)), X1 = Math.min(W - 1, Math.ceil(px + (x2 + 0.06) * sc));
-  const Y0 = Math.max(0, Math.floor(py + (y1 - 0.06) * sc)), Y1 = Math.min(Hc - 1, Math.ceil(py + 0.12 * sc));
+  const Y0 = Math.max(0, Math.floor(py + (y1 - 0.06) * sc)), Y1 = Math.min(Hc - 1, Math.ceil(py + (y2 + 0.06) * sc));
   const [hi, mid, lo] = cols, d = img.data, step = 0.035;
   for (let Y = Y0; Y <= Y1; Y++) for (let X = X0; X <= X1; X++) {
     const ux = (X - px) / sc, uy = (Y - py) / sc, v = dens(ux, uy);
     if (v <= 0.18) continue;
     let acc = 0;                                                   // trace toward the light (up, a bit left)
     for (let s = 1; s <= 5; s++) acc += Math.max(0, dens(ux - step * s * 0.45, uy - step * s, 2));
-    const lit = Math.min(1, Math.exp(-acc * 0.55) * 1.05 + Math.max(0, -uy / -y1) * 0.18 - (uy > -0.12 ? (0.12 + uy) * 1.6 : 0));
+    const lit = Math.min(1, Math.exp(-acc * 0.55) * 1.05 + Math.max(0, -uy / -y1) * 0.18 - (uy > -0.12 ? Math.min(0.45, (0.12 + uy) * 1.6) : 0));
     const t = Math.max(0, lit), c = t > 0.5 ? [0, 1, 2].map((i) => mid[i] + (hi[i] - mid[i]) * (t - 0.5) * 2) : [0, 1, 2].map((i) => lo[i] + (mid[i] - lo[i]) * t * 2);
     const a = Math.min(1, (v - 0.18) / 0.22) * alpha, j = (Y * W + X) * 4, da = d[j + 3] / 255 * (1 - a), oa = a + da;
     for (let ch = 0; ch < 3; ch++) d[j + ch] = (c[ch] * a + d[j + ch] * da) / oa;
@@ -879,15 +886,30 @@ function skyChart(hours) {
   const cols = red ? [base, mix(base, [0, 0, 0], 0.35), mix(base, [0, 0, 0], 0.7)]
     : [mix(base, [255, 255, 255], light ? 0.95 : 0.8), mix(base, [255, 255, 255], light ? 0.35 : 0.15), mix(base, [40, 48, 64], light ? 0.55 : 0.6)];
   const img = ctx.createImageData(cv.width, cv.height);
+  let rainSvg = '';
   hours.forEach((h, i) => {
-    if (!isNum(h.cloud) || h.cloud < 0.5) return;
-    const seed = (isNum(h.t) ? Math.round(h.t / 3600) : i) % 9973 + 1, sh = cloudShape(seed);
-    const top_ = Y(h.cloud), w = cw * 0.86 * (0.62 + 0.38 * Math.min(100, h.cloud) / 100), hgt = Math.min(w * 0.62, H - top_);
-    if (hgt < 2) return;
-    const sc = Math.min(w / (sh.x2 - sh.x1), hgt / -sh.y1);
-    drawCloud(img, cv.width, cv.height, (i * cw + cw / 2 - ((sh.x1 + sh.x2) / 2) * sc) * dpr, (top_ - sh.y1 * sc) * dpr, sc * dpr, sh, cols, h.sky.k === 'day' ? 0.4 : 1);
+    const day = h.sky && h.sky.k === 'day', cx = i * cw + cw / 2;
+    let base = top, half = cw * 0.3;                               // where rain starts if there's no cloud drawn
+    if (isNum(h.cloud) && h.cloud >= 0.5) {
+      const seed = (isNum(h.t) ? Math.round(h.t / 3600) : i) % 9973 + 1, sh = cloudShape(seed);
+      const top_ = Y(h.cloud), w = cw * 0.86 * (0.62 + 0.38 * Math.min(100, h.cloud) / 100), hgt = Math.min(w * 0.72, H - top_);
+      if (hgt >= 2) {
+        const sc = Math.min(w / (sh.x2 - sh.x1), hgt / (sh.y2 - sh.y1)), px = cx - ((sh.x1 + sh.x2) / 2) * sc, py = top_ - sh.y1 * sc;
+        drawCloud(img, cv.width, cv.height, px * dpr, py * dpr, sc * dpr, sh, cols, day ? 0.4 : 1);
+        base = py + sh.y2 * sc * 0.8; half = (sh.x2 - sh.x1) * sc * 0.32;
+      }
+    }
+    // Rain falling from the cloud's underside: more and bolder streaks the higher the odds.
+    if (isNum(h.pop) && Math.round(h.pop) >= RAIN_SHOW && H - base > 4) {
+      const p = Math.min(100, h.pop), k = 2 + Math.round(p / 25), op = ((0.45 + p / 200) * (day ? 0.6 : 1)).toFixed(2);
+      for (let s = 0; s < k; s++) {
+        const x = cx - half + (2 * half * (s + 0.5)) / k, off = ((s * 7 + i * 3) % 9).toFixed(0);
+        rainSvg += `<line x1="${x.toFixed(1)}" y1="${(base + 1).toFixed(1)}" x2="${(x - (H - base) * 0.18).toFixed(1)}" y2="${H}" stroke="var(--rain)" stroke-width="${p >= RAIN_FLAG ? 1.6 : 1.2}" stroke-linecap="round" stroke-dasharray="3 5" stroke-dashoffset="${off}" opacity="${op}"/>`;
+      }
+    }
   });
   ctx.putImageData(img, 0, 0);
+  if (rainSvg) box.querySelectorAll('svg')[1].insertAdjacentHTML('afterbegin', rainSvg);
 }
 
 function showSheet(title, body, sub = '', wide = false, locked = false) {
