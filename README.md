@@ -1,8 +1,10 @@
-# Sky Watch
+# SkyWatch - Go / No Go
 
-Hour-by-hour night sky forecast for imaging with a Seestar S50 — runs entirely in the browser on GitHub Pages.
+Go / no-go night sky forecast for imaging with a Seestar S50 — a one-screen dashboard that runs entirely in the browser on GitHub Pages.
 
-- Next 12 hours: cloud cover (low/mid/high), precipitation chance, seeing, transparency, wind, gusts, temperature and dew gap, with a go/no-go score
+On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to install it with its icon (opens full-screen, no browser bars).
+
+- Tonight / Tomorrow toggle; hour-by-hour for the dark hours only: cloud cover (low/mid/high), precipitation chance, seeing, transparency, wind, gusts, temperature and dew gap, with a go/no-go score
 - Precipitation chance pooled from ICON, GFS, ECMWF and GEM ensemble runs, cross-checked against MET Norway and deterministic models
 - Tonight: sunset, astronomical darkness, sunrise, moonrise/set, best imaging window
 - Moon phase and a chart of the Moon's path across the sky tonight

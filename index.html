@@ -3,90 +3,108 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sky Watch</title>
-<meta name="description" content="Hour-by-hour night sky forecast for astrophotography with a Seestar S50.">
-<meta name="theme-color" content="#0b1020">
+<title>SkyWatch - Go / No Go</title>
+<meta name="description" content="Go / no-go night sky forecast for astrophotography with a Seestar S50.">
+<meta name="theme-color" content="#070b16">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Sky Watch">
+<meta name="apple-mobile-web-app-title" content="SkyWatch - Go / No Go">
+<meta name="application-name" content="SkyWatch - Go / No Go">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
 <link rel="stylesheet" href="style.css">
 <script>
-  // Apply red mode before first paint so the screen never flashes white/blue at night.
+  // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
 </script>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gps" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.3 7-12a7 7 0 0 0-14 0c0 5.7 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></symbol>
+</svg>
+
 <header class="top">
   <div class="brand">
-    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3a9 9 0 0 0 0 18a6 9 0 0 1 0-18z" fill="currentColor"/></svg>
-    <h1>Sky Watch</h1>
+    <img class="logo" src="icon.svg" alt="" width="30" height="30">
+    <div class="brand-txt"><h1>SkyWatch</h1><span class="sub">Go / No Go</span></div>
+  </div>
+  <div class="loc-ctl">
+    <svg class="pin"><use href="#i-pin"/></svg>
+    <select id="spotSelect" aria-label="Location"></select>
+    <button id="gpsBtn" class="ibtn" type="button" title="Use GPS" aria-label="Use GPS"><svg><use href="#i-gps"/></svg></button>
+    <button id="searchBtn" class="ibtn" type="button" title="Find a place" aria-label="Find a place" aria-expanded="false"><svg><use href="#i-search"/></svg></button>
   </div>
   <div class="controls">
-    <button id="unitsBtn" class="btn" type="button" aria-label="Switch units">°C</button>
-    <button id="refreshBtn" class="btn" type="button" aria-label="Refresh">↻</button>
-    <button id="redBtn" class="btn red-btn" type="button" aria-pressed="false">Red mode</button>
+    <div class="seg night-seg" id="nightSeg" role="group" aria-label="Night">
+      <button type="button" data-n="0" aria-pressed="true">Tonight</button><button type="button" data-n="1" aria-pressed="false">Tomorrow</button>
+    </div>
+    <div class="seg" role="group" aria-label="Units">
+      <button id="unitsBtn" type="button" aria-label="Switch units"><span data-u="metric">°C</span><span data-u="imperial">°F</span></button>
+    </div>
+    <button id="refreshBtn" class="ibtn" type="button" title="Refresh" aria-label="Refresh"><svg><use href="#i-refresh"/></svg></button>
+    <button id="redBtn" class="ibtn red-btn" type="button" aria-pressed="false" title="Red night mode" aria-label="Red night mode"><svg><use href="#i-eye"/></svg><span class="lbl">Red</span></button>
   </div>
 </header>
 
-<main>
-  <section class="card loc">
-    <div class="loc-row">
-      <select id="spotSelect" aria-label="Location"></select>
-      <button id="gpsBtn" class="btn" type="button">📍 GPS</button>
-    </div>
-    <div class="loc-row">
-      <input id="searchInput" type="search" placeholder="Search a place (e.g. Salmon Arm)" autocomplete="off">
-      <button id="saveBtn" class="btn" type="button">Save spot</button>
-      <button id="removeBtn" class="btn ghost" type="button">Remove</button>
-    </div>
-    <ul id="searchResults" class="results" hidden></ul>
-    <p id="locLabel" class="muted small"></p>
+<div id="searchPanel" class="search-panel" hidden>
+  <div class="sp-row">
+    <input id="searchInput" type="search" placeholder="Search a place (e.g. Salmon Arm)" autocomplete="off">
+    <button id="saveBtn" class="tbtn" type="button">Save spot</button>
+    <button id="removeBtn" class="tbtn ghost" type="button">Remove</button>
+  </div>
+  <ul id="searchResults" class="results" hidden></ul>
+  <p id="locLabel" class="muted xs"></p>
+</div>
+
+<main id="dash" class="dash">
+  <div id="status" class="status" role="status"></div>
+
+  <section class="card verdict-card" id="verdictCard">
+    <div class="eyebrow" id="verdictEyebrow">Tonight</div>
+    <div id="verdict" class="verdict"><div class="v-badge none">—</div><p class="v-why muted">Waiting for a location…</p></div>
+    <div id="tonight" class="timeline"></div>
   </section>
 
-  <p id="status" class="status" role="status"></p>
-
-  <section class="card" id="tonightCard" hidden>
-    <h2>Tonight</h2>
-    <div id="tonight" class="tonight"></div>
-  </section>
-
-  <section class="card" id="hoursCard" hidden>
-    <h2>Next 12 hours</h2>
-    <div id="strip" class="strip"></div>
-    <div id="hours"></div>
-    <p class="muted small">Score is a rough guide combining clouds, rain odds, wind, dew, seeing, darkness and moonlight. Tap an hour to see each source.</p>
-  </section>
-
-  <section class="card" id="moonCard" hidden>
-    <h2>Moon</h2>
+  <section class="card moon-card" id="moonCard">
+    <div class="eyebrow">Moon</div>
     <div id="moonInfo" class="moon-info"></div>
-    <h3>Moon's path tonight</h3>
+  </section>
+
+  <section class="card fc-card" id="hoursCard">
+    <div class="card-head"><div class="eyebrow" id="fcTitle">Dark hours</div><div class="legend xs muted"><i class="lg-cloud"></i>Cloud <i class="lg-rain"></i>Precip chance · tap an hour for sources</div></div>
+    <div id="forecast" class="forecast"></div>
+  </section>
+
+  <section class="card path-card" id="pathCard">
+    <div class="card-head"><div class="eyebrow" id="pathTitle">Moon path tonight</div><div id="pathNote" class="xs muted"></div></div>
     <div id="moonPath" class="moonpath"></div>
   </section>
 
-  <section class="card" id="planetsCard" hidden>
-    <h2>Planets tonight</h2>
-    <div id="planets"></div>
-  </section>
-
-  <section class="card" id="targetsCard" hidden>
-    <h2>Good Seestar targets tonight</h2>
-    <p class="muted small">Objects that climb above 30° during full darkness, best first. Times are when each is highest.</p>
-    <div id="targets"></div>
-  </section>
-
-  <section class="card" id="sourcesCard" hidden>
-    <h2>Data sources</h2>
-    <ul id="sources" class="sources"></ul>
+  <section class="card obj-card" id="objCard">
+    <div class="eyebrow">Planets</div>
+    <div id="planets" class="list"></div>
+    <div class="eyebrow mt">Seestar targets <span class="muted">· above 30° in darkness</span></div>
+    <div id="targets" class="list scroll"></div>
   </section>
 </main>
 
-<footer class="foot muted small">
+<footer class="foot xs muted">
+  <button id="sourcesBtn" class="linkbtn" type="button">Data sources</button>
   <span id="updated"></span>
-  <span>Sky Watch <span id="ver"></span></span>
+  <span>SkyWatch <span id="ver"></span></span>
 </footer>
+
+<dialog id="sheet" class="sheet">
+  <form method="dialog" class="sheet-head"><h2 id="sheetTitle"></h2><button class="ibtn" aria-label="Close">✕</button></form>
+  <div id="sheetBody"></div>
+</dialog>
 
 <script src="astronomy.browser.min.js"></script>
 <script src="app.js"></script>
