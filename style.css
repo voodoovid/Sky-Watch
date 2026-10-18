@@ -124,6 +124,9 @@ html.red .brand .sub { color: var(--accent); }
 .ibtn:active, .tbtn:active, .seg button:active { transform: translateY(1px); }
 .ibtn[aria-expanded="true"] { color: var(--accent); }
 .red-btn { color: #ff7070; }
+.home-btn { color: var(--muted); }
+.home-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--go) 18%, var(--card)); border-color: var(--go); color: var(--go); }
+html.red .home-btn[aria-pressed="true"] { background: #200000; border-color: var(--accent); color: var(--accent); }
 html.red .red-btn { background: #200000; border-color: var(--accent); color: var(--accent); }
 
 #unitsBtn {
@@ -499,7 +502,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .controls { margin-left: auto; }
   .night-seg button { padding: 0 8px; }
   .rate, .forecast.dense .rate { font-size: .54rem; letter-spacing: 0; }
-  .red-btn .lbl { display: none; }
+  .red-btn .lbl, .home-btn .lbl { display: none; }
   .forecast, .forecast.dense { font-size: .66rem; grid-template-columns: 3.1rem repeat(var(--n), minmax(0, 1fr)); grid-template-rows: repeat(4, auto) 70px repeat(5, auto); column-gap: 2px; }
   .fc-c.big, .forecast.dense .fc-c.big { font-size: .78rem; letter-spacing: -.02em; }
   .fc-l small { display: none; }

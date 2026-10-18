@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.4';
+const VERSION = 'v2.5';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,6 +21,7 @@ const state = {
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   data: null,
   night: 0, // 0 = tonight, 1 = tomorrow night
+  home: store.get('home', false), // only count the NW → N → E → S part of the sky
 };
 
 /* ---------- formatting ---------- */
@@ -36,6 +37,8 @@ const tempDiff = (c) => (!isNum(c) ? '–' : state.units === 'metric' ? Math.rou
 const wind = (k) => (!isNum(k) ? '–' : state.units === 'metric' ? String(Math.round(k)) : String(Math.round(k / 1.609344)));
 const windU = () => (state.units === 'metric' ? 'km/h' : 'mph');
 const rain = (mm) => (!isNum(mm) ? '–' : state.units === 'metric' ? mm.toFixed(1) + ' mm' : (mm / 25.4).toFixed(2) + ' in');
+/* Home sky: clockwise from NW through N and E to S (azimuth 315° → 360°/0° → 180°). */
+const inHome = (az) => { az = ((az % 360) + 360) % 360; return az >= 315 || az <= 180; };
 const compass = (az) => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((az % 360) + 360) % 360 / 45) % 8];
 
 /* ---------- networking ---------- */
@@ -233,24 +236,28 @@ function track(S, pos) {
   const { s, darkLim } = S;
   const curve = s.map((p) => { const h = pos(p.d); return { d: p.d, sun: p.sun, moon: p.moon, moonAz: p.moonAz, alt: h.alt, az: h.az }; });
   const dark = (p) => darkLim != null && p.sun <= darkLim;
-  const ok = (p) => dark(p) && p.alt >= MIN_ALT;
+  const home = state.home, dirOK = (p) => !home || inHome(p.az);
+  const ok = (p) => dark(p) && p.alt >= MIN_ALT && dirOK(p);
   const segs = [];
   let cur = null, peak = null;
   curve.forEach((p, k) => {
-    if (dark(p) && (!peak || p.alt > peak.alt)) peak = p;
+    if (dark(p) && dirOK(p) && (!peak || p.alt > peak.alt)) peak = p;
     if (!ok(p)) return;
     const prev = curve[k - 1], next = curve[k + 1];
     if (!cur) {
       const up = prev && dark(prev) && prev.alt < MIN_ALT; // climbed through 40° during darkness
-      cur = { s: up ? lerpT(prev.d, p.d, (MIN_ALT - prev.alt) / (p.alt - prev.alt)) : p.d, why: up ? 'alt' : 'dark', altS: up ? MIN_ALT : p.alt };
+      const turn = prev && dark(prev) && prev.alt >= MIN_ALT && !dirOK(prev); // came round into the home sky
+      cur = { s: up ? lerpT(prev.d, p.d, (MIN_ALT - prev.alt) / (p.alt - prev.alt)) : p.d, why: up ? 'alt' : turn ? 'dir' : 'dark', altS: up ? MIN_ALT : p.alt };
     }
     if (!next || !ok(next)) {
       const down = next && dark(next) && next.alt < MIN_ALT;
+      const turn = next && dark(next) && next.alt >= MIN_ALT && !dirOK(next);
       cur.e = down ? lerpT(p.d, next.d, (p.alt - MIN_ALT) / (p.alt - next.alt)) : p.d;
-      cur.why2 = down ? 'alt' : 'dark';
+      cur.why2 = down ? 'alt' : turn ? 'dir' : 'dark';
       segs.push(cur); cur = null;
     }
   });
+  if (!peak) curve.forEach((p) => { if (dark(p) && (!peak || p.alt > peak.alt)) peak = p; });
   const hrs = segs.reduce((a, g) => a + (g.e - g.s), 0) / 3600e3;
   const first = segs[0], last = segs[segs.length - 1];
   return {
@@ -281,7 +288,7 @@ function planetsTonight(obs, S) {
     const tr = track(S, (d) => altAz(p, d, obs));
     // Best placement once the sky is reasonably dark (sun below −6°).
     let best = null;
-    for (const c of tr.curve) if (c.sun <= -6 && (!best || c.alt > best.alt)) best = c;
+    for (const c of tr.curve) if (c.sun <= -6 && (!state.home || inHome(c.az)) && (!best || c.alt > best.alt)) best = c;
     if (!best || best.alt <= 5) continue;
     const il = A.Illumination(p, best.d);
     const distAU = il.geo_dist;
@@ -731,7 +738,7 @@ function renderPath(moon, lat, now) {
 function renderPlanets(list) {
   $('#planets').innerHTML = list.length ? list.map((p, i) => `<button type="button" class="row tgt" data-p="${i}">
     <div class="nm"><span class="t1"><b>${p.name}</b><span class="tag">mag ${p.mag.toFixed(1)}</span></span>
-    <span class="sub2">${p.start ? `40°+ from ${esc(fmtTime(p.start))}` : `Stays below ${MIN_ALT}°`}</span></div>
+    <span class="sub2">${p.start ? `40°+ from ${esc(fmtTime(p.start))}` : `Stays below ${MIN_ALT}°${state.home ? ' in home sky' : ''}`}</span></div>
     <div class="r">${esc(fmtTime(p.d))}<span class="sub2">${Math.round(p.alt)}° ${compass(p.az)}</span></div></button>`).join('')
     : '<p class="empty">None well placed after dusk.</p>';
 }
@@ -746,10 +753,10 @@ function renderTargets(list) {
       ? `Comet · mag ≈${o.mag.toFixed(1)}${o.moonSep == null ? '' : ' · ' + moonTxt}`
       : `${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}`;
     const when = esc(fmtTime(o.start));
-    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `up now · to ${esc(fmtTime(o.end))}` : `${o.startWhy === 'dark' ? 'at dark · ' : ''}${o.hrs.toFixed(1)} h`;
+    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `up now · to ${esc(fmtTime(o.end))}` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
-  }).join('') : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness tonight.`}</p>`;
+  }).join('') : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ' in your home sky (NW → N → E → S)' : ''} tonight.`}</p>`;
 }
 
 /* ---------- object pop-up ---------- */
@@ -848,7 +855,7 @@ function altChart(el, o, now) {
   const fs = parseFloat(getComputedStyle(el).fontSize) || 14;
   const W = Math.max(280, Math.round(el.clientWidth));
   const H = Math.round(Math.min(330, Math.max(210, W * 0.4)));
-  const L = fs * 2.7, R = fs * 0.9, T = fs * 2.2, B = fs * 2.2;
+  const L = fs * 2.7, R = fs * 0.9, T = fs * 2.6, B = fs * 2.2;
   const pw = W - L - R, ph = H - T - B;
   const t0 = c[0].d.getTime(), t1 = c[c.length - 1].d.getTime();
   const X = (d) => L + ((+d - t0) / (t1 - t0)) * pw;
@@ -872,6 +879,7 @@ function altChart(el, o, now) {
   }
   // Altitude grid
   for (const a of [20, 60, 80]) s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(Y(a))}" y2="${f(Y(a))}" stroke="var(--grid)" stroke-width="1"/>`;
+  s += `<text x="${f(L - 6)}" y="${f(T - fs * 0.55)}" font-size="${f(sm * 0.9)}" text-anchor="end" fill="var(--muted)">Dir</text>`;
   for (const a of [0, 20, 40, 60, 80]) s += `<text x="${f(L - 6)}" y="${f(Y(a) + sm * 0.35)}" font-size="${f(sm)}" text-anchor="end" fill="var(--muted)">${a}°</text>`;
   // Usable window: ≥40° in darkness
   for (const g of o.segs || []) {
@@ -886,6 +894,8 @@ function altChart(el, o, now) {
   const poly = (key) => c.map((p) => f(X(p.d)) + ',' + f(Y(p[key]))).join(' ');
   s += `<g clip-path="url(#plotClip)"><polyline points="${poly('moon')}" fill="none" stroke="var(--moon-lit)" stroke-width="1.6" stroke-dasharray="4 4" opacity=".55"/>
     <polyline points="${poly('alt')}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/></g>`;
+  // Direction of the target at each labelled hour, along the top (dimmed outside the home sky when Home is on)
+  const azAt = (d) => c[Math.min(c.length - 1, Math.max(0, Math.round((+d - t0) / STEP)))].az;
   // Time axis: baseline, hourly ticks, labels
   const nH = (t1 - t0) / 3600e3, every = pw / nH < fs * 2.6 ? 3 : pw / nH < fs * 4.2 ? 2 : 1;
   s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(T + ph)}" y2="${f(T + ph)}" stroke="var(--muted)" stroke-width="1.2"/>`;
@@ -893,7 +903,11 @@ function altChart(el, o, now) {
     const d = new Date(t), x = X(d), hr = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: state.tz }).format(d);
     const lab = hr % every === 0;
     s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T + ph)}" y2="${f(T + ph + (lab ? 6 : 3.5))}" stroke="var(--muted)" stroke-width="1"/>`;
-    if (lab && x > L + fs * 1.2 && x < L + pw - fs * 1.2) s += `<text x="${f(x)}" y="${f(T + ph + 7 + sm)}" font-size="${f(sm)}" text-anchor="middle" fill="var(--muted)">${esc(fmtHourShort(d))}</text>`;
+    if (lab && x > L + fs * 1.2 && x < L + pw - fs * 1.2) {
+      s += `<text x="${f(x)}" y="${f(T + ph + 7 + sm)}" font-size="${f(sm)}" text-anchor="middle" fill="var(--muted)">${esc(fmtHourShort(d))}</text>`;
+      const az = azAt(d), out = state.home && !inHome(az);
+      s += `<text x="${f(x)}" y="${f(T - fs * 0.55)}" font-size="${f(sm)}" font-weight="700" text-anchor="middle" fill="var(${out ? '--dim' : '--text'})"${out ? ' opacity=".6"' : ''}>${compass(az)}</text>`;
+    }
   }
   // Callouts are placed after everything else so they can dodge the curves, markers and each other.
   const obst = [];
@@ -954,13 +968,13 @@ function altChart(el, o, now) {
   }
   if (o.start) {
     const x = X(o.start);
-    const label = o.startWhy === 'alt' ? `Reaches 40° · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
+    const label = o.startWhy === 'alt' ? `Reaches 40° · ${fmtTime(o.start)}` : o.startWhy === 'dir' ? `In home sky · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
     const side = x > L + pw * 0.6 ? 'end' : 'start', dx = side === 'end' ? -fs * 0.6 : fs * 0.6;
     pill([[x + dx, y40 + gap, side], [x + dx, y40 - gap, side], [x + dx, y40 + gap * 2.6, side], [x + dx, T + fs, side], [x - dx, y40 + gap, side === 'end' ? 'start' : 'end']], label, 'var(--go)');
     if (o.end) {
       const xe = X(o.end);
-      const txt = `${o.endWhy === 'alt' ? 'Below 40°' : 'Dawn'} · ${fmtTime(o.end)}`;
-      pill([[xe - fs * 0.6, y40 + gap, 'end'], [xe - fs * 0.6, y40 + gap * 2.6, 'end'], [xe - fs * 0.6, T + ph - gap * 2, 'end']], txt, 'var(--muted)');
+      const txt = `${o.endWhy === 'alt' ? 'Below 40°' : o.endWhy === 'dir' ? 'Leaves home sky' : 'Dawn'} · ${fmtTime(o.end)}`;
+      pill([[xe - fs * 0.6, y40 + gap, 'end'], [xe + fs * 0.6, y40 + gap, 'start'], [xe - fs * 0.6, y40 + gap * 2.6, 'end'], [xe + fs * 0.6, y40 + gap * 2.6, 'start'], [xe, T + ph - gap * 2, 'middle'], [xe, T + fs * 2.8, 'middle']], txt, 'var(--muted)');
     }
   }
   if (peakTxt) {
@@ -976,8 +990,8 @@ function windowTiles(o) {
   const now = state.data ? state.data.now : new Date();
   const upNow = o.start && o.start <= now && now < o.end;
   return o.start
-    ? tile(o.startWhy === 'alt' ? 'Reaches 40°' : 'Above 40° at dark', fmtTime(o.start), (o.startWhy === 'alt' ? 'rising through 40°' : `already ${Math.round(o.startAlt)}° when dark begins`) + (upNow ? ' · up now' : ''), 'key')
-      + tile('Imaging window', `${o.hrs.toFixed(1)} h`, `until ${fmtTime(o.end)}${o.endWhy === 'dark' ? ' (dawn)' : ''}`, 'key')
+    ? tile(o.startWhy === 'alt' ? 'Reaches 40°' : o.startWhy === 'dir' ? 'Into home sky' : 'Above 40° at dark', fmtTime(o.start), (o.startWhy === 'alt' ? 'rising through 40°' : o.startWhy === 'dir' ? `comes round past NW at ${Math.round(o.startAlt)}°` : `already ${Math.round(o.startAlt)}° when dark begins`) + (upNow ? ' · up now' : ''), 'key')
+      + tile('Imaging window', `${o.hrs.toFixed(1)} h`, `until ${fmtTime(o.end)}${o.endWhy === 'dark' ? ' (dawn)' : o.endWhy === 'dir' ? ' (passes S)' : ''}`, 'key')
     : tile('Reaches 40°', 'Not tonight', `in darkness`, 'warn');
 }
 function openObject(o) {
@@ -1087,6 +1101,21 @@ function renderAll() {
   $('#updated').textContent = 'Updated ' + fmtDay(D.now) + ', ' + fmtTime(D.now);
 }
 
+/* Planets and targets for both nights; re-run when the Home sky switch changes. */
+function findTargets() {
+  const D = state.data;
+  if (!D) return;
+  for (const N of D.nights) {
+    N.planets = planetsTonight(D.obs, N.S);
+    N.targets = [...cometsTonight(D.obs, N.S, N.win), ...targetsTonight(D.obs, N.S)];
+  }
+}
+function applyHome() {
+  const b = $('#homeBtn');
+  b.setAttribute('aria-pressed', String(state.home));
+  b.title = state.home ? 'Home sky on: only NW → N → E → S' : 'Home sky: only show targets from NW through N and E to S';
+}
+
 /* ---------- main load ---------- */
 function setStatus(msg, err) { const s = $('#status'); s.textContent = msg || ''; s.classList.toggle('err', !!err); }
 
@@ -1123,13 +1152,11 @@ async function load() {
     const mid = new Date((win.set.getTime() + win.rise.getTime()) / 2);
     const moon = moonInfo(obs, mid, win);
     const S = nightSamples(obs, win);
-    return {
-      win, moon, darkLim: S.darkLim, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day'),
-      planets: planetsTonight(obs, S), targets: [...cometsTonight(obs, S, win), ...targetsTonight(obs, S)],
-    };
+    return { win, moon, S, darkLim: S.darkLim, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day') };
   };
   const nights = [night(w0, w0.set > now ? w0.set : now), night(w1, w1.set)];
   state.data = { now, lat: +loc.lat, obs, src, nights };
+  findTargets();
   renderAll();
   if (Object.keys(src.om).length || met) setStatus('');
 }
@@ -1212,7 +1239,8 @@ function toggleSearch(open) {
 
 function init() {
   $('#ver').textContent = VERSION;
-  applyRed(); applyUnits(); applyNight(); renderSpots();
+  applyRed(); applyUnits(); applyNight(); applyHome(); renderSpots();
+  $('#homeBtn').addEventListener('click', () => { state.home = !state.home; store.set('home', state.home); applyHome(); findTargets(); renderAll(); });
   $('#redBtn').addEventListener('click', () => { state.red = !state.red; store.set('red', state.red); applyRed(); });
   $('#unitsBtn').addEventListener('click', () => { state.units = state.units === 'metric' ? 'imperial' : 'metric'; store.set('units', state.units); applyUnits(); renderAll(); });
   $('#refreshBtn').addEventListener('click', () => (state.loc && state.loc.gps ? useGPS() : load()));
