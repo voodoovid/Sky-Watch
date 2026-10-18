@@ -456,6 +456,7 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 .src .n { text-align: right; }
 .ok { color: var(--go); }
 .bad { color: var(--nogo); }
+.src .cached { color: var(--muted); }
 .note { color: var(--muted); font-size: .8rem; margin: 10px 0 0; }
 .sheet .note { font-size: .9em; }
 

@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.10';
+const VERSION = 'v3.11';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -194,6 +194,27 @@ async function fetch7Timer(lat, lon) {
     transparency: d.transparency >= 1 && d.transparency <= 8 ? d.transparency : null,
     cloud: d.cloudcover >= 1 && d.cloudcover <= 9 ? [3, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 97][d.cloudcover - 1] : null,
   }));
+}
+
+// Last good 7Timer! result from THIS session only (in memory, never saved to the device).
+// Used when a later fetch fails for the same location; a quiet retry follows.
+let t7Cache = null; // { key, data, at }
+let t7Retry = null, t7Tries = 0;
+const t7Key = (lat, lon) => (+lat).toFixed(2) + ',' + (+lon).toFixed(2);
+function scheduleT7Retry(lat, lon, key) {
+  clearTimeout(t7Retry);
+  if (t7Tries >= 3) return;
+  t7Retry = setTimeout(async () => {
+    t7Tries++;
+    try {
+      const data = await fetch7Timer(lat, lon);
+      t7Cache = { key, data, at: new Date() };
+      const D = state.data;
+      if (!D || D.key !== key) return; // location changed
+      D.src.t7 = data; D.src.t7cached = null;
+      buildNights(D.src, D.now);
+    } catch (e) { scheduleT7Retry(lat, lon, key); }
+  }, 5 * 60e3);
 }
 
 /* ---------- astronomy ---------- */
@@ -1432,10 +1453,10 @@ function showSources() {
   OM_MODELS.forEach((m) => items.push([m.name + ' (Open-Meteo)', !!src.om[m.id]]));
   items.push(['MET Norway (yr.no)', !!src.met]);
   ENSEMBLES.forEach((e) => items.push([e.name + ' (Open-Meteo)', !!src.ens[e.name], src.ens[e.name] ? src.ens[e.name].members + ' runs' : '']));
-  items.push(['7Timer! ASTRO — seeing & transparency', !!src.t7, !src.t7 && state.t7err ? '(' + state.t7err + ')' : '']);
+  items.push(['7Timer! ASTRO — seeing & transparency', src.t7cached ? 'cached' : !!src.t7, src.t7cached ? '(live fetch failed, using ' + fmtTime(src.t7cached) + ' data)' : !src.t7 && state.t7err ? '(' + state.t7err + ')' : '']);
   items.push(['Astronomy Engine — Sun, Moon, planets (on device)', true]);
   items.push(['Light Pollution Atlas 2025 (D. Lorenz) — Bortle', !!(state.lp && isNum(state.lp.sqm))]);
-  showSheet('Data sources', `<table class="src"><tbody>${items.map(([n, ok, x]) => `<tr><td>${esc(n)}${x ? ` <span class="muted">${esc(x)}</span>` : ''}</td><td class="n ${ok ? 'ok' : 'bad'}">${ok ? '✓ Online' : 'Unavailable'}</td></tr>`).join('')}</tbody></table>`);
+  showSheet('Data sources', `<table class="src"><tbody>${items.map(([n, ok, x]) => `<tr><td>${esc(n)}${x ? ` <span class="muted">${esc(x)}</span>` : ''}</td><td class="n ${ok === 'cached' ? 'cached' : ok ? 'ok' : 'bad'}">${ok === 'cached' ? 'Cached' : ok ? '✓ Online' : 'Unavailable'}</td></tr>`).join('')}</tbody></table>`);
 }
 
 function renderAll() {
@@ -1452,7 +1473,7 @@ function renderAll() {
   renderPath(N, D.lat, D.now);
   renderPlanets(N.planets);
   renderTargets(N.targets);
-  const s = D.src, on = OM_MODELS.filter((m) => s.om[m.id]).length + ENSEMBLES.filter((e) => s.ens[e.name]).length + (s.met ? 1 : 0) + (s.t7 ? 1 : 0);
+  const s = D.src, on = OM_MODELS.filter((m) => s.om[m.id]).length + ENSEMBLES.filter((e) => s.ens[e.name]).length + (s.met ? 1 : 0) + (s.t7 && !s.t7cached ? 1 : 0);
   $('#sourcesBtn').textContent = `Data sources · ${on}/${OM_MODELS.length + ENSEMBLES.length + 2} online`;
   $('#updated').textContent = 'Updated ' + fmtDay(D.now) + ', ' + fmtTime(D.now);
 }
@@ -1493,7 +1514,13 @@ async function load() {
     settle(fetch7Timer(lat, lon)),
   ]);
   if (run !== loading) return; // a newer load started
-  const src = { om: {}, ens: {}, met, t7 };
+  const key = t7Key(loc.lat, loc.lon);
+  let t7data = t7, t7cached = null;
+  clearTimeout(t7Retry); t7Tries = 0;
+  if (t7) t7Cache = { key, data: t7, at: new Date() };
+  else if (t7Cache && t7Cache.key === key) { t7data = t7Cache.data; t7cached = t7Cache.at; }
+  if (!t7 && t7Cache && t7Cache.key === key) scheduleT7Retry(lat, lon, key);
+  const src = { om: {}, ens: {}, met, t7: t7data, t7cached };
   OM_MODELS.forEach((m, i) => { if (omRes[i]) src.om[m.id] = omRes[i]; });
   ENSEMBLES.forEach((e, i) => { if (ensRes[i]) src.ens[e.name] = ensRes[i]; });
   const tz = (Object.values(src.om)[0] || {}).tz;
@@ -1501,7 +1528,14 @@ async function load() {
   if (!Object.keys(src.om).length && !met) {
     setStatus('Could not reach any weather service. Check your connection and tap ↻.', true);
   }
-  const now = new Date();
+  buildNights(src, new Date(), key);
+  if (Object.keys(src.om).length || met) setStatus('');
+}
+
+/* Build the three nights from fetched data (also re-run when a 7Timer! retry succeeds). */
+function buildNights(src, now, key) {
+  const loc = state.loc;
+  key = key || (state.data && state.data.key);
   const obs = new A.Observer(+loc.lat, +loc.lon, 0);
   // Tonight (the night in progress, or the next one if it's daytime), tomorrow night and the night after.
   const w0 = nightWindow(obs, now);
@@ -1514,10 +1548,9 @@ async function load() {
     return { win, moon, S, darkLim: S.darkLim, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day') };
   };
   const nights = [night(w0, w0.set > now ? w0.set : now), night(w1, w1.set), night(w2, w2.set)];
-  state.data = { now, lat: +loc.lat, obs, src, nights };
+  state.data = { now, lat: +loc.lat, obs, src, nights, key };
   findTargets();
   renderAll();
-  if (Object.keys(src.om).length || met) setStatus('');
 }
 
 /* ---------- locations ---------- */
