@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.17';
+const VERSION = 'v3.18';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -798,70 +798,96 @@ function renderForecast(hours) {
   skyChart(hours);
 }
 
-/* One free-floating cumulus cloud per hour. Its top sits at the cloud-cover % and it grows with the
-   cover. The cloud is a heap of overlapping billows, each shaded like a lit sphere (bright upper-left,
-   shadowed underneath), drawn back to front so every billow shows; the heap is seeded by the hour so
-   no two clouds are alike. */
-function puffs(seed, cx, maxW, top, bottom, pct) {
-  if (bottom - top < 1.5) return '';
+/* Realistic clouds: each hour's cloud is generated on a canvas from a soft billow shape broken up by
+   fractal noise, then lit from above (light is traced through the cloud, so thick parts and the flat
+   base go grey). The cloud's top sits at the cloud-cover % and it grows with the cover; the noise is
+   seeded by the hour so no two clouds are alike. */
+function cloudShape(seed) {
   let k = 0;
-  const f = (v) => v.toFixed(3), rnd = () => ((Math.sin(seed * 12.9898 + ++k * 78.233) * 43758.5453) % 1 + 1) % 1;
-  // Unit cloud: flat base at y = 0, rising to negative y. Order = back to front.
-  const back = [], mid = [], front = [];
-  const cr = 0.2 + rnd() * 0.07, cxr = 0.44 + rnd() * 0.14;                   // main crown
-  back.push([cxr, -0.07 - cr, cr]);
-  if (rnd() < 0.6) { const r = cr * (0.6 + rnd() * 0.2), side = rnd() < 0.5 ? -1 : 1; back.push([cxr + side * cr * (0.75 + rnd() * 0.25), -0.06 - r * 0.95, r]); }
-  const lr = 0.12 + rnd() * 0.06, rr = 0.11 + rnd() * 0.06;                    // sloping shoulders, sitting on the base
-  mid.push([0.17 + lr * 0.55 + rnd() * 0.04, -lr * (0.95 + rnd() * 0.25), lr], [0.83 - rr * 0.55 - rnd() * 0.04, -rr * (0.95 + rnd() * 0.25), rr]);
-  if (rnd() < 0.5) { const r = 0.07 + rnd() * 0.04; mid.push([cxr + (rnd() < 0.5 ? -1 : 1) * cr * 0.95, -0.05 - cr * 1.05, r]); } // small top bump
-  const er = 0.07 + rnd() * 0.03, er2 = 0.065 + rnd() * 0.03;                  // rounded base ends
-  front.push([0.08 + er, -er, er], [0.92 - er2, -er2, er2]);
-  front.sort((p, q) => p[0] - q[0]);
-  const all = [...back, ...mid, ...front];
+  const rnd = () => ((Math.sin(seed * 12.9898 + ++k * 78.233) * 43758.5453) % 1 + 1) % 1;
+  const B = [];
+  const cr = 0.2 + rnd() * 0.07, cx = 0.44 + rnd() * 0.14;
+  B.push([cx, -0.07 - cr, cr]);
+  if (rnd() < 0.7) { const r = cr * (0.6 + rnd() * 0.2), s = rnd() < 0.5 ? -1 : 1; B.push([cx + s * cr * (0.75 + rnd() * 0.25), -0.06 - r * 0.95, r]); }
+  const lr = 0.12 + rnd() * 0.06, rr = 0.11 + rnd() * 0.06;
+  B.push([0.17 + lr * 0.55 + rnd() * 0.04, -lr * (0.95 + rnd() * 0.25), lr], [0.83 - rr * 0.55 - rnd() * 0.04, -rr * (0.95 + rnd() * 0.25), rr]);
+  for (let i = 0; i < 2; i++) { const r = 0.06 + rnd() * 0.05; B.push([0.2 + rnd() * 0.6, -0.08 - rnd() * 0.25, r]); }
+  const er = 0.07 + rnd() * 0.03, er2 = 0.065 + rnd() * 0.03;
+  B.push([0.08 + er, -er, er], [0.92 - er2, -er2, er2], [0.5, -0.09, 0.1]);
   let x1 = 1, x2 = 0, y1 = 0;
-  for (const [x, y, r] of all) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
-  const w = maxW * (0.62 + 0.38 * Math.min(100, pct) / 100), hgt = Math.min(w * 0.62, bottom - top);
-  const sc = Math.min(w / (x2 - x1), hgt / -y1), tx = cx - ((x1 + x2) / 2) * sc, ty = top - y1 * sc;
-  // Trace one smooth outline around the billows: lumpy top, rounded ends, flat base.
-  const N = 72, top_ = [], bot = [];
-  for (let i = 0; i <= N; i++) {
-    const x = x1 + ((x2 - x1) * i) / N;
-    let yt = Infinity, yb = -Infinity;
-    for (const [cx, cy, r] of all) { const d = r * r - (x - cx) ** 2; if (d >= 0) { const s = Math.sqrt(d); yt = Math.min(yt, cy - s); yb = Math.max(yb, cy + s); } }
-    if (yt === Infinity) continue;
-    top_.push([x, yt]); bot.push([x, x >= front[0][0] && x <= front[front.length - 1][0] ? 0 : Math.min(0, yb)]);
+  for (const [x, y, r] of B) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
+  return { B, x1, x2, y1, ox: rnd() * 100, oy: rnd() * 100 };
+}
+const NOISE_T = Float32Array.from({ length: 65536 }, (_, i) => { const n = Math.sin((i & 255) * 127.1 + (i >> 8) * 311.7) * 43758.5453; return n - Math.floor(n); });
+function noise2(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const i0 = xi & 255, i1 = (xi + 1) & 255, j0 = (yi & 255) << 8, j1 = ((yi + 1) & 255) << 8;
+  const a = NOISE_T[j0 | i0], b = NOISE_T[j0 | i1], c = NOISE_T[j1 | i0], d = NOISE_T[j1 | i1];
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function drawCloud(img, W, Hc, px, py, sc, shape, cols, alpha) {
+  const { B, x1, x2, y1, ox, oy } = shape;
+  const dens = (ux, uy, oct = 4) => {
+    let m = 0;
+    for (const [cx, cy, r] of B) { const q = ((ux - cx) ** 2 + (uy - cy) ** 2) / (r * r); if (q < 1.6) m = Math.max(m, 1 - q * 0.62); }
+    if (m <= 0) return 0;
+    let n = 0, amp = 0.5, fr = 7;
+    for (let o = 0; o < oct; o++) { n += amp * noise2(ux * fr + ox, uy * fr + oy); amp *= 0.5; fr *= 2.1; }
+    let d = m + (n - (oct === 4 ? 0.47 : 0.375)) * 0.75;
+    if (uy > -0.035) d -= (uy + 0.035) * 9;                       // crisp, flat base
+    return d;
+  };
+  const X0 = Math.max(0, Math.floor(px + (x1 - 0.06) * sc)), X1 = Math.min(W - 1, Math.ceil(px + (x2 + 0.06) * sc));
+  const Y0 = Math.max(0, Math.floor(py + (y1 - 0.06) * sc)), Y1 = Math.min(Hc - 1, Math.ceil(py + 0.01 * sc));
+  const [hi, mid, lo] = cols, d = img.data, step = 0.035;
+  for (let Y = Y0; Y <= Y1; Y++) for (let X = X0; X <= X1; X++) {
+    const ux = (X - px) / sc, uy = (Y - py) / sc, v = dens(ux, uy);
+    if (v <= 0.18) continue;
+    let acc = 0;                                                   // trace toward the light (up, a bit left)
+    for (let s = 1; s <= 5; s++) acc += Math.max(0, dens(ux - step * s * 0.45, uy - step * s, 2));
+    const lit = Math.min(1, Math.exp(-acc * 0.55) * 1.05 + Math.max(0, -uy / -y1) * 0.18 - (uy > -0.12 ? (0.12 + uy) * 1.6 : 0));
+    const t = Math.max(0, lit), c = t > 0.5 ? [0, 1, 2].map((i) => mid[i] + (hi[i] - mid[i]) * (t - 0.5) * 2) : [0, 1, 2].map((i) => lo[i] + (mid[i] - lo[i]) * t * 2);
+    const a = Math.min(1, (v - 0.18) / 0.22) * alpha, j = (Y * W + X) * 4, da = d[j + 3] / 255 * (1 - a), oa = a + da;
+    for (let ch = 0; ch < 3; ch++) d[j + ch] = (c[ch] * a + d[j + ch] * da) / oa;
+    d[j + 3] = oa * 255;
   }
-  const pts = [...top_, ...bot.reverse()].map(([x, y]) => `${(tx + x * sc).toFixed(1)},${(ty + y * sc).toFixed(1)}`).join(' ');
-  return `<polygon points="${pts}" fill="url(#cbody)"/><polygon points="${pts}" fill="url(#billow)"/>`;
 }
 function skyChart(hours) {
   const box = $('#skyChart');
   if (!box) return;
-  const W = Math.max(120, Math.round(box.clientWidth)), H = Math.max(30, Math.round(box.clientHeight));
+  const W = Math.max(120, Math.round(box.clientWidth)), H = Math.max(30, Math.round(box.clientHeight)), dpr = Math.min(1.5, window.devicePixelRatio || 1);
   const n = hours.length, cw = W / n, top = 4, Y = (v) => top + (1 - v / 100) * (H - top), Yr = (v) => top + (1 - v / 100) * (H - top - 6);
-  let night = '', day = '', pts = [], dots = '';
-  hours.forEach((h, i) => {
-    if (!isNum(h.cloud) || h.cloud < 0.5) return;
-    const p = puffs((isNum(h.t) ? Math.round(h.t / 3600) : i) % 9973 + 1, i * cw + cw / 2, cw * 0.88, Y(h.cloud), H, h.cloud);
-    if (h.sky.k === 'day') day += p; else night += p;
-  });
+  let pts = [], dots = '';
   hours.forEach((h, i) => {
     if (!isNum(h.pop)) return;
     const x = i * cw + cw / 2, y = Yr(h.pop);
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     if (Math.round(h.pop) >= RAIN_SHOW) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${h.pop >= RAIN_FLAG ? 4.5 : 3.2}" fill="var(--rain)" stroke="var(--card2)" stroke-width="1.5"/>`;
   });
-  const red = document.documentElement.classList.contains('red'), hi = red ? 'var(--cloud)' : '#ffffff', lo = red ? '#5a0909' : 'color-mix(in srgb, var(--cloud) 70%, #000 30%)';
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
-    <defs>
-      <radialGradient id="billow" cx=".36" cy=".18" r=".55"><stop offset="0" style="stop-color:${hi}" stop-opacity=".7"/><stop offset="1" style="stop-color:${hi}" stop-opacity="0"/></radialGradient>
-      <linearGradient id="cbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${hi}"/><stop offset=".5" style="stop-color:var(--cloud)"/><stop offset="1" style="stop-color:${lo}"/></linearGradient>
-      <filter id="puff3d" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="${(cw * 0.03).toFixed(1)}" stdDeviation="${(cw * 0.03).toFixed(1)}" flood-color="#000" flood-opacity=".25"/></filter>
-    </defs>
-    ${hours.slice(1).map((_, i) => `<line x1="${((i + 1) * cw).toFixed(1)}" x2="${((i + 1) * cw).toFixed(1)}" y1="0" y2="${H}" stroke="var(--line2)" stroke-width="1"/>`).join('')}
-    <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/>
-    <g fill="var(--cloud)" opacity=".35" filter="url(#puff3d)">${day}</g><g fill="var(--cloud)" opacity=".85" filter="url(#puff3d)">${night}</g>
+  const grid = hours.slice(1).map((_, i) => `<line x1="${((i + 1) * cw).toFixed(1)}" x2="${((i + 1) * cw).toFixed(1)}" y1="0" y2="${H}" stroke="var(--line2)" stroke-width="1"/>`).join('');
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${grid}
+    <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/></svg>
+    <canvas width="${Math.round(W * dpr)}" height="${Math.round(H * dpr)}" style="position:absolute;inset:0;width:${W}px;height:${H}px"></canvas>
+    <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
     <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
+  // Cloud colours from the theme: lit tops, mid tone, shadowed base.
+  const cv = box.querySelector('canvas'), ctx = cv.getContext('2d');
+  ctx.fillStyle = getComputedStyle(box).getPropertyValue('--cloud').trim() || '#b9c8e6';
+  const hex = ctx.fillStyle, base = [1, 3, 5].map((o) => parseInt(hex.slice(o, o + 2), 16) || 200);
+  const red = document.documentElement.classList.contains('red'), light = document.documentElement.classList.contains('light') && !red;
+  const mix = (c, t, f) => c.map((v, i) => v + (t[i] - v) * f);
+  const cols = red ? [base, mix(base, [0, 0, 0], 0.35), mix(base, [0, 0, 0], 0.7)]
+    : [mix(base, [255, 255, 255], light ? 0.95 : 0.8), mix(base, [255, 255, 255], light ? 0.35 : 0.15), mix(base, [40, 48, 64], light ? 0.55 : 0.6)];
+  const img = ctx.createImageData(cv.width, cv.height);
+  hours.forEach((h, i) => {
+    if (!isNum(h.cloud) || h.cloud < 0.5) return;
+    const seed = (isNum(h.t) ? Math.round(h.t / 3600) : i) % 9973 + 1, sh = cloudShape(seed);
+    const top_ = Y(h.cloud), w = cw * 0.86 * (0.62 + 0.38 * Math.min(100, h.cloud) / 100), hgt = Math.min(w * 0.62, H - top_);
+    if (hgt < 2) return;
+    const sc = Math.min(w / (sh.x2 - sh.x1), hgt / -sh.y1);
+    drawCloud(img, cv.width, cv.height, (i * cw + cw / 2 - ((sh.x1 + sh.x2) / 2) * sc) * dpr, (top_ - sh.y1 * sc) * dpr, sc * dpr, sh, cols, h.sky.k === 'day' ? 0.4 : 1);
+  });
+  ctx.putImageData(img, 0, 0);
 }
 
 function showSheet(title, body, sub = '', wide = false, locked = false) {
