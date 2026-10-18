@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.3';
+const VERSION = 'v2.4';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -602,8 +602,11 @@ function renderForecast(hours) {
   let html = '<div class="fc-l"></div>' + hours.map((h, i) => `<button type="button" class="fc-c fc-h" data-i="${i}">${esc(fmtHour(h.d).replace(/\s?([AP])\.?M\.?/i, (m, p) => p.toLowerCase()))}<small>${SKY_SHORT[h.sky.k]}</small></button>`).join('');
   // Rating, then precip and cloud (large), the sky chart, temp, dew, wind, seeing, transparency.
   html += row('Rating', (h, i) => `<div class="fc-c rate ${h.rating.k}" data-i="${i}" title="${h.rating.score == null ? 'Daylight' : 'Score ' + h.rating.score + '/100'}">${RATE_TXT[h.rating.k]}</div>`);
-  html += row('<span class="big-l">Precip</span>', (h, i) => cell(h, i, pct(h.pop), 'big', tint(h.pop, '--rain', 0.55)));
-  html += row('<span class="big-l">Cloud</span>', (h, i) => cell(h, i, pct(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
+  const ico = (svg, name, col) => `<span class="big-l ico" title="${name}" style="color:var(${col})"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg><span class="ico-t">${name}</span></span>`;
+  const DROP = '<path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5z" fill="currentColor"/>';
+  const CLOUD = '<path d="M7 19h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.6 9.1 5 5 0 0 0 7 19z" fill="currentColor"/>';
+  html += row(ico(DROP, 'Precip', '--rain'), (h, i) => cell(h, i, pct(h.pop), 'big', tint(h.pop, '--rain', 0.55)));
+  html += row(ico(CLOUD, 'Cloud', '--cloud'), (h, i) => cell(h, i, pct(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
 
   // Chart: cloud bars + precip line (stretches to fill the card)
   const n = hours.length;
@@ -618,7 +621,7 @@ function renderForecast(hours) {
     <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></div>`;
 
   html += row('Temp', (h, i) => cell(h, i, temp(h.temp)));
-  html += row('Dew gap', (h, i) => cell(h, i, tempDiff(h.dewGap), isNum(h.dewGap) && h.dewGap < 2 ? 'warn' : ''));
+  html += row('Dew<span class="lg-only">&nbsp;gap</span>', (h, i) => cell(h, i, tempDiff(h.dewGap), isNum(h.dewGap) && h.dewGap < 2 ? 'warn' : ''));
   html += row(`Gusts<small>${windU()}</small>`, (h, i) => cell(h, i, wind(h.gust), isNum(h.gust) && h.gust > 30 ? 'warn' : '', '', `Wind ${wind(h.wind)} · gusts ${wind(h.gust)} ${windU()}`));
   html += row('Seeing', (h, i) => cell(h, i, qShort(h.seeing), qClass(h.seeing)));
   html += row('Transp', (h, i) => cell(h, i, qShort(h.transparency), qClass(h.transparency)));
@@ -799,29 +802,42 @@ function heroPhoto(wikiTitle, fallback) {
     <figcaption>Photo: Wikipedia</figcaption></figure>${fallback ? `<template class="hero-fallback">${fallback}</template>` : ''}`;
 }
 const wikiCache = {};
+// Wikimedia only serves thumbnails at its standard widths now (custom sizes like 800px fail),
+// so try a standard size, then the API's own thumbnail, then the original file.
 async function wikiImage(title) {
   if (title in wikiCache) return wikiCache[title];
-  let url = null;
+  let urls = [];
   try {
     const j = await getJSON('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title.replace(/ /g, '_')), 10000);
     const o = j.originalimage, t = j.thumbnail;
-    if (t && t.source) url = o && o.width > 800 ? t.source.replace(/\/\d+px-/, '/800px-') : (o ? o.source : t.source);
-  } catch (e) { /* offline or no page */ }
-  return (wikiCache[title] = url);
+    if (t && t.source && o && o.width > 960) urls.push(t.source.replace(/\/\d+px-/, '/960px-'));
+    if (t && t.source) urls.push(t.source);
+    if (o && o.source && !/\.(tiff?|svg)$/i.test(o.source)) urls.push(o.source);
+  } catch (e) { urls = null; /* network or API failure */ }
+  return (wikiCache[title] = urls && [...new Set(urls)]);
 }
+const heroMsg = (fig, offline) => fig.classList.add('failed', offline ? 'offline' : 'nophoto');
 function wireHero(root) {
-  root.querySelectorAll('.hero-img img').forEach((img) => {
+  root.querySelectorAll('.hero-img img:not([data-wiki])').forEach((img) => {
     const fig = img.closest('.hero');
     img.addEventListener('load', () => fig.classList.add('loaded'));
-    img.addEventListener('error', () => fig.classList.add('failed'));
+    img.addEventListener('error', () => heroMsg(fig, !navigator.onLine));
   });
   root.querySelectorAll('img[data-wiki]').forEach(async (img) => {
     const fig = img.closest('.hero');
-    const url = await wikiImage(img.dataset.wiki);
-    if (url) { img.src = url; return; }
-    const fb = fig.nextElementSibling;
-    if (fb && fb.classList.contains('hero-fallback')) { fig.outerHTML = fb.innerHTML; wireHero(root); }
-    else fig.classList.add('failed');
+    const urls = await wikiImage(img.dataset.wiki);
+    const fallback = () => {
+      const fb = fig.nextElementSibling;
+      if (fb && fb.classList.contains('hero-fallback')) { fig.outerHTML = fb.innerHTML; wireHero(root); return true; }
+    };
+    if (!urls || !urls.length) { if (!fallback()) heroMsg(fig, !navigator.onLine); return; }
+    let i = 0;
+    img.addEventListener('load', () => fig.classList.add('loaded'));
+    img.addEventListener('error', () => {
+      if (++i < urls.length) img.src = urls[i];
+      else if (!fallback()) heroMsg(fig, !navigator.onLine);
+    });
+    img.src = urls[0];
   });
 }
 
@@ -879,40 +895,79 @@ function altChart(el, o, now) {
     s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T + ph)}" y2="${f(T + ph + (lab ? 6 : 3.5))}" stroke="var(--muted)" stroke-width="1"/>`;
     if (lab && x > L + fs * 1.2 && x < L + pw - fs * 1.2) s += `<text x="${f(x)}" y="${f(T + ph + 7 + sm)}" font-size="${f(sm)}" text-anchor="middle" fill="var(--muted)">${esc(fmtHourShort(d))}</text>`;
   }
-  // Now marker
-  if (now && +now > t0 && +now < t1) {
-    const x = X(now);
-    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-opacity=".55" stroke-width="1" stroke-dasharray="2 3"/>
-      <text x="${f(x + 4)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" fill="var(--text)" opacity=".75">Now</text>`;
-  }
-  // Callout pill helper
-  const pill = (x, y, txt, color, anchor) => {
+  // Callouts are placed after everything else so they can dodge the curves, markers and each other.
+  const obst = [];
+  const box = (x, y, w, h) => ({ x, y, w, h });
+  const hit = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+  const dot = (x, y, r) => obst.push(box(x - r - 2, y - r - 2, 2 * r + 4, 2 * r + 4));
+  c.forEach((p) => { dot(X(p.d), Y(p.alt), 2.5); if (p.moon > 0) dot(X(p.d), Y(p.moon), 1); });
+  let marks = '', labels = '';
+  // Pill: try each candidate spot, keep the one that covers the least of what's already drawn.
+  const pill = (cands, txt, color) => {
     const w = txt.length * md * 0.56 + md * 1.1, h = md * 1.7;
-    let x0 = anchor === 'end' ? x - w : anchor === 'start' ? x : x - w / 2;
-    x0 = Math.max(L + 2, Math.min(L + pw - w - 2, x0));
-    const y0 = Math.max(2, Math.min(T + ph - h - 2, y - h / 2));
-    return `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(h / 2)}" fill="var(--card)" stroke="${color}" stroke-width="1.2"/>
+    let best = null;
+    for (const [x, y, anchor] of cands) {
+      let x0 = anchor === 'end' ? x - w : anchor === 'start' ? x : x - w / 2;
+      x0 = Math.max(L + 2, Math.min(L + pw - w - 2, x0));
+      const y0 = Math.max(T + 2, Math.min(T + ph - h - 2, y - h / 2));
+      const b = box(x0, y0, w, h), cost = obst.reduce((t, o) => t + hit(b, o), 0);
+      if (!best || cost < best.cost) best = { b, cost };
+      if (cost === 0) break;
+    }
+    const { x: x0, y: y0 } = best.b;
+    obst.push(best.b);
+    labels += `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(h / 2)}" fill="var(--card)" stroke="${color}" stroke-width="1.2"/>
       <text x="${f(x0 + w / 2)}" y="${f(y0 + h / 2 + md * 0.34)}" font-size="${f(md)}" font-weight="700" text-anchor="middle" fill="${color}">${esc(txt)}</text>`;
   };
+  const y40 = Y(MIN_ALT), gap = fs * 1.2;
+  let xs = null;
   // When it reaches 40° (or is already above it when darkness starts)
   if (o.start) {
     const x = X(o.start), y = Y(altAt(o.start));
-    const label = o.startWhy === 'alt' ? `Reaches 40° · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
-    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(y)}" y2="${f(T + ph)}" stroke="var(--go)" stroke-width="1.4" stroke-dasharray="3 3"/>
+    xs = x;
+    marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(y)}" y2="${f(T + ph)}" stroke="var(--go)" stroke-width="1.4" stroke-dasharray="3 3"/>
       <circle cx="${f(x)}" cy="${f(y)}" r="${f(fs * 0.38)}" fill="var(--go)" stroke="var(--card)" stroke-width="2"/>`;
-    s += pill(x + fs * 0.6, Math.min(y, Y(MIN_ALT)) - fs * 1.5, label, 'var(--go)', x > L + pw * 0.6 ? 'end' : 'start');
+    dot(x, y, fs * 0.38);
+    obst.push(box(x - 2, y, 4, T + ph - y));
     if (o.end) {
       const xe = X(o.end), ye = Y(altAt(o.end));
-      s += `<circle cx="${f(xe)}" cy="${f(ye)}" r="${f(fs * 0.3)}" fill="var(--card)" stroke="var(--go)" stroke-width="2"/>`;
-      if (xe - x > fs * 9) s += pill(xe - fs * 0.6, Y(MIN_ALT) + fs * 1.3, `${o.endWhy === 'alt' ? 'Below 40°' : 'Dawn'} · ${fmtTime(o.end)}`, 'var(--muted)', 'end');
+      marks += `<circle cx="${f(xe)}" cy="${f(ye)}" r="${f(fs * 0.3)}" fill="var(--card)" stroke="var(--go)" stroke-width="2"/>`;
+      dot(xe, ye, fs * 0.3);
     }
   }
   // Peak
+  let peakTxt = null;
   if (o.peak && o.peak.alt > 0) {
     const x = X(o.peak.d), y = Y(o.peak.alt);
-    s += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(fs * 0.26)}" fill="var(--accent)"/>`;
-    if (!o.start || Math.abs(x - X(o.start)) > fs * 11) s += `<text x="${f(x)}" y="${f(y - fs * 0.7)}" font-size="${f(sm)}" font-weight="700" text-anchor="middle" fill="var(--accent)">Peak ${Math.round(o.peak.alt)}°</text>`;
+    marks += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(fs * 0.26)}" fill="var(--accent)"/>`;
+    dot(x, y, fs * 0.26);
+    peakTxt = [x, y];
   }
+  // Now marker; its label flips to the other side of the line if it would sit on the 40° marker.
+  if (now && +now > t0 && +now < t1) {
+    const x = X(now), tw = sm * 1.9;
+    const right = xs == null || xs < x - 2 || xs > x + tw + 8;
+    const tx = right ? x + 4 : x - 4;
+    marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-opacity=".55" stroke-width="1" stroke-dasharray="2 3"/>`;
+    labels += `<text x="${f(tx)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" text-anchor="${right ? 'start' : 'end'}" fill="var(--text)" opacity=".75">Now</text>`;
+    obst.push(box(right ? tx : tx - tw, T + ph - 5 - sm, tw, sm + 2));
+  }
+  if (o.start) {
+    const x = X(o.start);
+    const label = o.startWhy === 'alt' ? `Reaches 40° · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
+    const side = x > L + pw * 0.6 ? 'end' : 'start', dx = side === 'end' ? -fs * 0.6 : fs * 0.6;
+    pill([[x + dx, y40 + gap, side], [x + dx, y40 - gap, side], [x + dx, y40 + gap * 2.6, side], [x + dx, T + fs, side], [x - dx, y40 + gap, side === 'end' ? 'start' : 'end']], label, 'var(--go)');
+    if (o.end) {
+      const xe = X(o.end);
+      const txt = `${o.endWhy === 'alt' ? 'Below 40°' : 'Dawn'} · ${fmtTime(o.end)}`;
+      pill([[xe - fs * 0.6, y40 + gap, 'end'], [xe - fs * 0.6, y40 + gap * 2.6, 'end'], [xe - fs * 0.6, T + ph - gap * 2, 'end']], txt, 'var(--muted)');
+    }
+  }
+  if (peakTxt) {
+    const [x, y] = peakTxt, tw = sm * 4.2, b = box(x - tw / 2, y - fs * 0.7 - sm, tw, sm + 2);
+    if (y - fs * 0.7 - sm > T && !obst.some((o2) => hit(b, o2) > 0)) labels += `<text x="${f(x)}" y="${f(y - fs * 0.7)}" font-size="${f(sm)}" font-weight="700" text-anchor="middle" fill="var(--accent)">Peak ${Math.round(o.peak.alt)}°</text>`;
+  }
+  s += marks + labels;
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Altitude through the night">${s}</svg>`;
 }
 

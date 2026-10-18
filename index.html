@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2.4">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -78,7 +78,7 @@
   </section>
 
   <section class="card fc-card" id="hoursCard">
-    <div class="card-head"><div class="eyebrow" id="fcTitle">Dark hours</div><div class="legend xs muted"><i class="lg-cloud"></i>Cloud <i class="lg-rain"></i>Precip chance · tap an hour for sources</div></div>
+    <div class="card-head"><div class="eyebrow" id="fcTitle">Dark hours</div><div class="legend xs muted"><i class="lg-cloud"></i>Cloud <i class="lg-rain"></i>Precip chance<span class="lg-tap"> · tap an hour for sources</span></div></div>
     <div id="forecast" class="forecast"></div>
   </section>
 
@@ -107,6 +107,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=2.4"></script>
 </body>
 </html>

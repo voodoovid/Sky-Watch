@@ -286,6 +286,10 @@ html.red .q-1, html.red .q-2, html.red .q-3, html.red .q-4, html.red .warn { col
 .fc-c.dim { color: var(--dim); font-weight: 500; }
 .fc-c.big { font-size: 1.12rem; font-weight: 800; padding: 7px 0; }
 .big-l { font-size: .82rem; font-weight: 800; color: var(--text); }
+.big-l.ico { display: inline-flex; align-items: center; gap: 5px; }
+.big-l.ico svg { width: 1.5em; height: 1.5em; flex: none; }
+.ico-t { display: none; }
+.fc-l { overflow: hidden; }
 .forecast.dense .fc-c.big { font-size: 1rem; }
 
 /* Moon path */
@@ -357,7 +361,8 @@ html.red .tag-comet { color: var(--accent); border-color: var(--line2); }
 .hero.loaded .hero-img img { opacity: 1; }
 .hero-img::after { content: 'Loading image…'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); font-size: .85em; }
 .hero.loaded .hero-img::after { content: none; }
-.hero.failed .hero-img::after { content: 'Image unavailable offline'; }
+.hero.failed .hero-img::after { content: 'Photo unavailable'; }
+.hero.failed.offline .hero-img::after { content: 'Photo unavailable offline'; }
 .hero.failed .frame, .hero.failed .moonscale, .hero.failed .xhair { display: none; }
 .frame {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -495,9 +500,12 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .night-seg button { padding: 0 8px; }
   .rate, .forecast.dense .rate { font-size: .54rem; letter-spacing: 0; }
   .red-btn .lbl { display: none; }
-  .forecast, .forecast.dense { font-size: .66rem; grid-template-columns: 3.4em repeat(var(--n), minmax(0, 1fr)); grid-template-rows: repeat(4, auto) 70px repeat(5, auto); column-gap: 2px; }
-  .fc-c.big, .forecast.dense .fc-c.big { font-size: .86rem; }
+  .forecast, .forecast.dense { font-size: .66rem; grid-template-columns: 3.1rem repeat(var(--n), minmax(0, 1fr)); grid-template-rows: repeat(4, auto) 70px repeat(5, auto); column-gap: 2px; }
+  .fc-c.big, .forecast.dense .fc-c.big { font-size: .78rem; letter-spacing: -.02em; }
   .fc-l small { display: none; }
+  .fc-l { font-size: .56rem; letter-spacing: .01em; }
+  .ico-t, .lg-only, .legend .lg-tap { display: none; }
+  .big-l.ico { font-size: .9rem; }
   .fc-h small { display: none; }
   .moonpath { min-height: 200px; }
   .list.scroll { max-height: 340px; }
