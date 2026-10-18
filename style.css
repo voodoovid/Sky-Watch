@@ -279,6 +279,7 @@ html.red .chip.bad, html.red .chip.ok { color: var(--text); }
 
 /* Verdict condition tiles (fill the card) */
 .vstats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+.vstats > .vs:last-child:nth-child(odd) { grid-column: span 2; }
 .vs { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .vs .lbl { font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
 .vs b { font-size: 1.6rem; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -617,6 +618,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .verdict { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 14px; }
   .verdict .v-text { flex: 1; min-width: 140px; }
   .verdict .vstats { flex-basis: 100%; grid-template-columns: repeat(3, 1fr); }
+  .vstats > .vs:last-child:nth-child(odd) { grid-column: auto; }
+  .vstats > .vs:last-child:nth-child(3n+1) { grid-column: span 3; }
   .vs b { font-size: 1.25rem; }
 }
 
@@ -630,6 +633,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   }
   .verdict { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
   .verdict .vstats { grid-template-columns: 1fr 1fr; flex: 1 1 auto; }
+  .vstats > .vs:last-child:nth-child(3n+1) { grid-column: auto; }
+  .vstats > .vs:last-child:nth-child(odd) { grid-column: span 2; }
   .v-badge { align-self: center; text-align: center; }
   .vs b { font-size: 1.4rem; }
   .vs { padding: 6px 8px; }

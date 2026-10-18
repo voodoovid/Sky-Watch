@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.8';
+const VERSION = 'v3.9';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -616,6 +616,59 @@ function bestWindow(hours) {
   return best;
 }
 
+/* ---------- Bortle (light pollution) ----------
+   Zenith sky brightness from David Lorenz's Light Pollution Atlas 2025 (VIIRS-based, 1/120° grid).
+   Same binary tiles and decoding as the atlas's own map; SQM converted to an approximate Bortle class. */
+const LP_YEAR = 2025;
+const lpMod = (n, m) => ((n % m) + m) % m;
+const lpKey = (lat, lon) => `lp${LP_YEAR}:${(+lat).toFixed(3)},${(+lon).toFixed(3)}`;
+function sqmToBortle(q) {
+  return q >= 21.99 ? 1 : q >= 21.89 ? 2 : q >= 21.69 ? 3 : q >= 20.49 ? 4 : q >= 19.5 ? 5 : q >= 18.94 ? 6 : q >= 18.38 ? 7 : q >= 17.8 ? 8 : 9;
+}
+async function fetchBortle(lat, lon) {
+  const key = lpKey(lat, lon);
+  try { const c = JSON.parse(localStorage.getItem(key)); if (c && isNum(c.sqm)) return c; } catch (e) {}
+  const lx = lpMod(+lon + 180, 360), ly = +lat + 65;
+  const tx = Math.floor(lx / 5) + 1, ty = Math.floor(ly / 5) + 1;
+  if (ty < 1 || ty > 28) return { out: true };
+  const ix = Math.round(120 * (lx - 5 * (tx - 1) + 1 / 240)), iy = Math.round(120 * (ly - 5 * (ty - 1) + 1 / 240));
+  const res = await fetch(`https://djlorenz.github.io/astronomy/binary_tiles/${LP_YEAR}/binary_tile_${tx}_${ty}.dat.gz`);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const raw = new Response(res.body.pipeThrough(new DecompressionStream('gzip')));
+  const d = new Int8Array(await raw.arrayBuffer());
+  // First value is 2 bytes; the rest are 1-byte deltas up the first column, then along row iy.
+  let v = 128 * d[0] + d[1];
+  for (let i = 1; i < iy; i++) v += d[600 * i + 1];
+  for (let i = 1; i < ix; i++) v += d[600 * (iy - 1) + 1 + i];
+  const ratio = (5 / 195) * (Math.exp(0.0195 * v) - 1); // artificial / natural brightness
+  const sqm = 22 - 5 * Math.log(1 + ratio) / Math.log(100);
+  const out = { sqm: Math.round(sqm * 100) / 100, bortle: sqmToBortle(sqm) };
+  try { localStorage.setItem(key, JSON.stringify(out)); } catch (e) {}
+  return out;
+}
+function bortleChip() {
+  const b = state.lp;
+  const tip = 'Light pollution: Light Pollution Atlas 2025 (D. Lorenz). Bortle is approximate, from zenith SQM.';
+  if (!b) return ['Bortle', '…', '', '', 'vsBortle', tip];
+  if (b.err || b.out) return ['Bortle', '–', '', '', 'vsBortle', tip];
+  return ['Bortle', b.bortle, `${b.sqm.toFixed(1)} sqm`, b.bortle <= 3 ? 'ok' : b.bortle >= 7 ? 'bad' : '', 'vsBortle', tip];
+}
+function updateBortle() {
+  const el = $('#vsBortle');
+  if (!el) return;
+  const [l, v, u, c] = bortleChip();
+  el.className = 'vs ' + c;
+  el.innerHTML = `<span class="lbl">${esc(l)}</span><b>${esc(v)}<small>${esc(u)}</small></b>`;
+}
+function loadBortle(loc) {
+  const k = lpKey(loc.lat, loc.lon);
+  if (state.lpFor === k && state.lp && !state.lp.err) return;
+  state.lp = null; state.lpFor = k;
+  fetchBortle(loc.lat, loc.lon)
+    .then((r) => r, () => ({ err: true }))
+    .then((r) => { if (state.loc && lpKey(state.loc.lat, state.loc.lon) === k) { state.lp = r; updateBortle(); } });
+}
+
 function renderVerdict(win, moon, hours) {
   const night = hours.filter((h) => h.rating.score != null);
   const best = bestWindow(hours);
@@ -661,11 +714,12 @@ function renderVerdict(win, moon, hours) {
     const moonUp = night.some((h) => h.moonAlt > 0);
     chips.push([moonUp ? 'Moon up' : 'Moon', moonUp ? Math.round(moon.illum * 100) : 'Down', moonUp ? '%' : '', moonUp && moon.illum > 0.5 ? 'bad' : !moonUp || moon.illum < 0.25 ? 'ok' : '']);
     chips.push([dew < 2 ? 'Dew · heater on' : 'Dew gap', dew < 99 ? tempDiff(dew) : '–', '', dew < 2 ? 'bad' : dew >= 5 ? 'ok' : '']);
+    chips.push(bortleChip());
     if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s), '', s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
   }
   $('#verdict').innerHTML = `<div class="v-badge ${cls}">${txt}</div>
     <div class="v-text"><div class="v-win">${line}</div>${note ? `<div class="v-note">${esc(note)}</div>` : ''}</div>
-    <div class="vstats">${chips.map(([l, v, u, c]) => `<div class="vs ${c}"><span class="lbl">${esc(l)}</span><b>${esc(v)}<small>${esc(u)}</small></b></div>`).join('')}</div>`;
+    <div class="vstats">${chips.map(([l, v, u, c, id, tip]) => `<div class="vs ${c}"${id ? ` id="${id}"` : ''}${tip ? ` title="${esc(tip)}"` : ''}><span class="lbl">${esc(l)}</span><b>${esc(v)}<small>${esc(u)}</small></b></div>`).join('')}</div>`;
 }
 
 function renderTonight(win) {
@@ -1380,6 +1434,7 @@ function showSources() {
   ENSEMBLES.forEach((e) => items.push([e.name + ' (Open-Meteo)', !!src.ens[e.name], src.ens[e.name] ? src.ens[e.name].members + ' runs' : '']));
   items.push(['7Timer! ASTRO — seeing & transparency', !!src.t7, !src.t7 && state.t7err ? '(' + state.t7err + ')' : '']);
   items.push(['Astronomy Engine — Sun, Moon, planets (on device)', true]);
+  items.push(['Light Pollution Atlas 2025 (D. Lorenz) — Bortle', !!(state.lp && isNum(state.lp.sqm))]);
   showSheet('Data sources', `<table class="src"><tbody>${items.map(([n, ok, x]) => `<tr><td>${esc(n)}${x ? ` <span class="muted">${esc(x)}</span>` : ''}</td><td class="n ${ok ? 'ok' : 'bad'}">${ok ? '✓ Online' : 'Unavailable'}</td></tr>`).join('')}</tbody></table>`);
 }
 
@@ -1429,6 +1484,7 @@ async function load() {
   const lat = (+loc.lat).toFixed(4), lon = (+loc.lon).toFixed(4);
   $('#locLabel').textContent = `${loc.name} · ${(+loc.lat).toFixed(3)}, ${(+loc.lon).toFixed(3)}`;
   setStatus('Loading forecasts…');
+  loadBortle(loc);
   const settle = (p) => p.then((v) => v, () => null);
   const [omRes, ensRes, met, t7] = await Promise.all([
     Promise.all(OM_MODELS.map((m) => settle(fetchOM(m, lat, lon)))),
