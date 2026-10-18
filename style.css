@@ -445,6 +445,10 @@ html.red .top-it .tw .hr { background: #300000; color: var(--accent); }
 .sheet-head h2 { font-size: 1.3em; font-weight: 750; letter-spacing: .005em; line-height: 1.2; }
 #sheetSub { margin: .2em 0 0; color: var(--muted); font-size: .86em; font-weight: 600; }
 .sh-x { flex: none; width: 2.4em; height: 2.4em; border-radius: 50%; font-size: 1em; }
+.sheet.locked #sheetBody { overflow: hidden; touch-action: none; }
+.sheet.locked { max-height: calc(100dvh - var(--sh-top) - 20px); }
+.sheet.locked .wheel { width: min(270px, 72vw, calc(100dvh - 500px)); min-width: 140px; }
+.sheet.locked input { touch-action: pan-x; }
 html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
 #sheetBody { padding: 1em 1.1em 1.2em; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .src { width: 100%; border-collapse: collapse; font-size: .92em; }

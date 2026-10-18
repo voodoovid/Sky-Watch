@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.3';
+const VERSION = 'v3.4';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -749,7 +749,7 @@ function showSheet(title, body, sub = '', wide = false, locked = false) {
   $('#sheetBody').innerHTML = body;
   const d = $('#sheet');
   d.classList.toggle('wide', wide);
-  d.classList.toggle('locked', locked); // locked: closes only with ✕ (or Esc), not by tapping outside
+  d.classList.toggle('locked', locked); // locked: fixed size, contents can't be scrolled or dragged
   document.documentElement.classList.add('sheet-open'); // freeze the page behind
   if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
   $('#sheetBody').scrollTop = 0;
@@ -1561,13 +1561,13 @@ function init() {
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#planets').addEventListener('click', (e) => { const t = e.target.closest('[data-p]'); if (t) showPlanet(+t.dataset.p); });
-  $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget && !e.currentTarget.classList.contains('locked')) e.currentTarget.close(); });
+  $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#sheet').addEventListener('close', () => document.documentElement.classList.remove('sheet-open'));
   // Stop the page behind an open sheet from scrolling or rubber-banding on iPad; only the sheet's own body may scroll.
   $('#sheet').addEventListener('touchmove', (e) => {
     if (e.target.closest('input, textarea, select')) return; // keep sliders and fields draggable
     const b = $('#sheetBody');
-    if (!b.contains(e.target) || b.scrollHeight <= b.clientHeight) e.preventDefault();
+    if ($('#sheet').classList.contains('locked') || !b.contains(e.target) || b.scrollHeight <= b.clientHeight) e.preventDefault();
   }, { passive: false });
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
