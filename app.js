@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.12';
+const VERSION = 'v3.13';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -191,7 +191,7 @@ async function fetch7Timer(lat, lon) {
   let j;
   try {
     j = await Promise.any(urls.map(async (u) => {
-      const r = await get7TimerJSON(u, 45000);
+      const r = await get7TimerJSON(u, 25000);
       if (!r || !Array.isArray(r.dataseries) || !r.dataseries.length) throw new Error('no data');
       return r;
     }));
@@ -1468,7 +1468,7 @@ function showSources() {
   OM_MODELS.forEach((m) => items.push([m.name + ' (Open-Meteo)', !!src.om[m.id]]));
   items.push(['MET Norway (yr.no)', !!src.met]);
   ENSEMBLES.forEach((e) => items.push([e.name + ' (Open-Meteo)', !!src.ens[e.name], src.ens[e.name] ? src.ens[e.name].members + ' runs' : '']));
-  items.push(['7Timer! ASTRO — seeing & transparency', src.t7cached ? 'cached' : !!src.t7, src.t7cached ? '(live fetch failed, using ' + fmtTime(src.t7cached) + ' data)' : !src.t7 && state.t7err ? '(' + state.t7err + ')' : '']);
+  items.push(['7Timer! ASTRO — seeing & transparency', src.t7cached ? 'cached' : !!src.t7, src.t7pending ? (src.t7cached ? '(loading… showing ' + fmtTime(src.t7cached) + ' data)' : '(loading…)') : src.t7cached ? '(live fetch failed, using ' + fmtTime(src.t7cached) + ' data)' : !src.t7 && state.t7err ? '(' + state.t7err + ')' : '']);
   items.push(['Astronomy Engine — Sun, Moon, planets (on device)', true]);
   items.push(['Light Pollution Atlas 2025 (D. Lorenz) — Bortle', !!(state.lp && isNum(state.lp.sqm))]);
   showSheet('Data sources', `<table class="src"><tbody>${items.map(([n, ok, x]) => `<tr><td>${esc(n)}${x ? ` <span class="muted">${esc(x)}</span>` : ''}</td><td class="n ${ok === 'cached' ? 'cached' : ok ? 'ok' : 'bad'}">${ok === 'cached' ? 'Cached' : ok ? '✓ Online' : 'Unavailable'}</td></tr>`).join('')}</tbody></table>`);
@@ -1522,20 +1522,26 @@ async function load() {
   setStatus('Loading forecasts…');
   loadBortle(loc);
   const settle = (p) => p.then((v) => v, () => null);
-  const [omRes, ensRes, met, t7] = await Promise.all([
+  // 7Timer! is slow, so it never holds up the forecast: it's started now and filled in when it arrives.
+  const t7p = settle(fetch7Timer(lat, lon));
+  const [omRes, ensRes, met] = await Promise.all([
     Promise.all(OM_MODELS.map((m) => settle(fetchOM(m, lat, lon)))),
     Promise.all(ENSEMBLES.map((e) => settle(fetchEnsemble(e, lat, lon)))),
     settle(fetchMET(lat, lon)),
-    settle(fetch7Timer(lat, lon)),
   ]);
   if (run !== loading) return; // a newer load started
   const key = t7Key(loc.lat, loc.lon);
-  let t7data = t7, t7cached = null;
   clearTimeout(t7Retry); t7Tries = 0;
-  if (t7) t7Cache = { key, data: t7, at: new Date() };
-  else if (t7Cache && t7Cache.key === key) { t7data = t7Cache.data; t7cached = t7Cache.at; }
-  if (!t7 && t7Cache && t7Cache.key === key) scheduleT7Retry(lat, lon, key);
-  const src = { om: {}, ens: {}, met, t7: t7data, t7cached };
+  // Until 7Timer! answers, show this session's last good data for the same spot (if any).
+  const hasCache = t7Cache && t7Cache.key === key;
+  const src = { om: {}, ens: {}, met, t7: hasCache ? t7Cache.data : null, t7cached: hasCache ? t7Cache.at : null, t7pending: true };
+  t7p.then((t7) => {
+    if (run !== loading) return;
+    src.t7pending = false;
+    if (t7) { t7Cache = { key, data: t7, at: new Date() }; src.t7 = t7; src.t7cached = null; }
+    else if (hasCache) scheduleT7Retry(lat, lon, key);
+    if (state.data && state.data.key === key) buildNights(src, state.data.now, key);
+  });
   OM_MODELS.forEach((m, i) => { if (omRes[i]) src.om[m.id] = omRes[i]; });
   ENSEMBLES.forEach((e, i) => { if (ensRes[i]) src.ens[e.name] = ensRes[i]; });
   const tz = (Object.values(src.om)[0] || {}).tz;
