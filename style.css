@@ -194,7 +194,8 @@ html.red .night-seg button[aria-pressed="true"] { background: #300000; color: va
 /* Section titles for Planets / targets: bigger, brighter, with an accent bar */
 .eyebrow.ttl { white-space: nowrap; font-size: .92rem; font-weight: 800; letter-spacing: .08em; color: var(--text); align-items: center; gap: 8px; margin-bottom: 6px; }
 .eyebrow.ttl::before { content: ''; flex: none; width: 4px; height: 1.05em; border-radius: 2px; background: var(--accent); }
-.eyebrow.ttl .eb-r { font-size: .64rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.eyebrow.ttl .eb-r { font-size: .8rem; font-weight: 800; letter-spacing: .06em; color: var(--accent); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.row.tgt .r { font-size: .95rem; font-weight: 750; }
 .eyebrow.ttl.mt { margin-top: 14px; }
 
 .status {
@@ -215,6 +216,9 @@ html.red .status.err { color: var(--accent); }
 }
 .v-badge.go { background: var(--go); }
 .v-badge.fair { background: var(--fair); }
+.v-badge.partial { background: var(--go2); }
+.v-note { margin-top: 4px; font-size: .86rem; font-weight: 700; color: var(--rain); }
+html.red .v-note { color: var(--text); }
 .v-badge.nogo { background: var(--nogo); color: #fff; }
 .v-badge.day, .v-badge.none { background: var(--day); color: var(--text); }
 html.red .v-badge.nogo { color: var(--text); }
@@ -243,6 +247,8 @@ html.red .chip.bad, html.red .chip.ok { color: var(--text); }
 .vs b small { font-size: .55em; font-weight: 700; margin-left: 3px; color: var(--muted); }
 .vs.ok { border-color: color-mix(in srgb, var(--go) 45%, var(--line)); } .vs.ok b { color: var(--go); }
 .vs.bad { border-color: color-mix(in srgb, var(--nogo) 45%, var(--line)); } .vs.bad b { color: var(--nogo); }
+.vs.wet { border: 2px solid var(--rain); background: color-mix(in srgb, var(--rain) 22%, var(--card2)); } .vs.wet b, .vs.wet .lbl { color: var(--rain); }
+.vs.wet.bad { background: color-mix(in srgb, var(--rain) 38%, var(--card2)); } .vs.wet.bad b { color: #fff; }
 html.red .vs.ok b, html.red .vs.bad b { color: var(--text); }
 
 /* Moon */
@@ -257,9 +263,14 @@ html.red .vs.ok b, html.red .vs.bad b { color: var(--text); }
 
 /* Forecast grid */
 .fc-card { overflow: hidden; }
-.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin: 0 3px 0 8px; }
-.legend .lg-cloud { background: var(--cloud); opacity: .7; }
-.legend .lg-rain { background: var(--rain); height: 3px; vertical-align: 2px; }
+.fc-head { align-items: center; margin-bottom: 10px; }
+.fc-date { margin-left: 4px; font-size: .8rem; font-weight: 700; letter-spacing: .04em; text-transform: none; color: var(--muted); }
+.legend { display: flex; align-items: center; gap: 14px; font-size: .86rem; font-weight: 700; color: var(--text); white-space: nowrap; min-width: 0; overflow: hidden; }
+.legend .lg { display: inline-flex; align-items: center; gap: 6px; }
+.legend svg { flex: none; }
+.legend .lg-cloud { width: 24px; height: 24px; color: var(--cloud); opacity: .85; }
+.legend .lg-rain { width: 26px; height: 12px; color: var(--rain); }
+.legend .lg-tap { font-size: .76rem; font-weight: 600; color: var(--muted); }
 .forecast {
   flex: 1; min-height: 0; display: grid; column-gap: 3px; row-gap: 3px;
   --n: 12;
@@ -278,7 +289,7 @@ html.red .vs.ok b, html.red .vs.bad b { color: var(--text); }
 .fc-c.night { background: color-mix(in srgb, var(--card2) 60%, transparent); }
 .fc-c.now { box-shadow: inset 0 0 0 1px var(--accent); }
 .fc-chart { grid-column: 2 / -1; min-height: 0; position: relative; border-radius: 8px; overflow: hidden; background: var(--card2); }
-.fc-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fc-chart svg { position: absolute; inset: 0; }
 .rate { font-size: .68rem; font-weight: 800; letter-spacing: .03em; color: var(--chip-ink); border-radius: 6px; padding: 5px 0; }
 .rate.great { background: var(--go); }
 .rate.good { background: var(--go2); }
@@ -294,6 +305,11 @@ html.red .q-1, html.red .q-2, html.red .q-3, html.red .q-4, html.red .warn { col
 .forecast.dense .fc-h { font-size: .72rem; }
 .fc-c.dim { color: var(--dim); font-weight: 500; }
 .fc-c.big { font-size: 1.12rem; font-weight: 800; padding: 7px 0; }
+.fc-c.dry { color: var(--dim); font-weight: 600; }
+.fc-c.wet { color: #fff; box-shadow: inset 0 0 0 1.5px var(--rain); }
+.fc-c.wet.mid, .fc-c.wet.hi { box-shadow: inset 0 0 0 2px #9cc8ff; }
+.fc-c.wet.hi { text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+html.red .fc-c.wet { color: #000; box-shadow: inset 0 0 0 2px var(--accent); }
 .big-l { font-size: .82rem; font-weight: 800; color: var(--text); }
 .big-l.ico { display: inline-flex; align-items: center; gap: 5px; }
 .big-l.ico svg { width: 1.5em; height: 1.5em; flex: none; }
@@ -304,7 +320,8 @@ html.red .q-1, html.red .q-2, html.red .q-3, html.red .q-4, html.red .warn { col
 /* Moon path */
 .path-card .card-head { margin-bottom: 6px; white-space: nowrap; }
 .moonpath { flex: 1; min-height: 140px; position: relative; border-radius: 10px; overflow: hidden; }
-.moonpath svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.moonpath svg { position: absolute; inset: 0; }
+#pathNote { font-size: .8rem; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
 
 /* Objects */
 .list { display: flex; flex-direction: column; }
@@ -356,7 +373,9 @@ html.red .top-it .rk { background: #300000; color: var(--accent); }
 .top-it .tn { font-size: 1.05rem; font-weight: 600; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .top-it .tn b { font-weight: 800; margin-right: 6px; }
 .top-it .ts { font-size: .74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.top-it .tw { font-size: .8rem; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-it .tw { font-size: 1rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-it .tw .to { color: var(--accent); }
+.top-it .tw .hr { margin-left: 8px; font-size: .82em; font-weight: 650; color: var(--muted); }
 
 /* Footer */
 .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 16px 10px; }
@@ -366,9 +385,13 @@ html.red .top-it .rk { background: #300000; color: var(--accent); }
   width: min(560px, calc(100vw - 24px)); max-height: min(84vh, 680px); padding: 0;
   background: var(--card); color: var(--text); border: 1px solid var(--line2); border-radius: 18px;
   box-shadow: 0 30px 80px rgba(0,0,0,.6); font-size: 14px; overflow: hidden;
+  /* Centre in the space below the status bar so the title is never pushed up under it. */
+  --sh-top: calc(max(env(safe-area-inset-top), 24px) + 48px);
+  top: var(--sh-top); bottom: 20px; margin: auto;
 }
+.sheet:not(.wide) { max-height: min(84vh, 680px, calc(100dvh - var(--sh-top) - 20px)); }
 .sheet[open] { display: flex; flex-direction: column; }
-.sheet.wide { width: min(920px, calc(100vw - 32px)); max-height: min(92vh, 1000px); }
+.sheet.wide { width: min(920px, calc(100vw - 32px)); max-height: min(1000px, calc(100dvh - var(--sh-top) - 20px)); }
 .sheet::backdrop { background: rgba(2,5,12,.7); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: .9em 1.1em; border-bottom: 1px solid var(--line); background: var(--card); flex: none; }
 .sh-t { min-width: 0; }
@@ -393,6 +416,7 @@ html.red .top-it .rk { background: #300000; color: var(--accent); }
 .wheel .wedge.on { fill: color-mix(in srgb, var(--go) 42%, var(--card2)); stroke: color-mix(in srgb, var(--go) 70%, var(--line2)); }
 .wheel .wedge:focus-visible { stroke: var(--accent); stroke-width: 3; }
 .wheel .hub { fill: var(--card); stroke: var(--line2); }
+.wheel .axis { stroke: var(--text); stroke-opacity: .55; stroke-width: 1.5; pointer-events: none; }
 .wheel .wl { fill: var(--muted); font-size: 10px; font-weight: 700; pointer-events: none; }
 .wheel .wl.big { fill: var(--text); font-size: 14px; font-weight: 800; }
 .wheel .wl.sm { fill: var(--dim); }
@@ -438,6 +462,12 @@ html.red .moonscale, html.red .xhair { border-color: var(--accent); }
 .tile .lbl { display: block; font-size: .72em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .tile b { display: block; font-size: 1.35em; font-weight: 800; line-height: 1.2; margin-top: .1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile small { display: block; font-size: .8em; color: var(--muted); margin-top: .1em; }
+.tile.sm { padding: .45em .7em; border-radius: 10px; }
+.tile.sm .lbl { font-size: .66em; }
+.tile.sm b { font-size: 1.08em; }
+.tile.sm small { font-size: .74em; }
+.tile.span, .tiles .tip { grid-column: 1 / -1; }
+.tiles .tip { font-size: .86em; padding: .6em .8em; }
 .tile.key { border-color: color-mix(in srgb, var(--go) 50%, var(--line)); background: color-mix(in srgb, var(--go) 9%, var(--card2)); }
 .tile.key .lbl, .tile.key b { color: var(--go); }
 .tile.warn .lbl, .tile.warn b { color: var(--fair); }
@@ -511,8 +541,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
 /* Landscape */
 @media (min-width: 900px) and (min-height: 560px) and (min-aspect-ratio: 5/4) {
   .dash {
-    /* Narrower Tonight/Moon column; wider targets column. */
-    grid-template-columns: minmax(215px, .8fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(300px, 1.3fr);
+    /* Narrow Tonight/Moon column; Dark hours and Top targets get the room the target list gave up. */
+    grid-template-columns: minmax(215px, .8fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(265px, 1fr);
     grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
     grid-template-areas: "verdict fc fc obj" "moon path top obj";
   }
@@ -561,7 +591,9 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .rate, .forecast.dense .rate { font-size: .54rem; letter-spacing: 0; }
   .red-btn .lbl, .home-btn .lbl { display: none; }
   .forecast, .forecast.dense { font-size: .66rem; grid-template-columns: 3.1rem repeat(var(--n), minmax(0, 1fr)); grid-template-rows: repeat(4, auto) 70px repeat(5, auto); column-gap: 2px; }
-  .fc-c.big, .forecast.dense .fc-c.big { font-size: .78rem; letter-spacing: -.02em; }
+  .fc-c.big, .forecast.dense .fc-c.big { font-size: .7rem; letter-spacing: -.04em; }
+  .fc-head { flex-wrap: wrap; row-gap: 6px; }
+  .legend { font-size: .8rem; gap: 12px; }
   .fc-l small { display: none; }
   .fc-l { font-size: .56rem; letter-spacing: .01em; }
   .ico-t, .lg-only, .legend .lg-tap { display: none; }

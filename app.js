@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.6';
+const VERSION = 'v2.7';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -13,7 +13,9 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
 };
 
-const HOME_DEFAULT = Array.from({ length: 16 }, (_, i) => i <= 8 || i >= 14);
+/* Home sky: 16 wedges of 22.5°, wedge i runs from compass point i to point i+1 (N→NNE, NNE→NE …),
+   so the dividing lines fall exactly on N, E, S and W. Default: NW clockwise through N and E to S. */
+const HOME_DEFAULT = Array.from({ length: 16 }, (_, i) => i <= 7 || i >= 14);
 const PT16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const state = {
   units: store.get('units', 'metric'),
@@ -24,8 +26,13 @@ const state = {
   data: null,
   night: 0, // 0 = tonight, 1 = tomorrow night
   home: store.get('home', false), // only count the part of the sky set in Options
-  // 16 wedges of 22.5°, centred on N, NNE, NE … NNW. Default: NW clockwise through N and E to S.
-  homeSky: (() => { const v = store.get('homeSky', null); return Array.isArray(v) && v.length === 16 ? v.map(Boolean) : HOME_DEFAULT.slice(); })(),
+  homeSky: (() => {
+    const v = store.get('homeSky2', null);
+    if (Array.isArray(v) && v.length === 16) return v.map(Boolean);
+    // Older versions centred wedges on the compass points: keep a new wedge only if both old halves were on.
+    const o = store.get('homeSky', null);
+    return Array.isArray(o) && o.length === 16 ? o.map((x, i) => !!(x && o[(i + 1) % 16])) : HOME_DEFAULT.slice();
+  })(),
 };
 
 /* ---------- formatting ---------- */
@@ -42,7 +49,7 @@ const wind = (k) => (!isNum(k) ? '–' : state.units === 'metric' ? String(Math.
 const windU = () => (state.units === 'metric' ? 'km/h' : 'mph');
 const rain = (mm) => (!isNum(mm) ? '–' : state.units === 'metric' ? mm.toFixed(1) + ' mm' : (mm / 25.4).toFixed(2) + ' in');
 /* Home sky: the wedges picked in Options (16 × 22.5°). */
-const inHome = (az) => state.homeSky[Math.round((((az % 360) + 360) % 360) / 22.5) % 16];
+const inHome = (az) => state.homeSky[Math.floor((((az % 360) + 360) % 360) / 22.5) % 16];
 /* Plain description of the home sky, e.g. "NW → S" (clockwise runs). */
 function homeDesc() {
   const h = state.homeSky, n = h.filter(Boolean).length;
@@ -56,7 +63,7 @@ function homeDesc() {
     else if (h[i]) runs[runs.length - 1][1] = i;
   }
   runs.sort((x, y) => (y[0] > y[1]) - (x[0] > x[1]) || x[0] - y[0]); // a run through north first
-  return runs.map(([a, b]) => (a === b ? PT16[a] : `${PT16[a]} → ${PT16[b]}`)).join(', ');
+  return runs.map(([a, b]) => `${PT16[a]} → ${PT16[(b + 1) % 16]}`).join(', ');
 }
 const compass = (az) => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((az % 360) + 360) % 360 / 45) % 8];
 
@@ -558,20 +565,28 @@ function moonGlyph(cx, cy, r, angle, lat) {
   return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--moon-dark)" stroke="var(--moon-lit)" stroke-opacity=".35" stroke-width="1"/>${lit}`;
 }
 
+const PUFF_ICON = '<path d="M6.2 19.5h11.9a4.1 4.1 0 0 0 .9-8.1 4.3 4.3 0 0 0-5.6-3.3A5 5 0 0 0 4.6 10.6a4.5 4.5 0 0 0 1.6 8.9z" fill="currentColor"/><circle cx="9.3" cy="10.4" r="3.9" fill="currentColor"/><circle cx="14.6" cy="9.6" r="3.3" fill="currentColor"/>';
 const RATE_TXT = { great: 'GO', good: 'GO', fair: 'FAIR', poor: 'NO', day: 'DAY' };
 const qClass = (v) => (!isNum(v) ? 'dim' : v <= 2 ? 'q-1' : v <= 4 ? 'q-2' : v <= 6 ? 'q-3' : 'q-4');
 const qShort = (v) => (!isNum(v) ? '–' : v <= 2 ? 'Exc' : v <= 4 ? 'Good' : v <= 6 ? 'Avg' : 'Poor');
 const SKY_SHORT = { day: 'day', civil: 'twi', nautical: 'twi', astro: 'twi', dark: 'dark' };
 
-/* Best run of Good-or-better hours. */
+/* Rain thresholds (ensemble % chance in the hour). Erring on the side of caution:
+   any hour at RAIN_FLAG or more turns a GO night into a PARTIAL GO, and an hour at RAIN_STOP or more
+   (plus the hour before it, to pack up dry) can never be part of the go window. */
+const RAIN_SHOW = 1, RAIN_FLAG = 15, RAIN_STOP = 30;
+const popOf = (h) => (isNum(h.pop) ? h.pop : 0);
+/* Best run of Good-or-better hours that stay clear of rain. */
 function bestWindow(hours) {
   let best = null, cur = null;
-  for (const h of hours) {
-    if (h.rating.score != null && h.rating.score >= 55) {
+  hours.forEach((h, i) => {
+    const next = hours[i + 1];
+    const dry = popOf(h) < RAIN_STOP && !(next && popOf(next) >= RAIN_STOP);
+    if (h.rating.score != null && h.rating.score >= 55 && dry) {
       cur = cur ? { ...cur, end: h } : { start: h, end: h };
       if (!best || cur.end.t - cur.start.t > best.end.t - best.start.t) best = cur;
     } else cur = null;
-  }
+  });
   if (best) best.hrs = (best.end.t - best.start.t) / 3600 + 1;
   return best;
 }
@@ -579,26 +594,43 @@ function bestWindow(hours) {
 function renderVerdict(win, moon, hours) {
   const night = hours.filter((h) => h.rating.score != null);
   const best = bestWindow(hours);
-  let cls, txt, line, chips = [];
+  let cls, txt, line, note = '', chips = [];
   if (!night.length) {
     cls = 'day'; txt = 'NO DATA';
     line = 'No forecast available for this night yet';
   } else {
-    const hasGood = best && night.some((h) => h.rating.score >= 55);
-    if (best && best.hrs >= 2 && hasGood) { cls = 'go'; txt = 'GO'; }
-    else if (best || night.some((h) => h.rating.k === 'fair')) { cls = 'fair'; txt = 'MARGINAL'; }
+    const inWin = (h) => best && h.t >= best.start.t && h.t <= best.end.t;
+    const wet = night.filter((h) => popOf(h) >= RAIN_FLAG);
+    const poor = night.filter((h) => !inWin(h) && h.rating.k === 'poor');
+    if (best && best.hrs >= 2) {
+      // A solid window — but anything risky elsewhere in the night makes it only a partial go.
+      if (wet.length || poor.length) { cls = 'partial'; txt = 'PARTIAL GO'; } else { cls = 'go'; txt = 'GO'; }
+    } else if (best || night.some((h) => h.rating.k === 'fair')) { cls = 'fair'; txt = 'MARGINAL'; }
     else { cls = 'nogo'; txt = 'NO GO'; }
+    const winEnd = best ? new Date((best.end.t + 3600) * 1000) : null;
     line = best
-      ? `Best window <b>${esc(fmtTime(best.start.d))} – ${esc(fmtTime(new Date((best.end.t + 3600) * 1000)))}</b> <span class="muted">(${best.hrs} h)</span>`
+      ? `${cls === 'partial' ? 'Go' : 'Best window'} <b>${esc(fmtTime(best.start.d))} – ${esc(fmtTime(winEnd))}</b> <span class="muted">(${best.hrs} h)</span>`
       : cls === 'fair' ? 'Fair hours only — no solid window' : 'No usable window this night';
+    // Say when the rain risk is, relative to the window.
+    if (wet.length) {
+      const after = best ? wet.filter((h) => h.t > best.end.t) : [];
+      const before = best ? wet.filter((h) => h.t < best.start.t) : [];
+      const peak = Math.round(Math.max(...wet.map(popOf)));
+      if (after.length) note = `Rain risk from ${fmtTime(after[0].d)} (up to ${peak}%) — pack up before then`;
+      else if (before.length) note = `Rain risk until ${fmtTime(new Date((before[before.length - 1].t + 3600) * 1000))} (up to ${peak}%)`;
+      else note = `Rain risk ${fmtTime(wet[0].d)} – ${fmtTime(new Date((wet[wet.length - 1].t + 3600) * 1000))} (up to ${peak}%)`;
+    } else if (cls === 'partial' && poor.length) {
+      const after = poor.filter((h) => h.t > best.end.t);
+      note = after.length ? `Conditions worsen from ${fmtTime(after[0].d)}` : `Poor until ${fmtTime(best.start.d)}`;
+    }
     // Conditions over the dark hours ahead
     const cloud = avg(night.map((h) => h.cloud));
-    const pop = Math.max(...night.map((h) => (isNum(h.pop) ? h.pop : 0)));
+    const pop = Math.max(...night.map(popOf));
     const gust = Math.max(...night.map((h) => (isNum(h.gust) ? h.gust : 0)));
     const dew = Math.min(...night.map((h) => (isNum(h.dewGap) ? h.dewGap : 99)));
     const see = night.map((h) => h.seeing).filter(isNum);
     // [label, value, unit, class]
-    chips.push(['Rain risk', isNum(pop) ? Math.round(pop) : '–', '%', pop < 15 ? 'ok' : pop >= 40 ? 'bad' : '']);
+    chips.push(['Rain risk', Math.round(pop), '%', Math.round(pop) < RAIN_SHOW ? 'ok' : pop >= RAIN_STOP ? 'bad wet' : 'wet']);
     if (isNum(cloud)) chips.push(['Cloud', Math.round(cloud), '%', cloud < 30 ? 'ok' : cloud > 60 ? 'bad' : '']);
     if (gust > 0) chips.push(['Max gusts', wind(gust), windU(), gust > 30 ? 'bad' : gust < 20 ? 'ok' : '']);
     const moonUp = night.some((h) => h.moonAlt > 0);
@@ -607,7 +639,7 @@ function renderVerdict(win, moon, hours) {
     if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s), '', s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
   }
   $('#verdict').innerHTML = `<div class="v-badge ${cls}">${txt}</div>
-    <div class="v-text"><div class="v-win">${line}</div></div>
+    <div class="v-text"><div class="v-win">${line}</div>${note ? `<div class="v-note">${esc(note)}</div>` : ''}</div>
     <div class="vstats">${chips.map(([l, v, u, c]) => `<div class="vs ${c}"><span class="lbl">${esc(l)}</span><b>${esc(v)}<small>${esc(u)}</small></b></div>`).join('')}</div>`;
 }
 
@@ -630,31 +662,59 @@ function renderForecast(hours) {
   html += row('Rating', (h, i) => `<div class="fc-c rate ${h.rating.k}" data-i="${i}" title="${h.rating.score == null ? 'Daylight' : 'Score ' + h.rating.score + '/100'}">${RATE_TXT[h.rating.k]}</div>`);
   const ico = (svg, name, col) => `<span class="big-l ico" title="${name}" style="color:var(${col})"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg><span class="ico-t">${name}</span></span>`;
   const DROP = '<path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5z" fill="currentColor"/>';
-  const CLOUD = '<path d="M7 19h10.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 6.6 9.1 5 5 0 0 0 7 19z" fill="currentColor"/>';
-  html += row(ico(DROP, 'Precip', '--rain'), (h, i) => cell(h, i, pct(h.pop), 'big', tint(h.pop, '--rain', 0.55)));
+  const CLOUD = PUFF_ICON;
+  // Any chance of rain stands out: solid blue, stronger the higher the odds; dry hours stay quiet.
+  const wetCls = (p) => (!isNum(p) ? 'big' : Math.round(p) < RAIN_SHOW ? 'big dry' : p >= RAIN_STOP ? 'big wet hi' : p >= RAIN_FLAG ? 'big wet mid' : 'big wet');
+  html += row(ico(DROP, 'Precip', '--rain'), (h, i) => cell(h, i, pct(h.pop), wetCls(h.pop), isNum(h.pop) && Math.round(h.pop) >= RAIN_SHOW ? `background:color-mix(in srgb, var(--rain) ${Math.round(28 + Math.min(h.pop, 100) * 0.6)}%, transparent)` : ''));
   html += row(ico(CLOUD, 'Cloud', '--cloud'), (h, i) => cell(h, i, pct(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
 
-  // Chart: cloud bars + precip line (stretches to fill the card)
-  const n = hours.length;
-  let bars = '', pts = [];
-  hours.forEach((h, i) => {
-    const c = isNum(h.cloud) ? h.cloud : 0;
-    bars += `<rect x="${i * 10 + 1.2}" y="${100 - c}" width="7.6" height="${c}" fill="var(--cloud)" opacity="${h.sky.k === 'day' ? 0.3 : 0.7}"/>`;
-    if (isNum(h.pop)) pts.push(`${i * 10 + 5},${(100 - h.pop).toFixed(1)}`);
-  });
-  html += `<div class="fc-l">Sky<small>%</small></div><div class="fc-chart"><svg viewBox="0 0 ${n * 10} 100" preserveAspectRatio="none" aria-label="Cloud cover and precipitation chance by hour">
-    <line x1="0" x2="${n * 10}" y1="50" y2="50" stroke="var(--line2)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>${bars}
-    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></div>`;
+  // Chart: puffy clouds + precip line, drawn at real pixel size once the grid has laid out.
+  html += `<div class="fc-l">Sky<small>%</small></div><div class="fc-chart" id="skyChart" role="img" aria-label="Cloud cover and precipitation chance by hour"></div>`;
 
   html += row('Temp', (h, i) => cell(h, i, temp(h.temp)));
   html += row('Dew<span class="lg-only">&nbsp;gap</span>', (h, i) => cell(h, i, tempDiff(h.dewGap), isNum(h.dewGap) && h.dewGap < 2 ? 'warn' : ''));
   html += row(`Gusts<small>${windU()}</small>`, (h, i) => cell(h, i, wind(h.gust), isNum(h.gust) && h.gust > 30 ? 'warn' : '', '', `Wind ${wind(h.wind)} · gusts ${wind(h.gust)} ${windU()}`));
   html += row('Seeing', (h, i) => cell(h, i, qShort(h.seeing), qClass(h.seeing)));
   html += row('Transp', (h, i) => cell(h, i, qShort(h.transparency), qClass(h.transparency)));
-  const f = $('#forecast');
+  const f = $('#forecast'), n = hours.length;
   f.style.setProperty('--n', n);
   f.classList.toggle('dense', n > 13);
   f.innerHTML = html;
+  skyChart(hours);
+}
+
+/* One puffy cloud per hour, as tall as the cloud cover; adjacent hours merge into a cloud bank. */
+function puffs(x0, w, top, bottom) {
+  const h = bottom - top;
+  if (h < 1.5) return '';
+  const r = Math.max(1.2, Math.min(w * 0.3, h / 2, 22)), sr = r * 0.74, xm = x0 + w / 2, f = (v) => v.toFixed(1);
+  const bodyTop = Math.min(bottom, top + r);
+  return `<circle cx="${f(xm)}" cy="${f(top + r)}" r="${f(r)}"/>`
+    + `<circle cx="${f(x0 + sr)}" cy="${f(Math.min(bottom - sr * 0.4, top + r + sr * 0.55))}" r="${f(sr)}"/>`
+    + `<circle cx="${f(x0 + w - sr)}" cy="${f(Math.min(bottom - sr * 0.4, top + r + sr * 0.65))}" r="${f(sr)}"/>`
+    + `<rect x="${f(x0)}" y="${f(bodyTop)}" width="${f(w)}" height="${f(bottom - bodyTop)}" rx="${f(Math.min(sr, (bottom - bodyTop) / 2))}"/>`;
+}
+function skyChart(hours) {
+  const box = $('#skyChart');
+  if (!box) return;
+  const W = Math.max(120, Math.round(box.clientWidth)), H = Math.max(30, Math.round(box.clientHeight));
+  const n = hours.length, cw = W / n, top = 3, Y = (v) => top + (1 - v / 100) * (H - top);
+  let night = '', day = '', pts = [], dots = '';
+  hours.forEach((h, i) => {
+    if (!isNum(h.cloud) || h.cloud < 0.5) return;
+    const p = puffs(i * cw + cw * 0.06, cw * 0.88, Y(h.cloud), H);
+    if (h.sky.k === 'day') day += p; else night += p;
+  });
+  hours.forEach((h, i) => {
+    if (!isNum(h.pop)) return;
+    const x = i * cw + cw / 2, y = Y(h.pop);
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    if (Math.round(h.pop) >= RAIN_SHOW) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${h.pop >= RAIN_FLAG ? 4.5 : 3.2}" fill="var(--rain)" stroke="var(--card2)" stroke-width="1.5"/>`;
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+    <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/>
+    <g fill="var(--cloud)" opacity=".3">${day}</g><g fill="var(--cloud)" opacity=".72">${night}</g>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
 }
 
 function showSheet(title, body, sub = '', wide = false) {
@@ -703,55 +763,109 @@ function renderMoon(moon, lat) {
     <dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
 }
 
-function renderPath(moon, lat, now) {
-  const box = $('#moonPath');
-  const W = Math.max(280, Math.round(box.clientWidth || 480));
+/* Moon through the night: altitude against time (same time axis as the forecast), twilight shading,
+   when it rises/sets, where it is in the sky, and its highest point. */
+function renderPath(N, lat, now) {
+  const box = $('#moonPath'), moon = N.moon, c = N.S.s.map((p) => ({ d: p.d, sun: p.sun, alt: p.moon, az: p.moonAz }));
+  if (c.length < 2) { box.innerHTML = ''; return; }
+  const W = Math.max(260, Math.round(box.clientWidth || 480));
   const H = Math.max(140, Math.round(box.clientHeight || 260));
-  const L = 30, R = 10, T = 14, B = 22, pw = W - L - R, ph = H - T - B;
-  const X = (az) => L + (az / 360) * pw;
-  const Y = (alt) => T + (1 - Math.max(alt, 0) / 90) * ph;
-  let grid = '';
-  for (const a of [30, 60]) grid += `<line x1="${L}" x2="${W - R}" y1="${Y(a)}" y2="${Y(a)}" stroke="var(--line2)" stroke-dasharray="3 5"/><text x="${L - 6}" y="${Y(a) + 4}" font-size="11" text-anchor="end" fill="var(--muted)">${a}°</text>`;
-  const step = pw < 360 ? 90 : 45;
-  const names = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW', 360: 'N' };
-  for (let a = 0; a <= 360; a += step) {
-    const x = X(a);
-    grid += `<line x1="${x}" x2="${x}" y1="${T}" y2="${T + ph}" stroke="var(--line2)" stroke-opacity=".45"/><text x="${x}" y="${H - 6}" font-size="11" font-weight="600" text-anchor="middle" fill="var(--muted)">${names[a]}</text>`;
+  const L = 30, R = 10, T = 20, B = 20, pw = W - L - R, ph = H - T - B;
+  const f = (v) => v.toFixed(1);
+  const t0 = +c[0].d, t1 = +c[c.length - 1].d;
+  const up = c.filter((p) => p.alt > 0);
+  const top = up.length ? up.reduce((a, b) => (b.alt > a.alt ? b : a)) : null;
+  const yMax = top ? Math.min(90, Math.max(30, Math.ceil((top.alt + 12) / 15) * 15)) : 30;
+  const X = (d) => L + ((+d - t0) / (t1 - t0)) * pw;
+  const Y = (a) => T + (1 - Math.max(0, Math.min(a, yMax)) / yMax) * ph;
+  let s = '';
+  // Twilight bands (darkest = full dark)
+  const half = pw / (c.length - 1) / 2;
+  let k0 = 0;
+  for (let k = 1; k <= c.length; k++) {
+    if (k < c.length && skyState(c[k].sun).k === skyState(c[k0].sun).k) continue;
+    const x0 = k0 === 0 ? L : X(c[k0].d) - half, x1 = k === c.length ? L + pw : X(c[k].d) - half;
+    s += `<rect x="${f(x0)}" y="${T}" width="${f(x1 - x0 + 0.5)}" height="${f(ph)}" fill="var(--band-${skyState(c[k0].sun).k})"/>`;
+    k0 = k;
   }
-  const up = moon.path.filter((p) => p.alt > 0);
-  let segs = '', marks = '', glyphs = '';
+  // Altitude grid
+  const step = yMax <= 45 ? 15 : 30;
+  for (let a = step; a <= yMax; a += step) s += `<line x1="${L}" x2="${L + pw}" y1="${f(Y(a))}" y2="${f(Y(a))}" stroke="var(--grid)"/><text x="${L - 5}" y="${f(Y(a) + 4)}" font-size="10.5" text-anchor="end" fill="var(--muted)">${a}°</text>`;
+  // Ground
+  s += `<rect x="0" y="${f(T + ph)}" width="${W}" height="${B}" fill="var(--ground)"/><line x1="${L}" x2="${L + pw}" y1="${f(T + ph)}" y2="${f(T + ph)}" stroke="var(--muted)" stroke-opacity=".7"/>`;
+  s += `<text x="${L - 5}" y="${f(T + ph + 4)}" font-size="10.5" text-anchor="end" fill="var(--muted)">0°</text>`;
+  // Hour ticks and labels; the Moon's direction along the top while it is up
+  const nH = (t1 - t0) / 3600e3, every = pw / nH < 30 ? 3 : pw / nH < 48 ? 2 : 1;
+  for (let t = Math.ceil(t0 / 3600e3) * 3600e3; t <= t1; t += 3600e3) {
+    const d = new Date(t), x = X(d), hr = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: state.tz }).format(d);
+    if (hr % every || x < L + 10 || x > L + pw - 10) continue;
+    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T + ph)}" y2="${f(T + ph + 4)}" stroke="var(--muted)"/><text x="${f(x)}" y="${f(H - 5)}" font-size="10.5" text-anchor="middle" fill="var(--muted)">${esc(fmtHourShort(d))}</text>`;
+    const p = c[Math.min(c.length - 1, Math.round((t - t0) / STEP))];
+    if (p.alt > 0) s += `<text x="${f(x)}" y="${T - 6}" font-size="10.5" font-weight="700" text-anchor="middle" fill="var(--text)" opacity=".8">${compass(p.az)}</text>`;
+  }
+  let marks = '', labels = '';
   if (up.length) {
-    let d = '', prev = null;
-    for (const p of moon.path) {
-      if (p.alt <= 0) { prev = null; continue; }
-      d += `${!prev || Math.abs(p.az - prev.az) > 180 ? 'M' : 'L'}${X(p.az).toFixed(1)} ${Y(p.alt).toFixed(1)}`;
-      prev = p;
+    // Curve with a soft fill down to the horizon, split wherever the Moon is down.
+    let line = '', area = '', run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        const pts = run.map((p) => `${f(X(p.d))} ${f(Y(p.alt))}`);
+        line += `M${pts.join(' L')}`;
+        area += `M${f(X(run[0].d))} ${f(T + ph)} L${pts.join(' L')} L${f(X(run[run.length - 1].d))} ${f(T + ph)}Z`;
+      }
+      run = [];
+    };
+    // Include the horizon crossings so the curve meets the ground exactly.
+    const xs = crossings(c, 0);
+    const pts = c.map((p) => ({ d: p.d, alt: p.alt })).concat(xs.map((x) => ({ d: x.d, alt: 0, kind: x.kind }))).sort((a, b) => a.d - b.d);
+    for (const p of pts) {
+      if (p.kind === 'set') { run.push(p); flush(); }
+      else if (p.kind === 'rise') { flush(); run.push(p); }
+      else if (p.alt > 0) run.push(p);
+      else flush();
     }
-    segs = `<path d="${d}" fill="none" stroke="var(--path)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
-    const top = up.reduce((a, b) => (b.alt > a.alt ? b : a));
-    let lastX = -99;
-    moon.hourly.forEach((p) => {
-      if (p.alt <= 0) return;
-      const x = X(p.az), y = Y(p.alt);
-      marks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4" fill="var(--path)"/>`;
-      if (Math.abs(x - lastX) < 40 || (Math.abs(x - X(top.az)) < 30 && Math.abs(y - Y(top.alt)) < 30)) return;
-      lastX = x;
-      marks += `<text x="${x.toFixed(1)}" y="${(y - 7).toFixed(1)}" font-size="10" text-anchor="middle" fill="var(--muted)">${esc(fmtHour(p.d))}</text>`;
-    });
-    const r = Math.max(9, Math.min(14, ph / 12));
-    const lx = Math.min(Math.max(X(top.az), L + 75), W - R - 75);
-    glyphs += moonGlyph(X(top.az), Y(top.alt), r, moon.angle, lat)
-      + `<text x="${lx}" y="${top.alt < 45 ? Y(top.alt) - r - 8 : Y(top.alt) + r + 15}" font-size="12" font-weight="600" text-anchor="middle" fill="var(--text)">Highest ${Math.round(top.alt)}° · ${esc(fmtTime(top.d))}</text>`;
-    const nowP = moon.path.find((p) => Math.abs(p.d - now) <= 5 * 60e3);
-    if (nowP && nowP.alt > 0) glyphs += `<circle cx="${X(nowP.az)}" cy="${Y(nowP.alt)}" r="7" fill="none" stroke="var(--accent)" stroke-width="2"/><text x="${X(nowP.az) + 10}" y="${Y(nowP.alt) - 8}" font-size="11" fill="var(--accent)">Now</text>`;
+    flush();
+    s += `<path d="${area}" fill="var(--moon-lit)" fill-opacity=".1"/><path d="${line}" fill="none" stroke="var(--path)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // Rise / set on the horizon
+    const pill = (x, txt, side) => {
+      const w = txt.length * 6.2 + 12, hgt = 18;
+      let x0 = side === 'right' ? x + 6 : x - 6 - w;
+      if (x0 < L + 2) x0 = x + 6; if (x0 + w > L + pw - 2) x0 = x - 6 - w;
+      const y0 = T + ph - hgt - 6;
+      return `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${hgt}" rx="9" fill="var(--card)" stroke="var(--path)" stroke-opacity=".7"/><text x="${f(x0 + w / 2)}" y="${f(y0 + 12.5)}" font-size="11" font-weight="700" text-anchor="middle" fill="var(--text)">${esc(txt)}</text>`;
+    };
+    // Label times match the Moon card (rise/set of the Moon's upper limb).
+    const evs = moon.events.filter((e) => +e.d >= t0 && +e.d <= t1);
+    for (const x of evs) {
+      marks += `<circle cx="${f(X(x.d))}" cy="${f(T + ph)}" r="3.5" fill="var(--path)"/>`;
+      labels += pill(X(x.d), `${x.kind === 'rise' ? 'Rises' : 'Sets'} ${fmtTime(x.d)}`, x.kind === 'set' ? 'right' : 'left');
+    }
+    // Highest point: Moon glyph + label
+    const r = Math.max(8, Math.min(13, ph / 10)), gx = Math.min(Math.max(X(top.d), L + r + 1), L + pw - r - 1), gy = Y(top.alt);
+    marks += moonGlyph(gx, gy, r, moon.angle, lat);
+    const txt = `Highest ${Math.round(top.alt)}° · ${fmtTime(top.d)}`, tw = txt.length * 7;
+    const lx = Math.min(Math.max(gx, L + tw / 2 + 2), L + pw - tw / 2 - 2);
+    const ly = gy - r - 7 > T + 12 ? gy - r - 7 : gy + r + 16;
+    labels += `<text x="${f(lx)}" y="${f(ly)}" font-size="12.5" font-weight="800" text-anchor="middle" fill="var(--text)" stroke="var(--card)" stroke-width="3" paint-order="stroke">${esc(txt)}</text>`;
   } else {
-    glyphs = `<text x="${W / 2}" y="${T + ph / 2}" text-anchor="middle" font-size="13" fill="var(--muted)">The Moon stays below the horizon tonight.</text>`;
+    labels = `<text x="${f(L + pw / 2)}" y="${f(T + ph / 2)}" text-anchor="middle" font-size="13" fill="var(--muted)">The Moon stays below the horizon all night.</text>`;
   }
-  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Moon path across the sky tonight">
-    <defs><linearGradient id="skyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--sky-top)"/><stop offset="1" stop-color="var(--sky-bot)"/></linearGradient></defs>
-    <rect width="${W}" height="${H}" fill="url(#skyg)"/><rect x="0" y="${T + ph}" width="${W}" height="${B}" fill="var(--ground)"/>
-    ${grid}<line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" stroke="var(--muted)" stroke-opacity=".6"/>${segs}${marks}${glyphs}</svg>`;
-  $('#pathNote').textContent = `${fmtTime(moon.path[0].d)} → ${fmtTime(moon.path[moon.path.length - 1].d)}`;
+  // Now
+  if (now && +now > t0 && +now < t1) {
+    const x = X(now);
+    marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">Now</text>`;
+  }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Moon altitude through the night">${s}${marks}${labels}</svg>`;
+  // Header: what the Moon does during the dark hours
+  const dark = N.S.darkLim == null ? [] : c.filter((p) => p.sun <= N.S.darkLim);
+  const dUp = dark.filter((p) => p.alt > 0);
+  let note;
+  if (!dark.length) note = up.length ? 'Up tonight' : 'Down all night';
+  else if (!dUp.length) note = 'Down during full dark';
+  else if (dUp.length === dark.length) note = 'Up all through full dark';
+  else if (dark[0].alt > 0) note = `Up in full dark until ${fmtTime(dark.find((p) => p.alt <= 0).d)}`;
+  else note = `Rises in full dark at ${fmtTime(dUp[0].d)}`;
+  $('#pathNote').textContent = note;
 }
 
 function renderPlanets(list) {
@@ -776,7 +890,7 @@ function renderTop(list, topIdx, now) {
     const upNow = o.start <= now && now < o.end;
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
     const what = o.kind === 'comet' ? `Comet · mag ≈${o.mag.toFixed(1)}` : esc(o.type);
-    const when = `${upNow ? 'Up now' : esc(fmtTime(o.start))} → ${esc(fmtTime(o.end))} · ${o.hrs.toFixed(1)} h`;
+    const when = `${upNow ? '' : `${esc(fmtTime(o.start))} `}<span class="to">To</span> ${esc(fmtTime(o.end))}<span class="hr">${o.hrs.toFixed(1)} h</span>`;
     return `<button type="button" class="top-it" data-t="${i}">
       <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
@@ -797,8 +911,8 @@ function renderTargets(list) {
     const sub = o.kind === 'comet'
       ? `Comet · mag ≈${o.mag.toFixed(1)}${o.moonSep == null ? '' : ' · ' + moonTxt}`
       : `${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}`;
-    const when = esc(fmtTime(o.start));
-    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `up now · to ${esc(fmtTime(o.end))}` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
+    const when = upNow ? `To ${esc(fmtTime(o.end))}` : esc(fmtTime(o.start));
+    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `${o.hrs.toFixed(1)} h` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
   }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} tonight.`}</p>`;
@@ -1032,12 +1146,10 @@ function altChart(el, o, now) {
 
 const tile = (lbl, val, sub = '', cls = '') => `<div class="tile ${cls}"><span class="lbl">${esc(lbl)}</span><b>${esc(val)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 function windowTiles(o) {
-  const now = state.data ? state.data.now : new Date();
-  const upNow = o.start && o.start <= now && now < o.end;
   return o.start
-    ? tile(o.startWhy === 'alt' ? 'Reaches 40°' : o.startWhy === 'dir' ? 'Into home sky' : 'Above 40° at dark', fmtTime(o.start), (o.startWhy === 'alt' ? 'rising through 40°' : o.startWhy === 'dir' ? `comes round past NW at ${Math.round(o.startAlt)}°` : `already ${Math.round(o.startAlt)}° when dark begins`) + (upNow ? ' · up now' : ''), 'key')
+    ? tile(o.startWhy === 'alt' ? 'Reaches 40°' : o.startWhy === 'dir' ? 'Into home sky' : 'Above 40° at dark', fmtTime(o.start), (o.startWhy === 'alt' ? 'rising through 40°' : o.startWhy === 'dir' ? `comes round past NW at ${Math.round(o.startAlt)}°` : `already ${Math.round(o.startAlt)}° when dark begins`), 'key')
       + tile('Imaging window', `${o.hrs.toFixed(1)} h`, `until ${fmtTime(o.end)}${o.endWhy === 'dark' ? ' (dawn)' : o.endWhy === 'dir' ? ' (passes S)' : ''}`, 'key')
-    : tile('Reaches 40°', 'Not tonight', `in darkness`, 'warn');
+    : tile('Reaches 40°', 'Not tonight', `in darkness`, o.kind === 'planet' ? 'warn' : 'warn span');
 }
 function openObject(o) {
   if (!o) return;
@@ -1051,7 +1163,7 @@ function openObject(o) {
     title = `${o.id} · ${o.name}`;
     sub = `${o.type} in ${constellation(o.ra, o.dec)}`;
     hero = heroSky(o.ra, o.dec, sz ? sz[0] : 0, 'DSS2 sky survey · dashed box = Seestar S50 frame · circle = full Moon');
-    tiles = windowTiles(o) + tile('Peak', peakTxt, o.peak ? `at ${fmtTime(o.peak.d)}` : '') + tile('Fits Seestar frame', fit, fitSub);
+    tiles = windowTiles(o) + tile('Peak', peakTxt, o.peak ? `at ${fmtTime(o.peak.d)}` : '', 'sm') + tile('Fits Seestar frame', fit, fitSub, 'sm');
     rows = [
       ['Size', info[1] ? `${info[1]} (arcminutes)` : '–'], ['In plain terms', sizeScale(sz) || '–'],
       ['Seestar frame', `${SEESTAR.w}° × ${SEESTAR.h}° (77′ × 43′)`],
@@ -1068,8 +1180,8 @@ function openObject(o) {
     hero = heroPhoto(PLANET_WIKI[o.name] || o.name);
     const rs = crossings(o.curve, 0);
     const rise = rs.find((x) => x.kind === 'rise'), set = rs.find((x) => x.kind === 'set');
-    tiles = windowTiles(o) + tile('Highest', peakTxt, `at ${fmtTime(o.d)}`) + tile('Magnitude', o.mag.toFixed(1), o.mag < 0 ? 'very bright' : '')
-      + (o.start ? '' : tile('Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″`, `≈ ${Math.max(1, Math.round(px))} px in the Seestar`));
+    tiles = windowTiles(o) + tile('Highest', peakTxt, `at ${fmtTime(o.d)}`, 'sm') + tile('Magnitude', o.mag.toFixed(1), o.mag < 0 ? 'very bright' : '', 'sm')
+      + (o.start ? '' : tile('Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″`, `≈ ${Math.max(1, Math.round(px))} px in the Seestar`, 'sm'));
     rows = [
       ['Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″ (arcseconds${o.name === 'Saturn' ? ', globe' : ''})`],
       ['In the Seestar', `≈ ${Math.max(1, Math.round(px))} px across (frame 1080 × 1920 px)`],
@@ -1086,7 +1198,7 @@ function openObject(o) {
     const sky = heroSky(o.ra, o.dec, 0, 'Star field at the comet’s position tonight (DSS2) · the comet moves nightly', true);
     hero = c.wiki ? heroPhoto(c.wiki, sky) : sky;
     const tp = new Date((c.tp - 2440587.5) * 86400e3);
-    tiles = windowTiles(o) + tile('Peak', peakTxt, `at ${fmtTime(o.peak.d)}`) + tile('Brightness', `≈ ${o.mag.toFixed(1)}`, 'predicted magnitude');
+    tiles = windowTiles(o) + tile('Peak', peakTxt, `at ${fmtTime(o.peak.d)}`, 'sm') + tile('Brightness', `≈ ${o.mag.toFixed(1)}`, 'predicted magnitude', 'sm');
     rows = [
       ['Perihelion', `${fmtDay(tp)}, ${tp.getFullYear()}`],
       ['From Earth', `${o.delta.toFixed(2)} AU · ${Math.round(o.delta * 149.6)} million km`],
@@ -1097,14 +1209,13 @@ function openObject(o) {
     tip = 'Comets drift against the stars, so 15–30 minute sessions keep the head sharp. LP filter off. Brightness predictions are uncertain — comets can surprise either way.';
   }
   showSheet(title, `<div class="obj">
-      <div class="obj-top">${hero}<div class="tiles">${tiles}</div></div>
+      <div class="obj-top">${hero}<div class="tiles">${tiles}<div class="tip"><b>Seestar tip</b>${esc(tip)}</div></div></div>
       <section class="chart-card">
         <div class="chart-head"><h3>Altitude tonight</h3><span>${o.start ? `In view ≥40° for ${o.hrs.toFixed(1)} h` : `Never reaches ${MIN_ALT}° in darkness`}</span></div>
         <div class="chart" id="objChart"></div>
         <div class="chart-key"><span><i class="k-tgt"></i>${esc(o.kind === 'planet' ? o.name : o.id)}</span><span><i class="k-moon"></i>Moon</span><span><i class="k-min"></i>40° minimum</span><span><i class="k-win"></i>Imaging window</span><span><i class="k-dark"></i>Full dark</span></div>
       </section>
       <dl class="facts">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-      <div class="tip"><b>Seestar tip</b>${esc(tip)}</div>
       <p class="fine">${o.kind === 'comet' ? 'Orbit: JPL Horizons. Positions computed on device.' : o.kind === 'dso' ? 'Catalog sizes and magnitudes are approximate.' : 'Positions computed on device (Astronomy Engine).'}</p>
     </div>`, sub, true);
   state.openObj = o;
@@ -1117,16 +1228,18 @@ function showPlanet(i) { const D = state.data; openObject(D && D.nights[state.ni
 
 /* ---------- options ---------- */
 function homeWheel() {
-  const C = 130, R1 = 38, R2 = 108, RL = 122, rad = Math.PI / 180;
+  const C = 134, R1 = 38, R2 = 106, RL = 120, rad = Math.PI / 180;
   const pt = (a, r) => `${(C + r * Math.sin(a * rad)).toFixed(1)} ${(C - r * Math.cos(a * rad)).toFixed(1)}`;
   let s = '';
   state.homeSky.forEach((on, i) => {
-    const a0 = i * 22.5 - 11.25, a1 = a0 + 22.5;
-    s += `<path class="wedge${on ? ' on' : ''}" data-w="${i}" role="checkbox" aria-checked="${on}" aria-label="${PT16[i]}" tabindex="0"
+    const a0 = i * 22.5, a1 = a0 + 22.5;
+    s += `<path class="wedge${on ? ' on' : ''}" data-w="${i}" role="checkbox" aria-checked="${on}" aria-label="${PT16[i]} to ${PT16[(i + 1) % 16]}" tabindex="0"
       d="M${pt(a0, R1)} L${pt(a0, R2)} A${R2} ${R2} 0 0 1 ${pt(a1, R2)} L${pt(a1, R1)} A${R1} ${R1} 0 0 0 ${pt(a0, R1)}Z"/>`;
   });
+  // N–S and E–W lines run right through the wheel to the labels.
+  for (const a of [0, 90]) s += `<line class="axis" x1="${pt(a, RL - 9).split(' ')[0]}" y1="${pt(a, RL - 9).split(' ')[1]}" x2="${pt(a + 180, RL - 9).split(' ')[0]}" y2="${pt(a + 180, RL - 9).split(' ')[1]}"/>`;
   PT16.forEach((n, i) => {
-    const big = i % 4 === 0, mid = i % 2 === 0, a = i * 22.5, r = big || mid ? RL : RL - 2;
+    const big = i % 4 === 0, mid = i % 2 === 0, a = i * 22.5, r = big ? RL + 4 : RL;
     const [x, y] = pt(a, r).split(' ');
     s += `<text x="${x}" y="${(+y + (big ? 5 : 4)).toFixed(1)}" text-anchor="middle" class="wl${big ? ' big' : mid ? '' : ' sm'}">${big || mid ? n : '·'}</text>`;
   });
@@ -1140,7 +1253,7 @@ function renderOptions() {
   box.querySelector('.wheel-desc').textContent = homeDesc();
 }
 function saveHome() {
-  store.set('homeSky', state.homeSky);
+  store.set('homeSky2', state.homeSky);
   renderOptions(); applyHome();
   if (state.home) { findTargets(); renderAll(); }
 }
@@ -1187,10 +1300,10 @@ function renderAll() {
   renderVerdict(N.win, N.moon, N.hours);
   renderTonight(N.win);
   renderForecast(N.hours);
-  $('#fcTitle').textContent = `Dark hours · ${fmtDay(N.win.set)}`;
+  $('#fcTitle').innerHTML = `Dark hours<span class="fc-date">${esc(fmtDay(N.win.set))}</span>`;
   $('#pathTitle').textContent = state.night ? 'Moon path · tomorrow' : 'Moon path';
   renderMoon(N.moon, D.lat);
-  renderPath(N.moon, D.lat, D.now);
+  renderPath(N, D.lat, D.now);
   renderPlanets(N.planets);
   renderTargets(N.targets);
   const s = D.src, on = OM_MODELS.filter((m) => s.om[m.id]).length + ENSEMBLES.filter((e) => s.ens[e.name]).length + (s.met ? 1 : 0) + (s.t7 ? 1 : 0);
@@ -1359,7 +1472,8 @@ function init() {
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
     const D = state.data; if (!D) return;
-    renderPath(D.nights[state.night].moon, D.lat, D.now);
+    renderPath(D.nights[state.night], D.lat, D.now);
+    skyChart(D.nights[state.night].hours);
     if ($('#sheet').open && $('#objChart') && state.openObj) altChart($('#objChart'), state.openObj, D.now);
   }, 150); });
   $('#searchInput').addEventListener('input', onSearch);

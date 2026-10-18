@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=2.6">
+<link rel="stylesheet" href="style.css?v=2.7">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -82,7 +82,7 @@
   </section>
 
   <section class="card fc-card" id="hoursCard">
-    <div class="card-head"><div class="eyebrow" id="fcTitle">Dark hours</div><div class="legend xs muted"><i class="lg-cloud"></i>Cloud <i class="lg-rain"></i>Precip chance<span class="lg-tap"> · tap an hour for sources</span></div></div>
+    <div class="card-head fc-head"><div class="eyebrow ttl eb-row" id="fcTitle">Dark hours</div><div class="legend"><span class="lg"><svg class="lg-cloud" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 19.5h11.9a4.1 4.1 0 0 0 .9-8.1 4.3 4.3 0 0 0-5.6-3.3A5 5 0 0 0 4.6 10.6a4.5 4.5 0 0 0 1.6 8.9z" fill="currentColor"/><circle cx="9.3" cy="10.4" r="3.9" fill="currentColor"/><circle cx="14.6" cy="9.6" r="3.3" fill="currentColor"/></svg>Cloud</span><span class="lg"><svg class="lg-rain" viewBox="0 0 26 12" aria-hidden="true"><path d="M2 9 L13 4 L24 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="4" r="3" fill="currentColor"/></svg>Rain chance</span><span class="lg-tap">Tap an hour for sources</span></div></div>
     <div id="forecast" class="forecast"></div>
   </section>
 
@@ -116,6 +116,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=2.6"></script>
+<script src="app.js?v=2.7"></script>
 </body>
 </html>
