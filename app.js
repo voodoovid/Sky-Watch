@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.7';
+const VERSION = 'v2.8';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -160,8 +160,30 @@ async function fetchMET(lat, lon) {
 /* 7Timer! ASTRO — seeing and transparency (3-hourly). */
 const SEEING = ['', '<0.5″', '0.5–0.75″', '0.75–1″', '1–1.25″', '1.25–1.5″', '1.5–2″', '2–2.5″', '>2.5″'];
 const QUAL = (v) => (v <= 2 ? 'Excellent' : v <= 4 ? 'Good' : v <= 6 ? 'Average' : 'Poor');
+// 7Timer! is slow (often 10–30 s) and sometimes returns broken JSON
+// (e.g. `"temp2m" : ,`), so: long timeout, repair the text, retry, try both hosts.
+async function get7TimerJSON(url, ms) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: c.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const txt = (await r.text()).replace(/:\s*(?=[,}\]])/g, ': null');
+    return JSON.parse(txt);
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'timed out' : (e.message || 'failed'));
+  } finally { clearTimeout(t); }
+}
 async function fetch7Timer(lat, lon) {
-  const j = await getJSON(`https://www.7timer.info/bin/astro.php?lon=${(+lon).toFixed(3)}&lat=${(+lat).toFixed(3)}&ac=0&unit=metric&output=json&tzshift=0`, 20000);
+  const q = `/bin/astro.php?lon=${(+lon).toFixed(3)}&lat=${(+lat).toFixed(3)}&ac=0&unit=metric&output=json&tzshift=0`;
+  const hosts = ['https://www.7timer.info', 'https://7timer.info', 'https://www.7timer.info'];
+  let j, last;
+  for (const h of hosts) {
+    try { j = await get7TimerJSON(h + q, 40000); if (j && Array.isArray(j.dataseries)) break; j = null; last = new Error('no data'); }
+    catch (e) { last = e; }
+  }
+  if (!j) { state.t7err = last ? last.message : 'failed'; throw last || new Error('failed'); }
+  state.t7err = '';
   const s = String(j.init);
   const t0 = Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10)) / 1000;
   return j.dataseries.map((d) => ({
@@ -1287,7 +1309,7 @@ function showSources() {
   OM_MODELS.forEach((m) => items.push([m.name + ' (Open-Meteo)', !!src.om[m.id]]));
   items.push(['MET Norway (yr.no)', !!src.met]);
   ENSEMBLES.forEach((e) => items.push([e.name + ' (Open-Meteo)', !!src.ens[e.name], src.ens[e.name] ? src.ens[e.name].members + ' runs' : '']));
-  items.push(['7Timer! ASTRO — seeing & transparency', !!src.t7]);
+  items.push(['7Timer! ASTRO — seeing & transparency', !!src.t7, !src.t7 && state.t7err ? '(' + state.t7err + ')' : '']);
   items.push(['Astronomy Engine — Sun, Moon, planets (on device)', true]);
   showSheet('Data sources', `<table class="src"><tbody>${items.map(([n, ok, x]) => `<tr><td>${esc(n)}${x ? ` <span class="muted">${esc(x)}</span>` : ''}</td><td class="n ${ok ? 'ok' : 'bad'}">${ok ? '✓ Online' : 'Unavailable'}</td></tr>`).join('')}</tbody></table>`);
 }
