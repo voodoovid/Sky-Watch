@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.15';
+const VERSION = 'v3.16';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -806,12 +806,19 @@ function puffs(seed, cx, maxW, top, bottom, pct) {
   const f = (v) => v.toFixed(2), rnd = () => ((Math.sin(seed * 12.9898 + ++k * 78.233) * 43758.5453) % 1 + 1) % 1;
   // Build the cloud in a unit box (base at y = 0, rising to negative y), then fit it to its slot.
   const L = [];
-  const er = 0.13 + rnd() * 0.06, er2 = 0.12 + rnd() * 0.07;
-  L.push([0.12 + er * 0.3, -er, er], [0.88 - er2 * 0.3, -er2, er2]);           // rounded ends
-  const n = 2 + Math.floor(rnd() * 2.6);                                        // 2-4 crown lobes
+  const er = 0.1 + rnd() * 0.05, er2 = 0.09 + rnd() * 0.06;
+  L.push([0.08 + er * 0.3, -er, er], [0.92 - er2 * 0.3, -er2, er2]);           // rounded ends (L[0], L[1])
+  const nb = 2 + Math.floor(rnd() * 2);                                         // low base billows
+  for (let i = 0; i < nb; i++) { const r = 0.12 + rnd() * 0.06; L.push([0.2 + (0.6 * (i + 0.5)) / nb + (rnd() - 0.5) * 0.08, -r * 0.95, r]); }
+  const n = 2 + Math.floor(rnd() * 2.6), crown = [];                            // 2-4 big crown lobes
   for (let i = 0; i < n; i++) {
-    const x = 0.3 + (0.4 * (i + 0.5)) / n + (rnd() - 0.5) * 0.12, r = 0.17 + rnd() * 0.15;
-    L.push([x, -r * (0.75 + rnd() * 0.35) - 0.05, r]);
+    const x = 0.28 + (0.44 * (i + 0.5)) / n + (rnd() - 0.5) * 0.12, r = 0.15 + rnd() * 0.14 + (i === Math.floor(n / 2) ? 0.05 : 0);
+    const c = [x, -r * (0.8 + rnd() * 0.3) - 0.07, r]; L.push(c); crown.push(c);
+  }
+  const nt = 3 + Math.floor(rnd() * 4);                                         // small billows on the tops
+  for (let i = 0; i < nt; i++) {
+    const [x, y, r] = crown[Math.floor(rnd() * crown.length)], a = Math.PI * (1.12 + rnd() * 0.76), rr = r * (0.28 + rnd() * 0.22);
+    L.push([x + Math.cos(a) * r * 0.9, y + Math.sin(a) * r * 0.9, rr]);
   }
   let x1 = 1, x2 = 0, y1 = 0;
   for (const [x, y, r] of L) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
@@ -825,7 +832,7 @@ function skyChart(hours) {
   const box = $('#skyChart');
   if (!box) return;
   const W = Math.max(120, Math.round(box.clientWidth)), H = Math.max(30, Math.round(box.clientHeight));
-  const n = hours.length, cw = W / n, top = 4, Y = (v) => top + (1 - v / 100) * (H - top);
+  const n = hours.length, cw = W / n, top = 4, Y = (v) => top + (1 - v / 100) * (H - top), Yr = (v) => top + (1 - v / 100) * (H - top - 6);
   let night = '', day = '', pts = [], dots = '';
   hours.forEach((h, i) => {
     if (!isNum(h.cloud) || h.cloud < 0.5) return;
@@ -834,20 +841,23 @@ function skyChart(hours) {
   });
   hours.forEach((h, i) => {
     if (!isNum(h.pop)) return;
-    const x = i * cw + cw / 2, y = Y(h.pop);
+    const x = i * cw + cw / 2, y = Yr(h.pop);
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     if (Math.round(h.pop) >= RAIN_SHOW) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${h.pop >= RAIN_FLAG ? 4.5 : 3.2}" fill="var(--rain)" stroke="var(--card2)" stroke-width="1.5"/>`;
   });
-  const blur = Math.max(2, Math.min(6, cw * 0.14)).toFixed(1);
+  const blur = Math.max(2, Math.min(5.5, cw * 0.1)).toFixed(1);
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
-    <defs><filter id="puff3d" x="-2%" y="-10%" width="104%" height="120%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="b"/>
-      <feDiffuseLighting in="b" surfaceScale="5" diffuseConstant="1.3" lighting-color="#fff" result="d"><feDistantLight azimuth="235" elevation="48"/></feDiffuseLighting>
-      <feSpecularLighting in="b" surfaceScale="5" specularConstant=".55" specularExponent="16" lighting-color="#fff" result="s"><feDistantLight azimuth="235" elevation="58"/></feSpecularLighting>
-      <feComposite in="SourceGraphic" in2="d" operator="arithmetic" k1="1" result="lit"/>
-      <feComposite in="s" in2="SourceAlpha" operator="in" result="sp"/>
-      <feComposite in="lit" in2="sp" operator="arithmetic" k2="1" k3=".8" result="all"/>
-      <feComposite in="all" in2="SourceAlpha" operator="in"/>
+    <defs><filter id="puff3d" x="-8%" y="-15%" width="116%" height="130%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".08" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="${(cw * 0.035).toFixed(1)}" xChannelSelector="R" yChannelSelector="G" result="g"/>
+      <feGaussianBlur in="g" stdDeviation=".5" result="g2"/>
+      <feGaussianBlur in="g2" stdDeviation="${blur}" result="b"/>
+      <feDiffuseLighting in="b" surfaceScale="4" diffuseConstant="1.35" lighting-color="#fff" result="d"><feDistantLight azimuth="250" elevation="42"/></feDiffuseLighting>
+      <feSpecularLighting in="b" surfaceScale="4" specularConstant=".45" specularExponent="14" lighting-color="#fff" result="s"><feDistantLight azimuth="250" elevation="55"/></feSpecularLighting>
+      <feComposite in="g2" in2="d" operator="arithmetic" k1="1" result="lit"/>
+      <feComposite in="s" in2="g2" operator="in" result="sp"/>
+      <feComposite in="lit" in2="sp" operator="arithmetic" k2="1" k3=".7" result="all"/>
+      <feComposite in="all" in2="g2" operator="in"/>
     </filter></defs>
     ${hours.slice(1).map((_, i) => `<line x1="${((i + 1) * cw).toFixed(1)}" x2="${((i + 1) * cw).toFixed(1)}" y1="0" y2="${H}" stroke="var(--line2)" stroke-width="1"/>`).join('')}
     <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/>
