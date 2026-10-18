@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=2.5">
+<link rel="stylesheet" href="style.css?v=2.6">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -28,6 +28,7 @@
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5M5.5 9.8V20h13V9.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M10 20v-5.5h4V20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="15" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s7-6.3 7-12a7 7 0 0 0-14 0c0 5.7 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="currentColor"/></symbol>
 </svg>
 
@@ -46,11 +47,12 @@
     <div class="seg night-seg" id="nightSeg" role="group" aria-label="Night">
       <button type="button" data-n="0" aria-pressed="true">Tonight</button><button type="button" data-n="1" aria-pressed="false">Tomorrow</button>
     </div>
-    <button id="homeBtn" class="ibtn home-btn" type="button" aria-pressed="false" aria-label="Home sky: only NW to N to E to S"><svg><use href="#i-home"/></svg><span class="lbl">Home</span></button>
+    <button id="homeBtn" class="ibtn home-btn" type="button" aria-pressed="false" aria-label="Home sky"><svg><use href="#i-home"/></svg><span class="lbl">Home</span></button>
     <div class="seg" role="group" aria-label="Units">
       <button id="unitsBtn" type="button" aria-label="Switch units"><span data-u="metric">°C</span><span data-u="imperial">°F</span></button>
     </div>
     <button id="refreshBtn" class="ibtn" type="button" title="Refresh" aria-label="Refresh"><svg><use href="#i-refresh"/></svg></button>
+    <button id="optBtn" class="ibtn" type="button" title="Options" aria-label="Options"><svg><use href="#i-gear"/></svg></button>
     <button id="redBtn" class="ibtn red-btn" type="button" aria-pressed="false" title="Red night mode" aria-label="Red night mode"><svg><use href="#i-eye"/></svg><span class="lbl">Red</span></button>
   </div>
 </header>
@@ -85,14 +87,19 @@
   </section>
 
   <section class="card path-card" id="pathCard">
-    <div class="card-head"><div class="eyebrow" id="pathTitle">Moon path tonight</div><div id="pathNote" class="xs muted"></div></div>
+    <div class="card-head"><div class="eyebrow" id="pathTitle">Moon path</div><div id="pathNote" class="xs muted"></div></div>
     <div id="moonPath" class="moonpath"></div>
   </section>
 
+  <section class="card top-card" id="topCard">
+    <div class="eyebrow ttl eb-row" id="topTitle">Top targets tonight</div>
+    <div id="topTargets" class="toplist"></div>
+  </section>
+
   <section class="card obj-card" id="objCard">
-    <div class="eyebrow eb-row">Planets<span class="eb-r">Highest</span></div>
+    <div class="eyebrow ttl eb-row">Planets<span class="eb-r">Highest</span></div>
     <div id="planets" class="list"></div>
-    <div class="eyebrow mt eb-row">Seestar targets<span class="eb-r">Reaches 40°</span></div>
+    <div class="eyebrow ttl mt eb-row" id="tgtTitle">Seestar targets<span class="eb-r">Reaches 40°</span></div>
     <div id="targets" class="list scroll"></div>
   </section>
 </main>
@@ -109,6 +116,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=2.5"></script>
+<script src="app.js?v=2.6"></script>
 </body>
 </html>

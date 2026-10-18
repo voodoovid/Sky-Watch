@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.5';
+const VERSION = 'v2.6';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -13,6 +13,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
 };
 
+const HOME_DEFAULT = Array.from({ length: 16 }, (_, i) => i <= 8 || i >= 14);
+const PT16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const state = {
   units: store.get('units', 'metric'),
   red: store.get('red', false),
@@ -21,7 +23,9 @@ const state = {
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   data: null,
   night: 0, // 0 = tonight, 1 = tomorrow night
-  home: store.get('home', false), // only count the NW → N → E → S part of the sky
+  home: store.get('home', false), // only count the part of the sky set in Options
+  // 16 wedges of 22.5°, centred on N, NNE, NE … NNW. Default: NW clockwise through N and E to S.
+  homeSky: (() => { const v = store.get('homeSky', null); return Array.isArray(v) && v.length === 16 ? v.map(Boolean) : HOME_DEFAULT.slice(); })(),
 };
 
 /* ---------- formatting ---------- */
@@ -37,8 +41,23 @@ const tempDiff = (c) => (!isNum(c) ? '–' : state.units === 'metric' ? Math.rou
 const wind = (k) => (!isNum(k) ? '–' : state.units === 'metric' ? String(Math.round(k)) : String(Math.round(k / 1.609344)));
 const windU = () => (state.units === 'metric' ? 'km/h' : 'mph');
 const rain = (mm) => (!isNum(mm) ? '–' : state.units === 'metric' ? mm.toFixed(1) + ' mm' : (mm / 25.4).toFixed(2) + ' in');
-/* Home sky: clockwise from NW through N and E to S (azimuth 315° → 360°/0° → 180°). */
-const inHome = (az) => { az = ((az % 360) + 360) % 360; return az >= 315 || az <= 180; };
+/* Home sky: the wedges picked in Options (16 × 22.5°). */
+const inHome = (az) => state.homeSky[Math.round((((az % 360) + 360) % 360) / 22.5) % 16];
+/* Plain description of the home sky, e.g. "NW → S" (clockwise runs). */
+function homeDesc() {
+  const h = state.homeSky, n = h.filter(Boolean).length;
+  if (n === 16) return 'whole sky';
+  if (!n) return 'nothing selected';
+  const start = h.findIndex((v, i) => v && !h[(i + 15) % 16]);
+  const runs = [];
+  for (let k = 0; k < 16; k++) {
+    const i = (start + k) % 16;
+    if (h[i] && !h[(i + 15) % 16]) runs.push([i, i]);
+    else if (h[i]) runs[runs.length - 1][1] = i;
+  }
+  runs.sort((x, y) => (y[0] > y[1]) - (x[0] > x[1]) || x[0] - y[0]); // a run through north first
+  return runs.map(([a, b]) => (a === b ? PT16[a] : `${PT16[a]} → ${PT16[b]}`)).join(', ');
+}
 const compass = (az) => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((az % 360) + 360) % 360 / 45) % 8];
 
 /* ---------- networking ---------- */
@@ -732,7 +751,7 @@ function renderPath(moon, lat, now) {
     <defs><linearGradient id="skyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--sky-top)"/><stop offset="1" stop-color="var(--sky-bot)"/></linearGradient></defs>
     <rect width="${W}" height="${H}" fill="url(#skyg)"/><rect x="0" y="${T + ph}" width="${W}" height="${B}" fill="var(--ground)"/>
     ${grid}<line x1="${L}" x2="${W - R}" y1="${T + ph}" y2="${T + ph}" stroke="var(--muted)" stroke-opacity=".6"/>${segs}${marks}${glyphs}</svg>`;
-  $('#pathNote').textContent = `Sunset ${fmtTime(moon.path[0].d)} → sunrise ${fmtTime(moon.path[moon.path.length - 1].d)} · south centre`;
+  $('#pathNote').textContent = `${fmtTime(moon.path[0].d)} → ${fmtTime(moon.path[moon.path.length - 1].d)}`;
 }
 
 function renderPlanets(list) {
@@ -743,9 +762,35 @@ function renderPlanets(list) {
     : '<p class="empty">None well placed after dusk.</p>';
 }
 
+/* Small survey image for the Top targets card, cropped to the object's size. */
+function thumbUrl(o) {
+  const sz = o.kind === 'dso' ? parseSize((DSO_INFO[o.id] || [])[1]) : null;
+  const fov = Math.min(4, Math.max(0.4, ((sz ? sz[0] : 40) / 60) * 1.6));
+  return skyCutout(o.ra, o.dec, fov, 240, 180);
+}
+const TOP_N = 3;
+function renderTop(list, topIdx, now) {
+  $('#topTitle').firstChild.textContent = state.night ? 'Top targets tomorrow' : 'Top targets tonight';
+  $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
+    const o = list[i];
+    const upNow = o.start <= now && now < o.end;
+    const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
+    const what = o.kind === 'comet' ? `Comet · mag ≈${o.mag.toFixed(1)}` : esc(o.type);
+    const when = `${upNow ? 'Up now' : esc(fmtTime(o.start))} → ${esc(fmtTime(o.end))} · ${o.hrs.toFixed(1)} h`;
+    return `<button type="button" class="top-it" data-t="${i}">
+      <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
+      <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
+  }).join('') : '<p class="empty">No targets reach 40° in darkness.</p>';
+}
+
 function renderTargets(list) {
   const now = state.data ? state.data.now : new Date();
-  $('#targets').innerHTML = list.length ? list.map((o, i) => {
+  // Top few still-visible targets go to their own card; the list continues with the rest.
+  const topIdx = [];
+  list.forEach((o, i) => { if (topIdx.length < TOP_N && o.end > now) topIdx.push(i); });
+  renderTop(list, topIdx, now);
+  const rest = list.map((o, i) => [o, i]).filter(([, i]) => !topIdx.includes(i));
+  $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
     const neb = /Emission|Supernova|Planetary/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
     const upNow = o.start <= now && now < o.end, past = o.end <= now;
@@ -756,7 +801,7 @@ function renderTargets(list) {
     const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `up now · to ${esc(fmtTime(o.end))}` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
-  }).join('') : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ' in your home sky (NW → N → E → S)' : ''} tonight.`}</p>`;
+  }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} tonight.`}</p>`;
 }
 
 /* ---------- object pop-up ---------- */
@@ -788,8 +833,8 @@ function frameFit(sz) {
   const nx = Math.ceil(a / (fw * 0.85)), ny = Math.ceil(b / (fh * 0.85));
   return ['Mosaic', `about ${nx} × ${ny} panels to cover it`];
 }
-function skyCutout(raHours, dec, fovDeg) {
-  return 'https://alasky.cds.unistra.fr/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=900&height=600'
+function skyCutout(raHours, dec, fovDeg, w = 900, h = 600) {
+  return `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=${w}&height=${h}`
     + `&fov=${fovDeg.toFixed(3)}&projection=TAN&coordsys=icrs&ra=${(raHours * 15).toFixed(4)}&dec=${dec.toFixed(4)}&format=jpg`;
 }
 /* Survey image with the Seestar frame and a full Moon drawn to the same scale. */
@@ -1070,6 +1115,58 @@ function openObject(o) {
 function showTarget(i) { const D = state.data; openObject(D && D.nights[state.night].targets[i]); }
 function showPlanet(i) { const D = state.data; openObject(D && D.nights[state.night].planets[i]); }
 
+/* ---------- options ---------- */
+function homeWheel() {
+  const C = 130, R1 = 38, R2 = 108, RL = 122, rad = Math.PI / 180;
+  const pt = (a, r) => `${(C + r * Math.sin(a * rad)).toFixed(1)} ${(C - r * Math.cos(a * rad)).toFixed(1)}`;
+  let s = '';
+  state.homeSky.forEach((on, i) => {
+    const a0 = i * 22.5 - 11.25, a1 = a0 + 22.5;
+    s += `<path class="wedge${on ? ' on' : ''}" data-w="${i}" role="checkbox" aria-checked="${on}" aria-label="${PT16[i]}" tabindex="0"
+      d="M${pt(a0, R1)} L${pt(a0, R2)} A${R2} ${R2} 0 0 1 ${pt(a1, R2)} L${pt(a1, R1)} A${R1} ${R1} 0 0 0 ${pt(a0, R1)}Z"/>`;
+  });
+  PT16.forEach((n, i) => {
+    const big = i % 4 === 0, mid = i % 2 === 0, a = i * 22.5, r = big || mid ? RL : RL - 2;
+    const [x, y] = pt(a, r).split(' ');
+    s += `<text x="${x}" y="${(+y + (big ? 5 : 4)).toFixed(1)}" text-anchor="middle" class="wl${big ? ' big' : mid ? '' : ' sm'}">${big || mid ? n : '·'}</text>`;
+  });
+  s += `<circle cx="${C}" cy="${C}" r="${R1 - 6}" class="hub"/><text x="${C}" y="${C + 5}" text-anchor="middle" class="wl big">You</text>`;
+  return `<svg viewBox="0 0 ${C * 2} ${C * 2}" class="wheel" aria-label="Home sky directions">${s}</svg>`;
+}
+function renderOptions() {
+  const box = $('#optHome');
+  if (!box) return;
+  box.querySelector('.wheel-wrap').innerHTML = homeWheel();
+  box.querySelector('.wheel-desc').textContent = homeDesc();
+}
+function saveHome() {
+  store.set('homeSky', state.homeSky);
+  renderOptions(); applyHome();
+  if (state.home) { findTargets(); renderAll(); }
+}
+function showOptions() {
+  showSheet('Options', `<section class="opt" id="optHome">
+      <h3 class="opt-h">Home sky</h3>
+      <p class="note" style="margin:0 0 .6em">Tap wedges to add or remove the directions you can see from home. The <b>Home</b> switch then only shows targets in these directions.</p>
+      <div class="wheel-wrap"></div>
+      <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
+      <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn" data-act="none">None</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
+    </section>`);
+  const box = $('#optHome');
+  const toggle = (w) => { state.homeSky[+w.dataset.w] = !state.homeSky[+w.dataset.w]; saveHome(); };
+  box.addEventListener('click', (e) => {
+    const w = e.target.closest('[data-w]');
+    if (w) return toggle(w);
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const act = b.dataset.act;
+    state.homeSky = act === 'all' ? Array(16).fill(true) : act === 'none' ? Array(16).fill(false) : HOME_DEFAULT.slice();
+    saveHome();
+  });
+  box.addEventListener('keydown', (e) => { const w = e.target.closest('[data-w]'); if (w && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(w); box.querySelector(`[data-w="${w.dataset.w}"]`).focus(); } });
+  renderOptions();
+}
+
 function showSources() {
   const src = state.data && state.data.src;
   if (!src) { showSheet('Data sources', '<p class="note">Load a forecast first.</p>'); return; }
@@ -1091,7 +1188,7 @@ function renderAll() {
   renderTonight(N.win);
   renderForecast(N.hours);
   $('#fcTitle').textContent = `Dark hours · ${fmtDay(N.win.set)}`;
-  $('#pathTitle').textContent = state.night ? 'Moon path tomorrow night' : 'Moon path tonight';
+  $('#pathTitle').textContent = state.night ? 'Moon path · tomorrow' : 'Moon path';
   renderMoon(N.moon, D.lat);
   renderPath(N.moon, D.lat, D.now);
   renderPlanets(N.planets);
@@ -1113,7 +1210,8 @@ function findTargets() {
 function applyHome() {
   const b = $('#homeBtn');
   b.setAttribute('aria-pressed', String(state.home));
-  b.title = state.home ? 'Home sky on: only NW → N → E → S' : 'Home sky: only show targets from NW through N and E to S';
+  b.title = state.home ? `Home sky on: only ${homeDesc()}` : `Home sky: only show targets in ${homeDesc()} (set in Options)`;
+  b.setAttribute('aria-label', b.title);
 }
 
 /* ---------- main load ---------- */
@@ -1253,6 +1351,8 @@ function init() {
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   $('#sourcesBtn').addEventListener('click', showSources);
+  $('#optBtn').addEventListener('click', showOptions);
+  $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#planets').addEventListener('click', (e) => { const t = e.target.closest('[data-p]'); if (t) showPlanet(+t.dataset.p); });
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
