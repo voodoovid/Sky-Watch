@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=2.9">
+<link rel="stylesheet" href="style.css?v=3.0">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -45,7 +45,7 @@
   </div>
   <div class="controls">
     <div class="seg night-seg" id="nightSeg" role="group" aria-label="Night">
-      <button type="button" data-n="0" aria-pressed="true">Tonight</button><button type="button" data-n="1" aria-pressed="false">Tomorrow</button>
+      <button type="button" data-n="0" aria-pressed="true">Tonight</button><button type="button" data-n="1" aria-pressed="false">Tomorrow</button><button type="button" data-n="2" aria-pressed="false">Day 3</button>
     </div>
     <button id="homeBtn" class="ibtn home-btn" type="button" aria-pressed="false" aria-label="Home sky"><svg><use href="#i-home"/></svg><span class="lbl">Home</span></button>
     <div class="seg" role="group" aria-label="Units">
@@ -116,6 +116,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=2.9"></script>
+<script src="app.js?v=3.0"></script>
 </body>
 </html>

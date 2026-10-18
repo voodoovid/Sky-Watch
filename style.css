@@ -67,6 +67,49 @@ html.red {
   --band-astro: #0d0101;
   --band-dark: #050000;
 }
+/* Day mode: follows the system light/dark setting. Red mode still wins. */
+@media (prefers-color-scheme: light) {
+  :root:not(.red) {
+    color-scheme: light;
+    --bg: #eef2f8;
+    --bg2: #e3e9f2;
+    --card: #ffffff;
+    --card2: #eef2f8;
+    --line: #d8dfea;
+    --line2: #c2ccdc;
+    --text: #13203a;
+    --muted: #56658a;
+    --dim: #8a97b0;
+    --accent: #2563d8;
+    --go: #17a463;
+    --go2: #6cb535;
+    --fair: #e09c1a;
+    --nogo: #d8404b;
+    --day: #cfd7e5;
+    --cloud: #7d8fb2;
+    --rain: #1d78e0;
+    --moon-lit: #f6e8c1;
+    --moon-dark: #3b4766;
+    --sky-top: #b9cbef;
+    --sky-bot: #e4ecf9;
+    --ground: #cdd5e2;
+    --path: #b5760f;
+    --chip-ink: #04110b;
+    --grid: rgba(40, 60, 110, .16);
+    --band-day: #eef2f8;
+    --band-civil: #dfe6f3;
+    --band-nautical: #cdd9ee;
+    --band-astro: #bccbe7;
+    --band-dark: #aabde0;
+  }
+  :root:not(.red) .sheet::backdrop { background: rgba(30, 45, 75, .35); }
+  :root:not(.red) .sheet, :root:not(.red) .search-panel { box-shadow: 0 20px 50px rgba(20, 35, 70, .22); }
+  :root:not(.red) .red-btn { color: #c62f3a; }
+  :root:not(.red) .tag-comet { color: #12804f; border-color: color-mix(in srgb, #12804f 40%, var(--line2)); }
+  :root:not(.red) .alt-row input[type=range]::-webkit-slider-thumb { background: #fff; }
+  :root:not(.red) .alt-row input[type=range]::-moz-range-thumb { background: #fff; }
+}
+
 html.red .logo { filter: grayscale(1) sepia(1) saturate(8) hue-rotate(-50deg) brightness(.7); }
 
 * { box-sizing: border-box; }
@@ -411,7 +454,7 @@ html.red .top-it .rk { background: #300000; color: var(--accent); }
 /* Options */
 .opt-h { margin: 0 0 .3em; font-size: .8em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 .wheel-wrap { display: flex; justify-content: center; }
-.wheel { width: min(300px, 78vw); height: auto; touch-action: manipulation; }
+.wheel { width: min(270px, 72vw, calc(100dvh - 400px)); min-width: 180px; height: auto; touch-action: manipulation; }
 .wheel .wedge { fill: var(--card2); stroke: var(--line2); stroke-width: 1.5; cursor: pointer; transition: fill .15s; outline: none; }
 .wheel .wedge.on { fill: color-mix(in srgb, var(--go) 42%, var(--card2)); stroke: color-mix(in srgb, var(--go) 70%, var(--line2)); }
 .wheel .wedge:focus-visible { stroke: var(--accent); stroke-width: 3; }
@@ -421,11 +464,14 @@ html.red .top-it .rk { background: #300000; color: var(--accent); }
 .wheel .wl.big { fill: var(--text); font-size: 14px; font-weight: 800; }
 .wheel .wl.sm { fill: var(--dim); }
 html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
-.wheel-sum { text-align: center; margin: .5em 0; color: var(--muted); }
+.wheel-sum { text-align: center; margin: .3em 0 .5em; color: var(--muted); }
 .wheel-sum b { color: var(--text); }
 .opt-btns { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
-#optAlt { margin-bottom: 1.4em; padding-bottom: 1.2em; border-bottom: 1px solid var(--line); }
-.alt-row { display: flex; align-items: center; gap: 14px; margin: .2em 0 .7em; }
+#optAlt { display: flex; align-items: center; gap: 12px; margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
+#optAlt .opt-h { margin: 0; flex: none; }
+.alt-row { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.alt-reset { flex: none; padding: 4px 9px; font-size: .85em; }
+.opt-note { margin: 0 0 .4em !important; }
 .alt-row input[type=range] {
   flex: 1; min-width: 0; height: 32px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; touch-action: pan-y;
 }
@@ -440,9 +486,9 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
   background: var(--text); border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.4);
 }
 .alt-row input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--text); border: 3px solid var(--accent); }
-.alt-num { display: inline-flex; align-items: center; gap: 2px; font-size: 1.4rem; font-weight: 800; }
+.alt-num { display: inline-flex; align-items: center; gap: 1px; font-size: 1.05rem; font-weight: 800; flex: none; }
 .alt-num input {
-  width: 3.2em; padding: 6px 6px; text-align: center; font: inherit; color: var(--text);
+  width: 2.6em; padding: 3px 4px; text-align: center; font: inherit; color: var(--text);
   background: var(--card2); border: 1px solid var(--line2); border-radius: 10px; -moz-appearance: textfield;
 }
 .alt-num input::-webkit-outer-spin-button, .alt-num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -610,7 +656,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
 @media (max-width: 759px) {
   .top { flex-wrap: wrap; }
   .loc-ctl { order: 3; flex-basis: 100%; max-width: none; }
-  .controls { margin-left: auto; }
+  .controls { margin-left: auto; flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+  .controls .night-seg { margin-right: auto; }
   .night-seg button { padding: 0 8px; }
   .rate, .forecast.dense .rate { font-size: .54rem; letter-spacing: 0; }
   .red-btn .lbl, .home-btn .lbl { display: none; }

@@ -3,7 +3,8 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.9';
+const VERSION = 'v3.0';
+const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -24,7 +25,7 @@ const state = {
   loc: store.get('lastLoc', null), // {name, lat, lon, gps?}
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   data: null,
-  night: 0, // 0 = tonight, 1 = tomorrow night
+  night: 0, // 0 = tonight, 1 = tomorrow night, 2 = the night after
   home: store.get('home', false), // only count the part of the sky set in Options
   homeSky: (() => {
     const v = store.get('homeSky2', null);
@@ -105,7 +106,7 @@ function hourlyToMap(h) {
 }
 async function fetchOM(model, lat, lon) {
   const base = `https://api.open-meteo.com/v1/${model.path}?latitude=${lat}&longitude=${lon}&timezone=auto&timeformat=unixtime`;
-  const urls = [OM_FULL, OM_MID, OM_MIN].flatMap((v) => [base + '&past_days=1&forecast_days=3&hourly=' + v, base + '&forecast_days=3&hourly=' + v]);
+  const urls = [OM_FULL, OM_MID, OM_MIN].flatMap((v) => [base + '&past_days=1&forecast_days=4&hourly=' + v, base + '&forecast_days=4&hourly=' + v]);
   const j = await firstOK(urls);
   return { tz: j.timezone, rows: hourlyToMap(j.hourly) };
 }
@@ -118,7 +119,7 @@ const ENSEMBLES = [
   { name: 'GEM ensemble', ids: ['cmc_gem_geps', 'gem_global'] },
 ];
 async function fetchEnsemble(ens, lat, lon) {
-  const urls = ens.ids.map((id) => `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&timeformat=unixtime&forecast_days=3&hourly=precipitation&models=${id}`);
+  const urls = ens.ids.map((id) => `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&timeformat=unixtime&forecast_days=4&hourly=precipitation&models=${id}`);
   const j = await firstOK(urls, 20000);
   const h = j.hourly;
   const keys = Object.keys(h).filter((k) => k.startsWith('precipitation'));
@@ -907,7 +908,7 @@ function thumbUrl(o) {
 }
 const TOP_N = 3;
 function renderTop(list, topIdx, now) {
-  $('#topTitle').firstChild.textContent = state.night ? 'Top targets tomorrow' : 'Top targets tonight';
+  $('#topTitle').firstChild.textContent = `Top targets ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow' : nightName(2)}`;
   $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
     const o = list[i];
     const upNow = o.start <= now && now < o.end;
@@ -938,7 +939,7 @@ function renderTargets(list) {
     const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `${o.hrs.toFixed(1)} h` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
-  }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} tonight.`}</p>`;
+  }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow night' : 'that night'}.`}</p>`;
 }
 
 /* ---------- object pop-up ---------- */
@@ -1305,18 +1306,17 @@ function applyMinAlt() {
   if (t) t.textContent = `Reaches ${MIN_ALT}°`;
 }
 function showOptions() {
-  showSheet('Options', `<section class="opt" id="optAlt">
-      <h3 class="opt-h">Minimum elevation</h3>
-      <p class="note" style="margin:0 0 .6em">Targets, planets and comets only count while they're at least this high in darkness. Used for every list, chart and window.</p>
+  showSheet('Options', `<section class="opt" id="optAlt" title="Targets, planets and comets only count while at least this high in darkness">
+      <h3 class="opt-h">Min elevation</h3>
       <div class="alt-row">
         <input type="range" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation in degrees">
         <label class="alt-num"><input type="number" inputmode="numeric" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation, degrees"><span>°</span></label>
+        <button type="button" class="tbtn ghost alt-reset" data-alt="${ALT_DEF}" title="Reset to ${ALT_DEF}°">${ALT_DEF}°</button>
       </div>
-      <div class="opt-btns"><button type="button" class="tbtn ghost" data-alt="${ALT_DEF}">Reset (${ALT_DEF}°)</button></div>
     </section>
     <section class="opt" id="optHome">
       <h3 class="opt-h">Home sky</h3>
-      <p class="note" style="margin:0 0 .6em">Tap wedges to add or remove the directions you can see from home. The <b>Home</b> switch then only shows targets in these directions.</p>
+      <p class="note opt-note">Tap wedges for the directions you can see. <b>Home</b> then only shows targets there.</p>
       <div class="wheel-wrap"></div>
       <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
       <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
@@ -1366,7 +1366,7 @@ function renderAll() {
   renderTonight(N.win);
   renderForecast(N.hours);
   $('#fcTitle').innerHTML = `Dark hours<span class="fc-date">${esc(fmtDay(N.win.set))}</span>`;
-  $('#pathTitle').textContent = state.night ? 'Moon path · tomorrow' : 'Moon path';
+  $('#pathTitle').textContent = state.night ? `Moon path · ${state.night === 1 ? 'tomorrow' : nightName(2)}` : 'Moon path';
   renderMoon(N.moon, D.lat);
   renderPath(N, D.lat, D.now);
   renderPlanets(N.planets);
@@ -1421,16 +1421,17 @@ async function load() {
   }
   const now = new Date();
   const obs = new A.Observer(+loc.lat, +loc.lon, 0);
-  // Tonight (the night in progress, or the next one if it's daytime) and tomorrow night.
+  // Tonight (the night in progress, or the next one if it's daytime), tomorrow night and the night after.
   const w0 = nightWindow(obs, now);
   const w1 = nightWindow(obs, new Date(w0.rise.getTime() + 3600e3));
+  const w2 = nightWindow(obs, new Date(w1.rise.getTime() + 3600e3));
   const night = (win, from) => {
     const mid = new Date((win.set.getTime() + win.rise.getTime()) / 2);
     const moon = moonInfo(obs, mid, win);
     const S = nightSamples(obs, win);
     return { win, moon, S, darkLim: S.darkLim, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day') };
   };
-  const nights = [night(w0, w0.set > now ? w0.set : now), night(w1, w1.set)];
+  const nights = [night(w0, w0.set > now ? w0.set : now), night(w1, w1.set), night(w2, w2.set)];
   state.data = { now, lat: +loc.lat, obs, src, nights };
   findTargets();
   renderAll();
@@ -1494,15 +1495,23 @@ function applyRed() {
   document.documentElement.classList.toggle('red', state.red);
   $('#redBtn').setAttribute('aria-pressed', String(state.red));
   $('#redBtn .lbl').textContent = state.red ? 'Normal' : 'Red';
-  document.querySelector('meta[name=theme-color]').setAttribute('content', state.red ? '#000000' : '#070b16');
+  document.querySelector('meta[name=theme-color]').setAttribute('content', state.red ? '#000000' : LIGHT.matches ? '#eef2f8' : '#070b16');
 }
 function applyUnits() {
   document.querySelectorAll('#unitsBtn span').forEach((s) => s.classList.toggle('on', s.dataset.u === state.units));
 }
+/* Weekday name of a night's evening, e.g. "Tuesday" (from the forecast once loaded, else from today). */
+function nightName(i) {
+  const D = state.data;
+  const d = D && D.nights[i] ? D.nights[i].win.set : new Date(Date.now() + i * 86400e3);
+  return new Intl.DateTimeFormat(undefined, { weekday: 'long', timeZone: state.tz }).format(d);
+}
 function applyNight() {
   document.querySelectorAll('#nightSeg button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.n === state.night)));
-  const n = state.night ? 'Tomorrow night' : 'Tonight';
+  const n = state.night === 0 ? 'Tonight' : state.night === 1 ? 'Tomorrow night' : `${nightName(2)} night`;
   $('#verdictEyebrow').textContent = n;
+  const b2 = $('#nightSeg [data-n="2"]');
+  if (b2) { b2.textContent = innerWidth < 760 ? nightName(2).slice(0, 3) : nightName(2); b2.title = `${nightName(2)} night`; }
 }
 function toggleSearch(open) {
   const p = $('#searchPanel');
@@ -1516,6 +1525,8 @@ function toggleSearch(open) {
 function init() {
   $('#ver').textContent = VERSION;
   applyRed(); applyUnits(); applyNight(); applyHome(); applyMinAlt(); renderSpots();
+  const onScheme = () => applyRed();
+  if (LIGHT.addEventListener) LIGHT.addEventListener('change', onScheme); else if (LIGHT.addListener) LIGHT.addListener(onScheme);
   $('#homeBtn').addEventListener('click', () => { state.home = !state.home; store.set('home', state.home); applyHome(); findTargets(); renderAll(); });
   $('#redBtn').addEventListener('click', () => { state.red = !state.red; store.set('red', state.red); applyRed(); });
   $('#unitsBtn').addEventListener('click', () => { state.units = state.units === 'metric' ? 'imperial' : 'metric'; store.set('units', state.units); applyUnits(); renderAll(); });
