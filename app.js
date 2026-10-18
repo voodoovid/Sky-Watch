@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.1';
+const VERSION = 'v2.2';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -253,6 +253,32 @@ const DSO = [
   ['M35', 'Open cluster in Gemini', 'Open cluster', 6.15, 24.33], ['M44', 'Beehive Cluster', 'Open cluster', 8.67, 19.67],
   ['NGC 253', 'Sculptor Galaxy', 'Galaxy', 0.793, -25.29],
 ];
+/* Approximate catalog details: [visual magnitude or null, apparent size, distance]. */
+const DSO_INFO = {
+  'M31': [3.4, "190′ × 60′", '2.5 million ly'], 'M33': [5.7, "70′ × 40′", '2.7 million ly'],
+  'M45': [1.6, "110′", '444 ly'], 'M42': [4.0, "65′ × 60′", '1,344 ly'], 'M1': [8.4, "6′ × 4′", '6,500 ly'],
+  'NGC 2237': [null, "80′", '5,200 ly'], 'IC 434': [null, "60′ × 10′", '1,375 ly'], 'NGC 1499': [null, "145′ × 40′", '1,000 ly'],
+  'IC 1805': [6.5, "150′", '7,500 ly'], 'IC 1848': [6.5, "150′ × 75′", '7,500 ly'], 'NGC 281': [7.4, "35′ × 30′", '9,500 ly'],
+  'NGC 869/884': [3.7, "60′ (pair)", '7,500 ly'], 'NGC 7000': [4.0, "120′ × 100′", '2,600 ly'],
+  'NGC 6960': [7.0, "70′ × 6′", '2,400 ly'], 'NGC 6992': [7.0, "60′ × 8′", '2,400 ly'], 'M27': [7.5, "8′ × 6′", '1,360 ly'],
+  'M57': [8.8, "1.4′ × 1′", '2,300 ly'], 'M13': [5.8, "20′", '22,200 ly'], 'M92': [6.3, "14′", '26,700 ly'],
+  'M15': [6.2, "18′", '35,000 ly'], 'M2': [6.5, "16′", '37,500 ly'], 'IC 1396': [3.5, "170′ × 140′", '2,400 ly'],
+  'NGC 7635': [10.0, "15′ × 8′", '7,100 ly'], 'IC 5146': [7.2, "12′", '4,000 ly'], 'NGC 7023': [6.8, "18′", '1,300 ly'],
+  'NGC 7293': [7.6, "25′", '650 ly'], 'NGC 7331': [9.5, "10′ × 4′", '40 million ly'], 'NGC 891': [10.0, "13′ × 3′", '30 million ly'],
+  'M74': [9.4, "10′ × 9′", '32 million ly'], 'M77': [8.9, "7′ × 6′", '47 million ly'], 'M81': [6.9, "27′ × 14′", '11.8 million ly'],
+  'M82': [8.4, "11′ × 5′", '12 million ly'], 'M51': [8.4, "11′ × 7′", '23 million ly'], 'M101': [7.9, "29′ × 27′", '21 million ly'],
+  'M97': [9.9, "3.4′", '2,030 ly'], 'M106': [8.4, "19′ × 8′", '24 million ly'], 'M63': [8.6, "13′ × 7′", '29 million ly'],
+  'M64': [8.5, "10′ × 5′", '17 million ly'], 'M3': [6.2, "18′", '33,900 ly'], 'M8': [6.0, "90′ × 40′", '4,100 ly'],
+  'M20': [6.3, "28′", '5,200 ly'], 'M16': [6.0, "35′ × 28′", '5,700 ly'], 'M17': [6.0, "46′ × 37′", '5,500 ly'],
+  'M11': [5.8, "14′", '6,200 ly'], 'M35': [5.3, "28′", '2,800 ly'], 'M44': [3.7, "95′", '577 ly'], 'NGC 253': [7.1, "27′ × 7′", '11.4 million ly'],
+};
+const TYPE_TIP = (type) => /Emission|Supernova/.test(type) ? 'Turn on the LP (light-pollution) filter. Nebulae reward long stacks: aim for 1–2 h or more.'
+  : /Planetary/.test(type) ? 'LP filter helps. Small and bright, so 20–40 min shows good detail.'
+  : /Galaxy/.test(type) ? 'Leave the LP filter off (broadband target). Needs dark skies and a low or absent Moon; aim for 1 h+.'
+  : /Globular/.test(type) ? 'LP filter off. Bright and compact: 15–30 min resolves stars nicely.'
+  : /Reflection|Cluster \+ reflection/.test(type) ? 'LP filter off — reflection nebulae are blue broadband light. Very Moon-sensitive.'
+  : 'LP filter off. Bright target: 10–20 min is plenty.';
+
 function angSep(a, b) {
   const r = Math.PI / 180;
   const c = Math.sin(a.alt * r) * Math.sin(b.alt * r) + Math.cos(a.alt * r) * Math.cos(b.alt * r) * Math.cos((a.az - b.az) * r);
@@ -270,6 +296,11 @@ function targetsTonight(obs, win) {
   }
   if (!times.length) return [];
   const moons = times.map((d) => altAz('Moon', d, obs));
+  const all = [];
+  for (let t = win.set.getTime(); t <= win.rise.getTime(); t += 15 * 60e3) {
+    const d = new Date(t);
+    all.push({ d, sun: altAz('Sun', d, obs).alt, moon: altAz('Moon', d, obs).alt });
+  }
   const out = [];
   for (const [id, name, type, ra, dec] of DSO) {
     let best = null, hrs = 0;
@@ -279,7 +310,8 @@ function targetsTonight(obs, win) {
       if (!best || h.alt > best.alt) best = { d, ...h, moon: moons[i] };
     });
     if (best && best.alt >= 30) {
-      out.push({ id, name, type, ...best, hrs, moonSep: best.moon.alt > 0 ? angSep(best, best.moon) : null });
+      const curve = all.map((p) => ({ ...p, alt: altAzRaDec(ra, dec, p.d, obs).alt }));
+      out.push({ id, name, type, ra, dec, ...best, hrs, curve, moonSep: best.moon.alt > 0 ? angSep(best, best.moon) : null });
     }
   }
   return out.sort((a, b) => b.hrs - a.hrs || b.alt - a.alt).slice(0, 15);
@@ -412,24 +444,25 @@ function renderVerdict(win, moon, hours) {
     const gust = Math.max(...night.map((h) => (isNum(h.gust) ? h.gust : 0)));
     const dew = Math.min(...night.map((h) => (isNum(h.dewGap) ? h.dewGap : 99)));
     const see = night.map((h) => h.seeing).filter(isNum);
-    if (isNum(cloud)) chips.push([`Cloud ${Math.round(cloud)}%`, cloud < 30 ? 'ok' : cloud > 60 ? 'bad' : '']);
-    chips.push([`Rain risk ${Math.round(pop)}%`, pop < 15 ? 'ok' : pop >= 40 ? 'bad' : '']);
-    if (gust > 0) chips.push([`Gusts ${wind(gust)} ${windU()}`, gust > 30 ? 'bad' : gust < 20 ? 'ok' : '']);
-    if (see.length) { const s = Math.min(...see); chips.push([`Seeing ${QUAL(s).toLowerCase()}`, s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
+    // [label, value, unit, class]
+    chips.push(['Rain risk', isNum(pop) ? Math.round(pop) : '–', '%', pop < 15 ? 'ok' : pop >= 40 ? 'bad' : '']);
+    if (isNum(cloud)) chips.push(['Cloud', Math.round(cloud), '%', cloud < 30 ? 'ok' : cloud > 60 ? 'bad' : '']);
+    if (gust > 0) chips.push(['Max gusts', wind(gust), windU(), gust > 30 ? 'bad' : gust < 20 ? 'ok' : '']);
     const moonUp = night.some((h) => h.moonAlt > 0);
-    chips.push([moonUp ? `Moon up ${Math.round(moon.illum * 100)}%` : 'Moon down', moonUp && moon.illum > 0.5 ? 'bad' : !moonUp || moon.illum < 0.25 ? 'ok' : '']);
-    if (dew < 2) chips.push(['Dew risk — heater on', 'bad']);
+    chips.push([moonUp ? 'Moon up' : 'Moon', moonUp ? Math.round(moon.illum * 100) : 'Down', moonUp ? '%' : '', moonUp && moon.illum > 0.5 ? 'bad' : !moonUp || moon.illum < 0.25 ? 'ok' : '']);
+    chips.push([dew < 2 ? 'Dew · heater on' : 'Dew gap', dew < 99 ? tempDiff(dew) : '–', '', dew < 2 ? 'bad' : dew >= 5 ? 'ok' : '']);
+    if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s), '', s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
   }
   $('#verdict').innerHTML = `<div class="v-badge ${cls}">${txt}</div>
     <div class="v-text"><div class="v-win">${line}</div></div>
-    <div class="chips">${chips.map(([t, c]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>`;
+    <div class="vstats">${chips.map(([l, v, u, c]) => `<div class="vs ${c}"><span class="lbl">${esc(l)}</span><b>${esc(v)}<small>${esc(u)}</small></b></div>`).join('')}</div>`;
 }
 
 function renderTonight(win) {
-  const stat = (l, v) => `<div class="stat"><span class="lbl">${l}</span><b>${v}</b></div>`;
-  $('#tonight').innerHTML = stat('Sunset', esc(fmtTime(win.set)))
-    + stat('Full dark', win.darkStart ? esc(fmtTime(win.darkStart)) : 'None')
-    + stat('Dark ends', win.darkEnd ? esc(fmtTime(win.darkEnd)) : '–')
+  const stat = (l, v, cls = '') => `<div class="stat ${cls}"><span class="lbl">${l}</span><b>${v}</b></div>`;
+  $('#tonight').innerHTML = stat('Full dark', win.darkStart ? esc(fmtTime(win.darkStart)) : 'None', 'prime')
+    + stat('Dark ends', win.darkEnd ? esc(fmtTime(win.darkEnd)) : '–', 'prime')
+    + stat('Sunset', esc(fmtTime(win.set)))
     + stat('Sunrise', esc(fmtTime(win.rise)));
 }
 
@@ -440,10 +473,10 @@ function renderForecast(hours) {
   const tint = (v, col, k) => (isNum(v) ? `background:color-mix(in srgb, var(${col}) ${Math.round(v * k)}%, transparent)` : '');
 
   let html = '<div class="fc-l"></div>' + hours.map((h, i) => `<button type="button" class="fc-c fc-h" data-i="${i}">${esc(fmtHour(h.d).replace(/\s?([AP])\.?M\.?/i, (m, p) => p.toLowerCase()))}<small>${SKY_SHORT[h.sky.k]}</small></button>`).join('');
-  // Precip and cloud lead (large), then rating, the sky chart, temp, dew, wind, seeing, transparency.
+  // Rating, then precip and cloud (large), the sky chart, temp, dew, wind, seeing, transparency.
+  html += row('Rating', (h, i) => `<div class="fc-c rate ${h.rating.k}" data-i="${i}" title="${h.rating.score == null ? 'Daylight' : 'Score ' + h.rating.score + '/100'}">${RATE_TXT[h.rating.k]}</div>`);
   html += row('<span class="big-l">Precip</span>', (h, i) => cell(h, i, pct(h.pop), 'big', tint(h.pop, '--rain', 0.55)));
   html += row('<span class="big-l">Cloud</span>', (h, i) => cell(h, i, pct(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
-  html += row('Rating', (h, i) => `<div class="fc-c rate ${h.rating.k}" data-i="${i}" title="${h.rating.score == null ? 'Daylight' : 'Score ' + h.rating.score + '/100'}">${RATE_TXT[h.rating.k]}</div>`);
 
   // Chart: cloud bars + precip line (stretches to fill the card)
   const n = hours.length;
@@ -501,7 +534,9 @@ function showHour(i) {
 function renderMoon(moon, lat) {
   const ev = moon.events.slice(0, 2).map((e) => [e.kind === 'rise' ? 'Rises' : 'Sets', fmtTime(e.d)]);
   const nextOf = (n) => moon.next.find((p) => p.n === n);
-  const rows = [...ev, ['Age', moon.ageDays.toFixed(1) + ' d'],
+  const waxing = moon.angle < 180;
+  const shape = moon.illum < 0.03 ? 'New' : moon.illum > 0.97 ? 'Full' : moon.illum < 0.5 ? 'Crescent' : 'Gibbous';
+  const rows = [['Phase', `${waxing ? 'Waxing' : 'Waning'} ${shape.toLowerCase()}`], ...ev, ['Age', moon.ageDays.toFixed(1) + ' d'],
     ...['Full', 'New'].map((n) => nextOf(n)).filter(Boolean).map((p) => [`Next ${p.n.toLowerCase()}`, fmtDay(p.d)])];
   $('#moonInfo').innerHTML = `<svg viewBox="0 0 84 84" aria-label="Moon phase">${moonGlyph(42, 42, 38, moon.angle, lat)}</svg>
     <div class="moon-txt"><div class="moon-name">${esc(moon.name)} <span>${Math.round(moon.illum * 100)}%</span></div>
@@ -569,9 +604,46 @@ function renderTargets(list) {
   $('#targets').innerHTML = list.length ? list.map((o) => {
     const neb = /Emission|Supernova|Planetary/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
-    return `<div class="row"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="sub2">${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}</span></div>
-      <div class="r">${esc(fmtTime(o.d))}<span class="sub2">${Math.round(o.alt)}° · ${o.hrs.toFixed(1)} h</span></div></div>`;
+    return `<button type="button" class="row tgt" data-t="${list.indexOf(o)}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="sub2">${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}</span></div>
+      <div class="r">${esc(fmtTime(o.d))}<span class="sub2">${Math.round(o.alt)}° · ${o.hrs.toFixed(1)} h</span></div></button>`;
   }).join('') : '<p class="empty">No full darkness tonight here.</p>';
+}
+
+function showTarget(i) {
+  const D = state.data; const o = D && D.nights[state.night].targets[i];
+  if (!o) return;
+  const info = DSO_INFO[o.id] || [null, '–', '–'];
+  let con = '';
+  try { con = A.Constellation(o.ra, o.dec).name; } catch (e) { /* not available */ }
+  const c = o.curve, n = c.length;
+  const above = c.filter((p) => p.alt >= 30 && p.sun <= -18);
+  const raStr = `${Math.floor(o.ra)}h ${String(Math.round((o.ra % 1) * 60)).padStart(2, '0')}m`;
+  const decStr = `${o.dec >= 0 ? '+' : '−'}${Math.abs(o.dec).toFixed(1)}°`;
+  const fitsFov = (() => { const m = /^([\d.]+)′/.exec(info[1]); return m ? +m[1] <= 70 : true; })();
+  // Altitude chart across the night: dark band, 30° line, target curve and the Moon.
+  const W = 500, H = 170, x = (k) => (k / Math.max(1, n - 1)) * W, y = (a) => H - (Math.max(0, a) / 90) * H;
+  let dark = '';
+  c.forEach((p, k) => { if (p.sun <= -18) dark += `<rect x="${x(k) - W / (2 * (n - 1))}" y="0" width="${W / (n - 1) + .5}" height="${H}" fill="var(--card2)"/>`; });
+  const line = (key) => c.map((p, k) => `${x(k).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
+  const ticks = c.map((p, k) => ({ p, k })).filter(({ p }) => p.d.getMinutes() === 0 && p.d.getHours() % 2 === 0)
+    .map(({ p, k }) => `<text x="${x(k)}" y="${H + 14}" text-anchor="${x(k) < 20 ? 'start' : x(k) > W - 20 ? 'end' : 'middle'}" font-size="11" fill="var(--muted)">${esc(fmtHour(p.d).replace(/\s?([AP])\.?M\.?/i, (m, q) => q.toLowerCase()))}</text>`).join('');
+  const kv = [
+    ['Type', o.type], ['Constellation', con || '–'], ['Magnitude', info[0] == null ? 'Faint (nebula)' : info[0].toFixed(1)],
+    ['Size', info[1]], ['Distance', info[2]], ['RA / Dec', `${raStr} / ${decStr}`],
+    ['Highest', `${Math.round(o.alt)}° ${compass(o.az)} at ${fmtTime(o.d)}`],
+    ['Above 30° in dark', above.length ? `${fmtTime(above[0].d)} – ${fmtTime(above[above.length - 1].d)} (${o.hrs.toFixed(1)} h)` : '–'],
+    ['Moon', o.moonSep == null ? 'Down at best time' : `${Math.round(o.moonSep)}° away at best time`],
+    ['Fits Seestar frame', fitsFov ? 'Yes (S50 field ≈ 78′ × 44′)' : 'Larger than the frame — use mosaic'],
+  ];
+  showSheet(`${o.id} · ${o.name}`, `<svg class="alt-chart" viewBox="0 -4 ${W} ${H + 22}" aria-label="Altitude through the night">
+      ${dark}<line x1="0" x2="${W}" y1="${y(30)}" y2="${y(30)}" stroke="var(--fair)" stroke-dasharray="4 4"/>
+      <text x="4" y="${y(30) - 4}" font-size="11" fill="var(--fair)">30°</text>
+      <polyline points="${line('moon')}" fill="none" stroke="var(--moon-lit)" stroke-width="1.5" stroke-dasharray="3 3" opacity=".6"/>
+      <polyline points="${line('alt')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>${ticks}</svg>
+    <p class="note" style="margin:2px 0 10px">Blue: ${esc(o.id)} altitude · dashed: Moon · shaded: full dark</p>
+    <dl class="kv tkv">${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <p class="note"><b>Seestar tip:</b> ${esc(TYPE_TIP(o.type))}</p>
+    <p class="note">Catalog figures are approximate.</p>`);
 }
 
 function showSources() {
@@ -739,6 +811,7 @@ function init() {
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   $('#sourcesBtn').addEventListener('click', showSources);
+  $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const D = state.data; if (D) renderPath(D.nights[state.night].moon, D.lat, D.now); }, 150); });
