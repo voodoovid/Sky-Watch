@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.9';
+const VERSION = 'v3.10';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -651,7 +651,7 @@ function bortleChip() {
   const tip = 'Light pollution: Light Pollution Atlas 2025 (D. Lorenz). Bortle is approximate, from zenith SQM.';
   if (!b) return ['Bortle', '…', '', '', 'vsBortle', tip];
   if (b.err || b.out) return ['Bortle', '–', '', '', 'vsBortle', tip];
-  return ['Bortle', b.bortle, `${b.sqm.toFixed(1)} sqm`, b.bortle <= 3 ? 'ok' : b.bortle >= 7 ? 'bad' : '', 'vsBortle', tip];
+  return ['Bortle', b.bortle, `${b.sqm.toFixed(1)} sqm`, '', 'vsBortle', tip];
 }
 function updateBortle() {
   const el = $('#vsBortle');
