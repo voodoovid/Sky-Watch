@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.0';
+const VERSION = 'v3.1';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -912,8 +912,8 @@ function renderTop(list, topIdx, now) {
   $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
     const o = list[i];
     const upNow = o.start <= now && now < o.end;
-    const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
-    const what = o.kind === 'comet' ? `Comet · mag ≈${o.mag.toFixed(1)}` : esc(o.type);
+    const moonTxt = o.moonSep == null ? 'Moon down' : `Moon <span class="n">${Math.round(o.moonSep)}°</span>`;
+    const what = o.kind === 'comet' ? `Comet · mag <span class="n">≈${o.mag.toFixed(1)}</span>` : esc(o.type);
     const when = `${upNow ? '' : `${esc(fmtTime(o.start))} `}<span class="to">To</span> ${esc(fmtTime(o.end))}<span class="hr">${o.hrs.toFixed(1)} h</span>`;
     return `<button type="button" class="top-it" data-t="${i}">
       <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
