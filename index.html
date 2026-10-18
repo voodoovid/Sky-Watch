@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.7">
+<link rel="stylesheet" href="style.css?v=3.8">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -39,6 +39,7 @@
     <img class="logo" src="icon.svg" alt="" width="30" height="30">
     <div class="brand-txt"><h1>SkyWatch</h1><span class="sub">Go / No Go</span></div>
   </div>
+  <span class="ver-top" id="verTop"></span>
   <div class="loc-ctl">
     <svg class="pin"><use href="#i-pin"/></svg>
     <select id="spotSelect" aria-label="Location"></select>
@@ -50,9 +51,6 @@
       <button type="button" data-n="0" aria-pressed="true">Tonight</button><button type="button" data-n="1" aria-pressed="false">Tomorrow</button><button type="button" data-n="2" aria-pressed="false">Day 3</button>
     </div>
     <button id="homeBtn" class="ibtn home-btn" type="button" aria-pressed="false" aria-label="Home sky"><svg><use href="#i-home"/></svg><span class="lbl">Home</span></button>
-    <div class="seg" role="group" aria-label="Units">
-      <button id="unitsBtn" type="button" aria-label="Switch units"><span data-u="metric">°C</span><span data-u="imperial">°F</span></button>
-    </div>
     <button id="refreshBtn" class="ibtn" type="button" title="Refresh" aria-label="Refresh"><svg><use href="#i-refresh"/></svg></button>
     <button id="optBtn" class="ibtn" type="button" title="Options" aria-label="Options"><svg><use href="#i-gear"/></svg></button>
     <button id="redBtn" class="ibtn red-btn" type="button" aria-pressed="false" title="Red night mode" aria-label="Red night mode"><svg><use href="#i-eye"/></svg><span class="lbl">Red</span></button>
@@ -109,7 +107,7 @@
 <footer class="foot xs muted">
   <button id="sourcesBtn" class="linkbtn" type="button">Data sources</button>
   <span id="updated"></span>
-  <span>SkyWatch <span id="ver"></span></span>
+  <span class="ver-foot">SkyWatch <span id="ver"></span></span>
 </footer>
 
 <dialog id="sheet" class="sheet">
@@ -118,6 +116,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=3.7"></script>
+<script src="app.js?v=3.8"></script>
 </body>
 </html>

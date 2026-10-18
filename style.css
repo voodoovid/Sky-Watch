@@ -135,6 +135,7 @@ svg { display: block; }
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   position: sticky; top: 0; z-index: 10;
 }
+.ver-top { display: none; font-size: .78rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .logo { width: 44px; height: 44px; border-radius: 11px; }
 .brand-txt { display: flex; flex-direction: column; align-items: center; text-align: center; line-height: 1.05; }
@@ -170,10 +171,6 @@ html.red .brand .sub { color: var(--accent); }
 html.red .home-btn[aria-pressed="true"] { background: #200000; border-color: var(--accent); color: var(--accent); }
 html.red .red-btn { background: #200000; border-color: var(--accent); color: var(--accent); }
 
-#unitsBtn {
-  display: inline-flex; height: 34px; padding: 3px; gap: 2px; align-items: stretch;
-  background: var(--card); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font: inherit;
-}
 .seg span { display: flex; align-items: center; padding: 0 8px; border-radius: 7px; color: var(--muted); font-size: .8rem; font-weight: 700; }
 .seg span.on { background: var(--card2); color: var(--text); }
 .night-seg { display: inline-flex; height: 34px; padding: 3px; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
@@ -482,7 +479,7 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 .alt-row { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .alt-reset { flex: none; padding: 4px 9px; font-size: .85em; }
 .opt-note { margin: 0 0 .4em !important; }
-#optTheme { margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
+#optUnits, #optTheme { margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
 #optTheme .opt-note { margin: .45em 0 0 !important; }
 .theme-seg { display: flex; width: 100%; }
 .theme-seg button { flex: 1; height: 28px; }
@@ -672,6 +669,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
 @media (max-width: 759px) {
   .top { flex-wrap: wrap; }
   .loc-ctl { order: 3; flex-basis: 100%; max-width: none; }
+  .ver-top { display: block; margin-left: auto; align-self: flex-start; padding-top: 2px; }
+  .ver-foot { display: none; }
   .controls { margin-left: auto; flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
   .controls .night-seg { margin-right: auto; }
   .night-seg button { padding: 0 8px; }

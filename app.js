@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.7';
+const VERSION = 'v3.8';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1309,7 +1309,11 @@ function applyMinAlt() {
   if (t) t.textContent = `Reaches ${MIN_ALT}°`;
 }
 function showOptions() {
-  showSheet('Options', `<section class="opt" id="optTheme">
+  showSheet('Options', `<section class="opt" id="optUnits">
+      <h3 class="opt-h">Units</h3>
+      <div class="night-seg theme-seg" role="group" aria-label="Units">${[['metric', '°C · km/h · mm'], ['imperial', '°F · mph · in']].map(([v, l]) => `<button type="button" data-units="${v}" aria-pressed="${state.units === v}">${l}</button>`).join('')}</div>
+    </section>
+    <section class="opt" id="optTheme">
       <h3 class="opt-h">Appearance</h3>
       <div class="night-seg theme-seg" role="group" aria-label="Appearance">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<button type="button" data-theme="${v}" aria-pressed="${state.theme === v}">${l}</button>`).join('')}</div>
       <p class="note opt-note">Auto follows your device. Red night mode still overrides this.</p>
@@ -1329,6 +1333,13 @@ function showOptions() {
       <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
       <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
     </section>`, '', false, true);
+  $('#optUnits').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-units]');
+    if (!b || b.dataset.units === state.units) return;
+    state.units = b.dataset.units; store.set('units', state.units);
+    $('#optUnits').querySelectorAll('[data-units]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    renderAll();
+  });
   $('#optTheme').addEventListener('click', (e) => {
     const b = e.target.closest('[data-theme]');
     if (!b) return;
@@ -1540,13 +1551,12 @@ function toggleSearch(open) {
 }
 
 function init() {
-  $('#ver').textContent = VERSION;
+  $('#ver').textContent = VERSION; $('#verTop').textContent = VERSION;
   applyRed(); applyUnits(); applyNight(); applyHome(); applyMinAlt(); renderSpots();
   const onScheme = () => applyRed();
   if (LIGHT.addEventListener) LIGHT.addEventListener('change', onScheme); else if (LIGHT.addListener) LIGHT.addListener(onScheme);
   $('#homeBtn').addEventListener('click', () => { state.home = !state.home; store.set('home', state.home); applyHome(); findTargets(); renderAll(); });
   $('#redBtn').addEventListener('click', () => { state.red = !state.red; store.set('red', state.red); applyRed(); });
-  $('#unitsBtn').addEventListener('click', () => { state.units = state.units === 'metric' ? 'imperial' : 'metric'; store.set('units', state.units); applyUnits(); renderAll(); });
   $('#refreshBtn').addEventListener('click', () => (state.loc && state.loc.gps ? useGPS() : load()));
   $('#gpsBtn').addEventListener('click', useGPS);
   $('#searchBtn').addEventListener('click', () => toggleSearch());
