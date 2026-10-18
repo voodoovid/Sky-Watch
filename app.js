@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.18';
+const VERSION = 'v3.19';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -813,7 +813,7 @@ function cloudShape(seed) {
   B.push([0.17 + lr * 0.55 + rnd() * 0.04, -lr * (0.95 + rnd() * 0.25), lr], [0.83 - rr * 0.55 - rnd() * 0.04, -rr * (0.95 + rnd() * 0.25), rr]);
   for (let i = 0; i < 2; i++) { const r = 0.06 + rnd() * 0.05; B.push([0.2 + rnd() * 0.6, -0.08 - rnd() * 0.25, r]); }
   const er = 0.07 + rnd() * 0.03, er2 = 0.065 + rnd() * 0.03;
-  B.push([0.08 + er, -er, er], [0.92 - er2, -er2, er2], [0.5, -0.09, 0.1]);
+  B.push([0.1 + er, -er * 0.9, er], [0.9 - er2, -er2 * 0.9, er2], [0.32 + rnd() * 0.08, -0.08, 0.1 + rnd() * 0.03], [0.6 + rnd() * 0.08, -0.08, 0.1 + rnd() * 0.03], [0.48 + rnd() * 0.06, -0.1, 0.13]);
   let x1 = 1, x2 = 0, y1 = 0;
   for (const [x, y, r] of B) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
   return { B, x1, x2, y1, ox: rnd() * 100, oy: rnd() * 100 };
@@ -834,11 +834,10 @@ function drawCloud(img, W, Hc, px, py, sc, shape, cols, alpha) {
     let n = 0, amp = 0.5, fr = 7;
     for (let o = 0; o < oct; o++) { n += amp * noise2(ux * fr + ox, uy * fr + oy); amp *= 0.5; fr *= 2.1; }
     let d = m + (n - (oct === 4 ? 0.47 : 0.375)) * 0.75;
-    if (uy > -0.035) d -= (uy + 0.035) * 9;                       // crisp, flat base
     return d;
   };
   const X0 = Math.max(0, Math.floor(px + (x1 - 0.06) * sc)), X1 = Math.min(W - 1, Math.ceil(px + (x2 + 0.06) * sc));
-  const Y0 = Math.max(0, Math.floor(py + (y1 - 0.06) * sc)), Y1 = Math.min(Hc - 1, Math.ceil(py + 0.01 * sc));
+  const Y0 = Math.max(0, Math.floor(py + (y1 - 0.06) * sc)), Y1 = Math.min(Hc - 1, Math.ceil(py + 0.12 * sc));
   const [hi, mid, lo] = cols, d = img.data, step = 0.035;
   for (let Y = Y0; Y <= Y1; Y++) for (let X = X0; X <= X1; X++) {
     const ux = (X - px) / sc, uy = (Y - py) / sc, v = dens(ux, uy);
@@ -864,12 +863,13 @@ function skyChart(hours) {
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     if (Math.round(h.pop) >= RAIN_SHOW) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${h.pop >= RAIN_FLAG ? 4.5 : 3.2}" fill="var(--rain)" stroke="var(--card2)" stroke-width="1.5"/>`;
   });
+  if (pts.length) { const f0 = pts[0].split(',')[1], fl = pts[pts.length - 1].split(',')[1]; pts.unshift(`0,${f0}`); pts.push(`${W},${fl}`); }
   const grid = hours.slice(1).map((_, i) => `<line x1="${((i + 1) * cw).toFixed(1)}" x2="${((i + 1) * cw).toFixed(1)}" y1="0" y2="${H}" stroke="var(--line2)" stroke-width="1"/>`).join('');
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">${grid}
     <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/></svg>
     <canvas width="${Math.round(W * dpr)}" height="${Math.round(H * dpr)}" style="position:absolute;inset:0;width:${W}px;height:${H}px"></canvas>
     <svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
-    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
+    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="butt"/>${dots}</svg>`;
   // Cloud colours from the theme: lit tops, mid tone, shadowed base.
   const cv = box.querySelector('canvas'), ctx = cv.getContext('2d');
   ctx.fillStyle = getComputedStyle(box).getPropertyValue('--cloud').trim() || '#b9c8e6';
