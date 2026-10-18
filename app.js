@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.2';
+const VERSION = 'v3.3';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -742,13 +742,15 @@ function skyChart(hours) {
     <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
 }
 
-function showSheet(title, body, sub = '', wide = false) {
+function showSheet(title, body, sub = '', wide = false, locked = false) {
   $('#sheetTitle').textContent = title;
   $('#sheetSub').textContent = sub;
   $('#sheetSub').hidden = !sub;
   $('#sheetBody').innerHTML = body;
   const d = $('#sheet');
   d.classList.toggle('wide', wide);
+  d.classList.toggle('locked', locked); // locked: closes only with ✕ (or Esc), not by tapping outside
+  document.documentElement.classList.add('sheet-open'); // freeze the page behind
   if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
   $('#sheetBody').scrollTop = 0;
 }
@@ -1326,7 +1328,7 @@ function showOptions() {
       <div class="wheel-wrap"></div>
       <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
       <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
-    </section>`);
+    </section>`, '', false, true);
   $('#optTheme').addEventListener('click', (e) => {
     const b = e.target.closest('[data-theme]');
     if (!b) return;
@@ -1559,7 +1561,14 @@ function init() {
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#planets').addEventListener('click', (e) => { const t = e.target.closest('[data-p]'); if (t) showPlanet(+t.dataset.p); });
-  $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+  $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget && !e.currentTarget.classList.contains('locked')) e.currentTarget.close(); });
+  $('#sheet').addEventListener('close', () => document.documentElement.classList.remove('sheet-open'));
+  // Stop the page behind an open sheet from scrolling or rubber-banding on iPad; only the sheet's own body may scroll.
+  $('#sheet').addEventListener('touchmove', (e) => {
+    if (e.target.closest('input, textarea, select')) return; // keep sliders and fields draggable
+    const b = $('#sheetBody');
+    if (!b.contains(e.target) || b.scrollHeight <= b.clientHeight) e.preventDefault();
+  }, { passive: false });
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
     const D = state.data; if (!D) return;

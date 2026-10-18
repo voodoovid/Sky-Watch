@@ -445,6 +445,7 @@ html.red .top-it .tw .hr { background: #300000; color: var(--accent); }
 .sheet-head h2 { font-size: 1.3em; font-weight: 750; letter-spacing: .005em; line-height: 1.2; }
 #sheetSub { margin: .2em 0 0; color: var(--muted); font-size: .86em; font-weight: 600; }
 .sh-x { flex: none; width: 2.4em; height: 2.4em; border-radius: 50%; font-size: 1em; }
+html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
 #sheetBody { padding: 1em 1.1em 1.2em; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .src { width: 100%; border-collapse: collapse; font-size: .92em; }
 .src th, .src td { text-align: left; padding: .45em .3em; border-bottom: 1px solid var(--line); }
