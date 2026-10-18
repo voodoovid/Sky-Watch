@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.0';
+const VERSION = 'v2.1';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -440,6 +440,9 @@ function renderForecast(hours) {
   const tint = (v, col, k) => (isNum(v) ? `background:color-mix(in srgb, var(${col}) ${Math.round(v * k)}%, transparent)` : '');
 
   let html = '<div class="fc-l"></div>' + hours.map((h, i) => `<button type="button" class="fc-c fc-h" data-i="${i}">${esc(fmtHour(h.d).replace(/\s?([AP])\.?M\.?/i, (m, p) => p.toLowerCase()))}<small>${SKY_SHORT[h.sky.k]}</small></button>`).join('');
+  // Precip and cloud lead (large), then rating, the sky chart, temp, dew, wind, seeing, transparency.
+  html += row('<span class="big-l">Precip</span>', (h, i) => cell(h, i, pct(h.pop), 'big', tint(h.pop, '--rain', 0.55)));
+  html += row('<span class="big-l">Cloud</span>', (h, i) => cell(h, i, pct(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
   html += row('Rating', (h, i) => `<div class="fc-c rate ${h.rating.k}" data-i="${i}" title="${h.rating.score == null ? 'Daylight' : 'Score ' + h.rating.score + '/100'}">${RATE_TXT[h.rating.k]}</div>`);
 
   // Chart: cloud bars + precip line (stretches to fill the card)
@@ -454,13 +457,11 @@ function renderForecast(hours) {
     <line x1="0" x2="${n * 10}" y1="50" y2="50" stroke="var(--line2)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>${bars}
     <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></div>`;
 
-  html += row('Cloud', (h, i) => cell(h, i, pct(h.cloud), '', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
-  html += row('Precip', (h, i) => cell(h, i, pct(h.pop), '', tint(h.pop, '--rain', 0.55)));
-  html += row('Seeing', (h, i) => cell(h, i, qShort(h.seeing), qClass(h.seeing)));
-  html += row('Transp', (h, i) => cell(h, i, qShort(h.transparency), qClass(h.transparency)));
-  html += row(`Gusts<small>${windU()}</small>`, (h, i) => cell(h, i, wind(h.gust), isNum(h.gust) && h.gust > 30 ? 'warn' : '', '', `Wind ${wind(h.wind)} ${windU()}`));
   html += row('Temp', (h, i) => cell(h, i, temp(h.temp)));
   html += row('Dew gap', (h, i) => cell(h, i, tempDiff(h.dewGap), isNum(h.dewGap) && h.dewGap < 2 ? 'warn' : ''));
+  html += row(`Gusts<small>${windU()}</small>`, (h, i) => cell(h, i, wind(h.gust), isNum(h.gust) && h.gust > 30 ? 'warn' : '', '', `Wind ${wind(h.wind)} · gusts ${wind(h.gust)} ${windU()}`));
+  html += row('Seeing', (h, i) => cell(h, i, qShort(h.seeing), qClass(h.seeing)));
+  html += row('Transp', (h, i) => cell(h, i, qShort(h.transparency), qClass(h.transparency)));
   const f = $('#forecast');
   f.style.setProperty('--n', n);
   f.classList.toggle('dense', n > 13);
