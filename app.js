@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.16';
+const VERSION = 'v3.17';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -799,34 +799,40 @@ function renderForecast(hours) {
 }
 
 /* One free-floating cumulus cloud per hour. Its top sits at the cloud-cover % and it grows with the
-   cover; every hour gets its own lobe pattern (seeded by the hour) so no two look alike. */
+   cover. The cloud is a heap of overlapping billows, each shaded like a lit sphere (bright upper-left,
+   shadowed underneath), drawn back to front so every billow shows; the heap is seeded by the hour so
+   no two clouds are alike. */
 function puffs(seed, cx, maxW, top, bottom, pct) {
   if (bottom - top < 1.5) return '';
   let k = 0;
-  const f = (v) => v.toFixed(2), rnd = () => ((Math.sin(seed * 12.9898 + ++k * 78.233) * 43758.5453) % 1 + 1) % 1;
-  // Build the cloud in a unit box (base at y = 0, rising to negative y), then fit it to its slot.
-  const L = [];
-  const er = 0.1 + rnd() * 0.05, er2 = 0.09 + rnd() * 0.06;
-  L.push([0.08 + er * 0.3, -er, er], [0.92 - er2 * 0.3, -er2, er2]);           // rounded ends (L[0], L[1])
-  const nb = 2 + Math.floor(rnd() * 2);                                         // low base billows
-  for (let i = 0; i < nb; i++) { const r = 0.12 + rnd() * 0.06; L.push([0.2 + (0.6 * (i + 0.5)) / nb + (rnd() - 0.5) * 0.08, -r * 0.95, r]); }
-  const n = 2 + Math.floor(rnd() * 2.6), crown = [];                            // 2-4 big crown lobes
-  for (let i = 0; i < n; i++) {
-    const x = 0.28 + (0.44 * (i + 0.5)) / n + (rnd() - 0.5) * 0.12, r = 0.15 + rnd() * 0.14 + (i === Math.floor(n / 2) ? 0.05 : 0);
-    const c = [x, -r * (0.8 + rnd() * 0.3) - 0.07, r]; L.push(c); crown.push(c);
-  }
-  const nt = 3 + Math.floor(rnd() * 4);                                         // small billows on the tops
-  for (let i = 0; i < nt; i++) {
-    const [x, y, r] = crown[Math.floor(rnd() * crown.length)], a = Math.PI * (1.12 + rnd() * 0.76), rr = r * (0.28 + rnd() * 0.22);
-    L.push([x + Math.cos(a) * r * 0.9, y + Math.sin(a) * r * 0.9, rr]);
-  }
+  const f = (v) => v.toFixed(3), rnd = () => ((Math.sin(seed * 12.9898 + ++k * 78.233) * 43758.5453) % 1 + 1) % 1;
+  // Unit cloud: flat base at y = 0, rising to negative y. Order = back to front.
+  const back = [], mid = [], front = [];
+  const cr = 0.2 + rnd() * 0.07, cxr = 0.44 + rnd() * 0.14;                   // main crown
+  back.push([cxr, -0.07 - cr, cr]);
+  if (rnd() < 0.6) { const r = cr * (0.6 + rnd() * 0.2), side = rnd() < 0.5 ? -1 : 1; back.push([cxr + side * cr * (0.75 + rnd() * 0.25), -0.06 - r * 0.95, r]); }
+  const lr = 0.12 + rnd() * 0.06, rr = 0.11 + rnd() * 0.06;                    // sloping shoulders, sitting on the base
+  mid.push([0.17 + lr * 0.55 + rnd() * 0.04, -lr * (0.95 + rnd() * 0.25), lr], [0.83 - rr * 0.55 - rnd() * 0.04, -rr * (0.95 + rnd() * 0.25), rr]);
+  if (rnd() < 0.5) { const r = 0.07 + rnd() * 0.04; mid.push([cxr + (rnd() < 0.5 ? -1 : 1) * cr * 0.95, -0.05 - cr * 1.05, r]); } // small top bump
+  const er = 0.07 + rnd() * 0.03, er2 = 0.065 + rnd() * 0.03;                  // rounded base ends
+  front.push([0.08 + er, -er, er], [0.92 - er2, -er2, er2]);
+  front.sort((p, q) => p[0] - q[0]);
+  const all = [...back, ...mid, ...front];
   let x1 = 1, x2 = 0, y1 = 0;
-  for (const [x, y, r] of L) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
-  const w = maxW * (0.6 + 0.4 * Math.min(100, pct) / 100), hgt = Math.min(w * (0.55 + rnd() * 0.15), bottom - top);
-  const sx = w / (x2 - x1), sy = hgt / -y1, tx = cx - w / 2 - x1 * sx, ty = top + hgt;
-  return `<g transform="translate(${f(tx)} ${f(ty)}) scale(${f(sx)} ${f(sy)})">`
-    + L.map(([x, y, r]) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}"/>`).join('')
-    + `<rect x="${f(L[0][0])}" y="${f(-Math.min(er, er2))}" width="${f(L[1][0] - L[0][0])}" height="${f(Math.min(er, er2))}"/></g>`;
+  for (const [x, y, r] of all) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
+  const w = maxW * (0.62 + 0.38 * Math.min(100, pct) / 100), hgt = Math.min(w * 0.62, bottom - top);
+  const sc = Math.min(w / (x2 - x1), hgt / -y1), tx = cx - ((x1 + x2) / 2) * sc, ty = top - y1 * sc;
+  // Trace one smooth outline around the billows: lumpy top, rounded ends, flat base.
+  const N = 72, top_ = [], bot = [];
+  for (let i = 0; i <= N; i++) {
+    const x = x1 + ((x2 - x1) * i) / N;
+    let yt = Infinity, yb = -Infinity;
+    for (const [cx, cy, r] of all) { const d = r * r - (x - cx) ** 2; if (d >= 0) { const s = Math.sqrt(d); yt = Math.min(yt, cy - s); yb = Math.max(yb, cy + s); } }
+    if (yt === Infinity) continue;
+    top_.push([x, yt]); bot.push([x, x >= front[0][0] && x <= front[front.length - 1][0] ? 0 : Math.min(0, yb)]);
+  }
+  const pts = [...top_, ...bot.reverse()].map(([x, y]) => `${(tx + x * sc).toFixed(1)},${(ty + y * sc).toFixed(1)}`).join(' ');
+  return `<polygon points="${pts}" fill="url(#cbody)"/><polygon points="${pts}" fill="url(#billow)"/>`;
 }
 function skyChart(hours) {
   const box = $('#skyChart');
@@ -845,20 +851,13 @@ function skyChart(hours) {
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     if (Math.round(h.pop) >= RAIN_SHOW) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${h.pop >= RAIN_FLAG ? 4.5 : 3.2}" fill="var(--rain)" stroke="var(--card2)" stroke-width="1.5"/>`;
   });
-  const blur = Math.max(2, Math.min(5.5, cw * 0.1)).toFixed(1);
+  const red = document.documentElement.classList.contains('red'), hi = red ? 'var(--cloud)' : '#ffffff', lo = red ? '#5a0909' : 'color-mix(in srgb, var(--cloud) 70%, #000 30%)';
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
-    <defs><filter id="puff3d" x="-8%" y="-15%" width="116%" height="130%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency=".08" numOctaves="2" seed="7" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="${(cw * 0.035).toFixed(1)}" xChannelSelector="R" yChannelSelector="G" result="g"/>
-      <feGaussianBlur in="g" stdDeviation=".5" result="g2"/>
-      <feGaussianBlur in="g2" stdDeviation="${blur}" result="b"/>
-      <feDiffuseLighting in="b" surfaceScale="4" diffuseConstant="1.35" lighting-color="#fff" result="d"><feDistantLight azimuth="250" elevation="42"/></feDiffuseLighting>
-      <feSpecularLighting in="b" surfaceScale="4" specularConstant=".45" specularExponent="14" lighting-color="#fff" result="s"><feDistantLight azimuth="250" elevation="55"/></feSpecularLighting>
-      <feComposite in="g2" in2="d" operator="arithmetic" k1="1" result="lit"/>
-      <feComposite in="s" in2="g2" operator="in" result="sp"/>
-      <feComposite in="lit" in2="sp" operator="arithmetic" k2="1" k3=".7" result="all"/>
-      <feComposite in="all" in2="g2" operator="in"/>
-    </filter></defs>
+    <defs>
+      <radialGradient id="billow" cx=".36" cy=".18" r=".55"><stop offset="0" style="stop-color:${hi}" stop-opacity=".7"/><stop offset="1" style="stop-color:${hi}" stop-opacity="0"/></radialGradient>
+      <linearGradient id="cbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${hi}"/><stop offset=".5" style="stop-color:var(--cloud)"/><stop offset="1" style="stop-color:${lo}"/></linearGradient>
+      <filter id="puff3d" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="${(cw * 0.03).toFixed(1)}" stdDeviation="${(cw * 0.03).toFixed(1)}" flood-color="#000" flood-opacity=".25"/></filter>
+    </defs>
     ${hours.slice(1).map((_, i) => `<line x1="${((i + 1) * cw).toFixed(1)}" x2="${((i + 1) * cw).toFixed(1)}" y1="0" y2="${H}" stroke="var(--line2)" stroke-width="1"/>`).join('')}
     <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/>
     <g fill="var(--cloud)" opacity=".35" filter="url(#puff3d)">${day}</g><g fill="var(--cloud)" opacity=".85" filter="url(#puff3d)">${night}</g>
