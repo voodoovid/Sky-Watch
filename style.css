@@ -353,6 +353,7 @@ html.red .fc-c.wet { color: #000; box-shadow: inset 0 0 0 2px var(--accent); }
 .big-l.ico { display: inline-flex; align-items: center; gap: 5px; }
 .big-l.ico svg { width: 1.5em; height: 1.5em; flex: none; }
 .ico-t { display: none; }
+.ico-pct { font-size: .95em; font-weight: 800; color: var(--text); }
 .fc-l { overflow: hidden; }
 .forecast.dense .fc-c.big { font-size: 1rem; }
 

@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.11';
+const VERSION = 'v3.12';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -45,6 +45,7 @@ const isNum = (v) => typeof v === 'number' && isFinite(v);
 const avg = (a) => { const v = a.filter(isNum); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
 const r0 = (v) => (isNum(v) ? Math.round(v) : '–');
 const pct = (v) => (isNum(v) ? Math.round(v) + '%' : '–');
+const num = (v) => (isNum(v) ? String(Math.round(v)) : '–');
 const temp = (c) => (!isNum(c) ? '–' : state.units === 'metric' ? Math.round(c) + '°' : Math.round(c * 9 / 5 + 32) + '°');
 const tempDiff = (c) => (!isNum(c) ? '–' : state.units === 'metric' ? Math.round(c) + '°' : Math.round(c * 9 / 5) + '°');
 const wind = (k) => (!isNum(k) ? '–' : state.units === 'metric' ? String(Math.round(k)) : String(Math.round(k / 1.609344)));
@@ -177,14 +178,28 @@ async function get7TimerJSON(url, ms) {
   } finally { clearTimeout(t); }
 }
 async function fetch7Timer(lat, lon) {
-  const q = `/bin/astro.php?lon=${(+lon).toFixed(3)}&lat=${(+lat).toFixed(3)}&ac=0&unit=metric&output=json&tzshift=0`;
-  const hosts = ['https://www.7timer.info', 'https://7timer.info', 'https://www.7timer.info'];
-  let j, last;
-  for (const h of hosts) {
-    try { j = await get7TimerJSON(h + q, 40000); if (j && Array.isArray(j.dataseries)) break; j = null; last = new Error('no data'); }
-    catch (e) { last = e; }
+  // 7Timer! only serves plain HTTP with no CORS, which an HTTPS page (GitHub Pages) is not allowed to call.
+  // So ask several HTTPS relays at the same time and take the first valid answer.
+  const target = `http://www.7timer.info/bin/astro.php?lon=${(+lon).toFixed(3)}&lat=${(+lat).toFixed(3)}&ac=0&unit=metric&output=json&tzshift=0`;
+  const e = encodeURIComponent(target);
+  const urls = [
+    `https://api.allorigins.win/raw?url=${e}`,
+    `https://api.codetabs.com/v1/proxy/?quest=${e}`,
+    `https://corsproxy.io/?url=${e}`,
+    target.replace('http://', 'https://'),
+  ];
+  let j;
+  try {
+    j = await Promise.any(urls.map(async (u) => {
+      const r = await get7TimerJSON(u, 45000);
+      if (!r || !Array.isArray(r.dataseries) || !r.dataseries.length) throw new Error('no data');
+      return r;
+    }));
+  } catch (err) {
+    const msgs = (err.errors || [err]).map((x) => x && x.message).filter(Boolean);
+    const last = new Error(msgs.includes('timed out') ? 'timed out' : msgs[0] || 'failed');
+    state.t7err = last.message; throw last;
   }
-  if (!j) { state.t7err = last ? last.message : 'failed'; throw last || new Error('failed'); }
   state.t7err = '';
   const s = String(j.init);
   const t0 = Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8), +s.slice(8, 10)) / 1000;
@@ -760,16 +775,16 @@ function renderForecast(hours) {
   let html = '<div class="fc-l"></div>' + hours.map((h, i) => `<button type="button" class="fc-c fc-h" data-i="${i}">${esc(fmtHour(h.d).replace(/\s?([AP])\.?M\.?/i, (m, p) => p.toLowerCase()))}<small>${SKY_SHORT[h.sky.k]}</small></button>`).join('');
   // Rating, then precip and cloud (large), the sky chart, temp, dew, wind, seeing, transparency.
   html += row('Rating', (h, i) => `<div class="fc-c rate ${h.rating.k}" data-i="${i}" title="${h.rating.score == null ? 'Daylight' : 'Score ' + h.rating.score + '/100'}">${RATE_TXT[h.rating.k]}</div>`);
-  const ico = (svg, name, col) => `<span class="big-l ico" title="${name}" style="color:var(${col})"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg><span class="ico-t">${name}</span></span>`;
+  const ico = (svg, name, col) => `<span class="big-l ico" title="${name}" style="color:var(${col})"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg><span class="ico-t">${name}</span><span class="ico-pct">%</span></span>`;
   const DROP = '<path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5z" fill="currentColor"/>';
   const CLOUD = PUFF_ICON;
   // Any chance of rain stands out: solid blue, stronger the higher the odds; dry hours stay quiet.
   const wetCls = (p) => (!isNum(p) ? 'big' : Math.round(p) < RAIN_SHOW ? 'big dry' : p >= RAIN_STOP ? 'big wet hi' : p >= RAIN_FLAG ? 'big wet mid' : 'big wet');
-  html += row(ico(DROP, 'Precip', '--rain'), (h, i) => cell(h, i, pct(h.pop), wetCls(h.pop), isNum(h.pop) && Math.round(h.pop) >= RAIN_SHOW ? `background:color-mix(in srgb, var(--rain) ${Math.round(28 + Math.min(h.pop, 100) * 0.6)}%, transparent)` : ''));
-  html += row(ico(CLOUD, 'Cloud', '--cloud'), (h, i) => cell(h, i, pct(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
+  html += row(ico(DROP, 'Precip', '--rain'), (h, i) => cell(h, i, num(h.pop), wetCls(h.pop), isNum(h.pop) && Math.round(h.pop) >= RAIN_SHOW ? `background:color-mix(in srgb, var(--rain) ${Math.round(28 + Math.min(h.pop, 100) * 0.6)}%, transparent)` : ''));
+  html += row(ico(CLOUD, 'Cloud', '--cloud'), (h, i) => cell(h, i, num(h.cloud), 'big', tint(h.cloud, '--cloud', 0.42), `Low ${r0(h.low)} · Mid ${r0(h.midc)} · High ${r0(h.high)}`));
 
   // Chart: puffy clouds + precip line, drawn at real pixel size once the grid has laid out.
-  html += `<div class="fc-l">Sky<small>%</small></div><div class="fc-chart" id="skyChart" role="img" aria-label="Cloud cover and precipitation chance by hour"></div>`;
+  html += `<div class="fc-l">Sky</div><div class="fc-chart" id="skyChart" role="img" aria-label="Cloud cover and precipitation chance by hour"></div>`;
 
   html += row('Temp', (h, i) => cell(h, i, temp(h.temp)));
   html += row('Dew<span class="lg-only">&nbsp;gap</span>', (h, i) => cell(h, i, tempDiff(h.dewGap), isNum(h.dewGap) && h.dewGap < 2 ? 'warn' : ''));
@@ -1545,7 +1560,11 @@ function buildNights(src, now, key) {
     const mid = new Date((win.set.getTime() + win.rise.getTime()) / 2);
     const moon = moonInfo(obs, mid, win);
     const S = nightSamples(obs, win);
-    return { win, moon, S, darkLim: S.darkLim, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day') };
+    // Only hours that are completely inside astronomical darkness; if the night never gets fully dark, keep the twilight hours.
+    const all = buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day');
+    const ds = win.darkStart && win.darkStart.getTime() / 1000, de = win.darkEnd && win.darkEnd.getTime() / 1000;
+    const dark = ds && de ? all.filter((h) => h.t >= ds && h.t + 3600 <= de) : [];
+    return { win, moon, S, darkLim: S.darkLim, hours: dark.length ? dark : all };
   };
   const nights = [night(w0, w0.set > now ? w0.set : now), night(w1, w1.set), night(w2, w2.set)];
   state.data = { now, lat: +loc.lat, obs, src, nights, key };
