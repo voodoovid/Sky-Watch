@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.8';
+const VERSION = 'v2.9';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -261,8 +261,9 @@ function moonInfo(obs, now, win) {
   return { angle, illum, name, next, events, path, hourly, ageDays: (angle / 360) * 29.530589 };
 }
 
-/* ---------- night sampling & 40° windows ---------- */
-const MIN_ALT = 40;          // Seestar minimum: only list targets that reach this altitude in darkness
+/* ---------- night sampling & minimum-elevation windows ---------- */
+const ALT_DEF = 40, ALT_LO = 0, ALT_HI = 85;
+let MIN_ALT = (() => { const v = +store.get('minAlt', ALT_DEF); return isNum(v) ? Math.min(ALT_HI, Math.max(ALT_LO, Math.round(v))) : ALT_DEF; })(); // minimum elevation, set in Options
 const STEP = 5 * 60e3;       // 5-minute sampling through the night
 const SEESTAR = { w: 1.28, h: 0.72, scale: 2.39 }; // S50 field in degrees, arcsec per pixel
 const MOON_DEG = 0.52;       // full Moon diameter
@@ -279,7 +280,7 @@ function nightSamples(obs, win) {
 }
 const lerpT = (a, b, f) => new Date(a.getTime() + (b.getTime() - a.getTime()) * f);
 
-/* Track an object through the night: altitude curve, the windows when it is ≥40° in darkness, and its peak. */
+/* Track an object through the night: altitude curve, the windows when it is ≥ MIN_ALT in darkness, and its peak. */
 function track(S, pos) {
   const { s, darkLim } = S;
   const curve = s.map((p) => { const h = pos(p.d); return { d: p.d, sun: p.sun, moon: p.moon, moonAz: p.moonAz, alt: h.alt, az: h.az }; });
@@ -293,7 +294,7 @@ function track(S, pos) {
     if (!ok(p)) return;
     const prev = curve[k - 1], next = curve[k + 1];
     if (!cur) {
-      const up = prev && dark(prev) && prev.alt < MIN_ALT; // climbed through 40° during darkness
+      const up = prev && dark(prev) && prev.alt < MIN_ALT; // climbed through MIN_ALT during darkness
       const turn = prev && dark(prev) && prev.alt >= MIN_ALT && !dirOK(prev); // came round into the home sky
       cur = { s: up ? lerpT(prev.d, p.d, (MIN_ALT - prev.alt) / (p.alt - prev.alt)) : p.d, why: up ? 'alt' : turn ? 'dir' : 'dark', altS: up ? MIN_ALT : p.alt };
     }
@@ -486,7 +487,7 @@ function angSep(a, b) {
   const c = Math.sin(a.alt * r) * Math.sin(b.alt * r) + Math.cos(a.alt * r) * Math.cos(b.alt * r) * Math.cos((a.az - b.az) * r);
   return Math.acos(Math.max(-1, Math.min(1, c))) / r;
 }
-/* Deep-sky targets that reach 40° in darkness for at least half an hour, longest window first. */
+/* Deep-sky targets that reach MIN_ALT in darkness for at least half an hour, longest window first. */
 function targetsTonight(obs, S) {
   if (S.darkLim == null) return [];
   const out = [];
@@ -893,7 +894,7 @@ function renderPath(N, lat, now) {
 function renderPlanets(list) {
   $('#planets').innerHTML = list.length ? list.map((p, i) => `<button type="button" class="row tgt" data-p="${i}">
     <div class="nm"><span class="t1"><b>${p.name}</b><span class="tag">mag ${p.mag.toFixed(1)}</span></span>
-    <span class="sub2">${p.start ? `40°+ from ${esc(fmtTime(p.start))}` : `Stays below ${MIN_ALT}°${state.home ? ' in home sky' : ''}`}</span></div>
+    <span class="sub2">${p.start ? `${MIN_ALT}°+ from ${esc(fmtTime(p.start))}` : `Stays below ${MIN_ALT}°${state.home ? ' in home sky' : ''}`}</span></div>
     <div class="r">${esc(fmtTime(p.d))}<span class="sub2">${Math.round(p.alt)}° ${compass(p.az)}</span></div></button>`).join('')
     : '<p class="empty">None well placed after dusk.</p>';
 }
@@ -916,7 +917,7 @@ function renderTop(list, topIdx, now) {
     return `<button type="button" class="top-it" data-t="${i}">
       <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
-  }).join('') : '<p class="empty">No targets reach 40° in darkness.</p>';
+  }).join('') : `<p class="empty">No targets reach ${MIN_ALT}° in darkness.</p>`;
 }
 
 function renderTargets(list) {
@@ -1029,7 +1030,7 @@ function wireHero(root) {
   });
 }
 
-/* Altitude chart: twilight shading, hour axis, 40° line, the usable window and when the target reaches 40°. */
+/* Altitude chart: twilight shading, hour axis, minimum-elevation line, the usable window and when the target reaches it. */
 function altChart(el, o, now) {
   const c = o.curve;
   if (!el || !c || c.length < 2) return;
@@ -1062,14 +1063,14 @@ function altChart(el, o, now) {
   for (const a of [20, 60, 80]) s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(Y(a))}" y2="${f(Y(a))}" stroke="var(--grid)" stroke-width="1"/>`;
   s += `<text x="${f(L - 6)}" y="${f(T - fs * 0.55)}" font-size="${f(sm * 0.9)}" text-anchor="end" fill="var(--muted)">Dir</text>`;
   for (const a of [0, 20, 40, 60, 80]) s += `<text x="${f(L - 6)}" y="${f(Y(a) + sm * 0.35)}" font-size="${f(sm)}" text-anchor="end" fill="var(--muted)">${a}°</text>`;
-  // Usable window: ≥40° in darkness
+  // Usable window: ≥ MIN_ALT in darkness
   for (const g of o.segs || []) {
     const pts = [[X(g.s), Y(MIN_ALT)], [X(g.s), Y(altAt(g.s))]];
     c.forEach((p) => { if (p.d > g.s && p.d < g.e) pts.push([X(p.d), Y(p.alt)]); });
     pts.push([X(g.e), Y(altAt(g.e))], [X(g.e), Y(MIN_ALT)]);
     s += `<polygon points="${pts.map(([x, y]) => f(x) + ',' + f(y)).join(' ')}" fill="var(--go)" fill-opacity=".22"/>`;
   }
-  // 40° minimum line
+  // Minimum-elevation line
   s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(Y(MIN_ALT))}" y2="${f(Y(MIN_ALT))}" stroke="var(--fair)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
   // Moon and target curves
   const poly = (key) => c.map((p) => f(X(p.d)) + ',' + f(Y(p[key]))).join(' ');
@@ -1116,7 +1117,7 @@ function altChart(el, o, now) {
   };
   const y40 = Y(MIN_ALT), gap = fs * 1.2;
   let xs = null;
-  // When it reaches 40° (or is already above it when darkness starts)
+  // When it reaches MIN_ALT (or is already above it when darkness starts)
   if (o.start) {
     const x = X(o.start), y = Y(altAt(o.start));
     xs = x;
@@ -1138,7 +1139,7 @@ function altChart(el, o, now) {
     dot(x, y, fs * 0.26);
     peakTxt = [x, y];
   }
-  // Now marker; its label flips to the other side of the line if it would sit on the 40° marker.
+  // Now marker; its label flips to the other side of the line if it would sit on the minimum marker.
   if (now && +now > t0 && +now < t1) {
     const x = X(now), tw = sm * 1.9;
     const right = xs == null || xs < x - 2 || xs > x + tw + 8;
@@ -1149,12 +1150,12 @@ function altChart(el, o, now) {
   }
   if (o.start) {
     const x = X(o.start);
-    const label = o.startWhy === 'alt' ? `Reaches 40° · ${fmtTime(o.start)}` : o.startWhy === 'dir' ? `In home sky · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
+    const label = o.startWhy === 'alt' ? `Reaches ${MIN_ALT}° · ${fmtTime(o.start)}` : o.startWhy === 'dir' ? `In home sky · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
     const side = x > L + pw * 0.6 ? 'end' : 'start', dx = side === 'end' ? -fs * 0.6 : fs * 0.6;
     pill([[x + dx, y40 + gap, side], [x + dx, y40 - gap, side], [x + dx, y40 + gap * 2.6, side], [x + dx, T + fs, side], [x - dx, y40 + gap, side === 'end' ? 'start' : 'end']], label, 'var(--go)');
     if (o.end) {
       const xe = X(o.end);
-      const txt = `${o.endWhy === 'alt' ? 'Below 40°' : o.endWhy === 'dir' ? 'Leaves home sky' : 'Dawn'} · ${fmtTime(o.end)}`;
+      const txt = `${o.endWhy === 'alt' ? `Below ${MIN_ALT}°` : o.endWhy === 'dir' ? 'Leaves home sky' : 'Dawn'} · ${fmtTime(o.end)}`;
       pill([[xe - fs * 0.6, y40 + gap, 'end'], [xe + fs * 0.6, y40 + gap, 'start'], [xe - fs * 0.6, y40 + gap * 2.6, 'end'], [xe + fs * 0.6, y40 + gap * 2.6, 'start'], [xe, T + ph - gap * 2, 'middle'], [xe, T + fs * 2.8, 'middle']], txt, 'var(--muted)');
     }
   }
@@ -1169,9 +1170,9 @@ function altChart(el, o, now) {
 const tile = (lbl, val, sub = '', cls = '') => `<div class="tile ${cls}"><span class="lbl">${esc(lbl)}</span><b>${esc(val)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
 function windowTiles(o) {
   return o.start
-    ? tile(o.startWhy === 'alt' ? 'Reaches 40°' : o.startWhy === 'dir' ? 'Into home sky' : 'Above 40° at dark', fmtTime(o.start), (o.startWhy === 'alt' ? 'rising through 40°' : o.startWhy === 'dir' ? `comes round past NW at ${Math.round(o.startAlt)}°` : `already ${Math.round(o.startAlt)}° when dark begins`), 'key')
+    ? tile(o.startWhy === 'alt' ? `Reaches ${MIN_ALT}°` : o.startWhy === 'dir' ? 'Into home sky' : `Above ${MIN_ALT}° at dark`, fmtTime(o.start), (o.startWhy === 'alt' ? `rising through ${MIN_ALT}°` : o.startWhy === 'dir' ? `comes round past NW at ${Math.round(o.startAlt)}°` : `already ${Math.round(o.startAlt)}° when dark begins`), 'key')
       + tile('Imaging window', `${o.hrs.toFixed(1)} h`, `until ${fmtTime(o.end)}${o.endWhy === 'dark' ? ' (dawn)' : o.endWhy === 'dir' ? ' (passes S)' : ''}`, 'key')
-    : tile('Reaches 40°', 'Not tonight', `in darkness`, o.kind === 'planet' ? 'warn' : 'warn span');
+    : tile(`Reaches ${MIN_ALT}°`, 'Not tonight', `in darkness`, o.kind === 'planet' ? 'warn' : 'warn span');
 }
 function openObject(o) {
   if (!o) return;
@@ -1233,9 +1234,9 @@ function openObject(o) {
   showSheet(title, `<div class="obj">
       <div class="obj-top">${hero}<div class="tiles">${tiles}<div class="tip"><b>Seestar tip</b>${esc(tip)}</div></div></div>
       <section class="chart-card">
-        <div class="chart-head"><h3>Altitude tonight</h3><span>${o.start ? `In view ≥40° for ${o.hrs.toFixed(1)} h` : `Never reaches ${MIN_ALT}° in darkness`}</span></div>
+        <div class="chart-head"><h3>Altitude tonight</h3><span>${o.start ? `In view ≥${MIN_ALT}° for ${o.hrs.toFixed(1)} h` : `Never reaches ${MIN_ALT}° in darkness`}</span></div>
         <div class="chart" id="objChart"></div>
-        <div class="chart-key"><span><i class="k-tgt"></i>${esc(o.kind === 'planet' ? o.name : o.id)}</span><span><i class="k-moon"></i>Moon</span><span><i class="k-min"></i>40° minimum</span><span><i class="k-win"></i>Imaging window</span><span><i class="k-dark"></i>Full dark</span></div>
+        <div class="chart-key"><span><i class="k-tgt"></i>${esc(o.kind === 'planet' ? o.name : o.id)}</span><span><i class="k-moon"></i>Moon</span><span><i class="k-min"></i>${MIN_ALT}° minimum</span><span><i class="k-win"></i>Imaging window</span><span><i class="k-dark"></i>Full dark</span></div>
       </section>
       <dl class="facts">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       <p class="fine">${o.kind === 'comet' ? 'Orbit: JPL Horizons. Positions computed on device.' : o.kind === 'dso' ? 'Catalog sizes and magnitudes are approximate.' : 'Positions computed on device (Astronomy Engine).'}</p>
@@ -1279,14 +1280,56 @@ function saveHome() {
   renderOptions(); applyHome();
   if (state.home) { findTargets(); renderAll(); }
 }
+/* Minimum elevation: one value used for targets, planets, comets, charts and labels everywhere. */
+let altTimer = 0;
+function setMinAlt(v, commit) {
+  v = Math.min(ALT_HI, Math.max(ALT_LO, Math.round(+v)));
+  if (!isNum(v)) return;
+  MIN_ALT = v;
+  syncAltUI(commit);
+  store.set('minAlt', v);
+  applyMinAlt();
+  clearTimeout(altTimer);
+  altTimer = setTimeout(() => { findTargets(); renderAll(); }, commit ? 0 : 120);
+}
+function syncAltUI(commit) {
+  const box = $('#optAlt');
+  if (!box) return;
+  const r = box.querySelector('input[type=range]'), n = box.querySelector('input[type=number]');
+  if (+r.value !== MIN_ALT) r.value = MIN_ALT;
+  if (document.activeElement !== n || commit) n.value = MIN_ALT;
+  r.style.setProperty('--p', ((MIN_ALT - ALT_LO) / (ALT_HI - ALT_LO) * 100).toFixed(1) + '%');
+}
+function applyMinAlt() {
+  const t = $('#tgtTitle .eb-r');
+  if (t) t.textContent = `Reaches ${MIN_ALT}°`;
+}
 function showOptions() {
-  showSheet('Options', `<section class="opt" id="optHome">
+  showSheet('Options', `<section class="opt" id="optAlt">
+      <h3 class="opt-h">Minimum elevation</h3>
+      <p class="note" style="margin:0 0 .6em">Targets, planets and comets only count while they're at least this high in darkness. Used for every list, chart and window.</p>
+      <div class="alt-row">
+        <input type="range" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation in degrees">
+        <label class="alt-num"><input type="number" inputmode="numeric" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation, degrees"><span>°</span></label>
+      </div>
+      <div class="opt-btns"><button type="button" class="tbtn ghost" data-alt="${ALT_DEF}">Reset (${ALT_DEF}°)</button></div>
+    </section>
+    <section class="opt" id="optHome">
       <h3 class="opt-h">Home sky</h3>
       <p class="note" style="margin:0 0 .6em">Tap wedges to add or remove the directions you can see from home. The <b>Home</b> switch then only shows targets in these directions.</p>
       <div class="wheel-wrap"></div>
       <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
-      <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn" data-act="none">None</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
+      <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
     </section>`);
+  const ab = $('#optAlt');
+  const rng = ab.querySelector('input[type=range]'), num = ab.querySelector('input[type=number]');
+  rng.addEventListener('input', () => setMinAlt(rng.value));
+  rng.addEventListener('change', () => setMinAlt(rng.value, true));
+  num.addEventListener('input', () => { if (num.value !== '' && +num.value >= ALT_LO && +num.value <= ALT_HI) setMinAlt(num.value); });
+  num.addEventListener('change', () => setMinAlt(num.value === '' ? MIN_ALT : num.value, true));
+  num.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); num.blur(); } });
+  ab.querySelector('[data-alt]').addEventListener('click', () => setMinAlt(ALT_DEF, true));
+  syncAltUI(true);
   const box = $('#optHome');
   const toggle = (w) => { state.homeSky[+w.dataset.w] = !state.homeSky[+w.dataset.w]; saveHome(); };
   box.addEventListener('click', (e) => {
@@ -1472,7 +1515,7 @@ function toggleSearch(open) {
 
 function init() {
   $('#ver').textContent = VERSION;
-  applyRed(); applyUnits(); applyNight(); applyHome(); renderSpots();
+  applyRed(); applyUnits(); applyNight(); applyHome(); applyMinAlt(); renderSpots();
   $('#homeBtn').addEventListener('click', () => { state.home = !state.home; store.set('home', state.home); applyHome(); findTargets(); renderAll(); });
   $('#redBtn').addEventListener('click', () => { state.red = !state.red; store.set('red', state.red); applyRed(); });
   $('#unitsBtn').addEventListener('click', () => { state.units = state.units === 'metric' ? 'imperial' : 'metric'; store.set('units', state.units); applyUnits(); renderAll(); });
