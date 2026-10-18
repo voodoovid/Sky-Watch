@@ -524,10 +524,12 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 .hero.failed .hero-img::after { content: 'Photo unavailable'; }
 .hero.failed.offline .hero-img::after { content: 'Photo unavailable offline'; }
 .hero.failed .frame, .hero.failed .moonscale, .hero.failed .xhair { display: none; }
-.frame {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  border: 1.5px dashed #ffd25a; box-shadow: 0 0 0 1px rgba(0,0,0,.4); pointer-events: none;
-}
+.frame { position: absolute; pointer-events: none; }
+/* Drawn as SVG: iOS Safari drops the side edges of a thin dashed CSS border at sub-pixel sizes. */
+.frame svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.frame rect { fill: none; shape-rendering: geometricPrecision; }
+.frame .fr-shadow { stroke: rgba(0,0,0,.45); stroke-width: 3.5; }
+.frame .fr-line { stroke: #ffd25a; stroke-width: 1.5; stroke-dasharray: 5 3.5; }
 .frame span, .moonscale span {
   position: absolute; bottom: 100%; left: -1px; margin-bottom: 3px; padding: 1px 6px; border-radius: 5px;
   font-size: .72em; font-weight: 700; white-space: nowrap; color: #ffd25a; background: rgba(0,0,0,.6);
@@ -537,7 +539,7 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 .xhair { position: absolute; left: 50%; top: 50%; width: 9%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 2px solid #79e0a8; border-radius: 50%; }
 .hero figcaption { margin-top: .45em; font-size: .78em; color: var(--muted); line-height: 1.35; }
 html.red .hero-img img { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(.5); }
-html.red .frame { border-color: var(--accent); } html.red .frame span, html.red .moonscale span { color: var(--accent); }
+html.red .frame .fr-line { stroke: var(--accent); } html.red .frame span, html.red .moonscale span { color: var(--accent); }
 html.red .moonscale, html.red .xhair { border-color: var(--accent); }
 
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: .6em; align-content: start; }

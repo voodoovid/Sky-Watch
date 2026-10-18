@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.6';
+const VERSION = 'v3.7';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -986,7 +986,7 @@ function heroSky(raHours, dec, majorArcmin, caption, marker) {
   return `<figure class="hero"><div class="hero-img">
       <img src="${skyCutout(raHours, dec, fov)}" alt="Sky survey image of the target" decoding="async">
       ${marker ? '<div class="xhair"></div>' : ''}
-      <div class="frame" style="width:${fw.toFixed(2)}%;height:${fh.toFixed(2)}%"><span>Seestar frame</span></div>
+      <div class="frame" style="left:${((100 - fw) / 2).toFixed(2)}%;top:${((100 - fh) / 2).toFixed(2)}%;width:${fw.toFixed(2)}%;height:${fh.toFixed(2)}%"><svg aria-hidden="true"><rect class="fr-shadow" x="0" y="0" width="100%" height="100%"/><rect class="fr-line" x="0" y="0" width="100%" height="100%"/></svg><span>Seestar frame</span></div>
       <div class="moonscale" style="width:${mw.toFixed(2)}%"><span>Full Moon</span></div>
     </div><figcaption>${caption} · image ${nice(fov)}° wide</figcaption></figure>`;
 }
