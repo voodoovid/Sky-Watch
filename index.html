@@ -88,9 +88,9 @@
   </section>
 
   <section class="card obj-card" id="objCard">
-    <div class="eyebrow">Planets</div>
+    <div class="eyebrow eb-row">Planets<span class="eb-r">Highest</span></div>
     <div id="planets" class="list"></div>
-    <div class="eyebrow mt">Seestar targets <span class="muted">· above 30° in darkness</span></div>
+    <div class="eyebrow mt eb-row">Seestar targets<span class="eb-r">Reaches 40°</span></div>
     <div id="targets" class="list scroll"></div>
   </section>
 </main>
@@ -102,7 +102,7 @@
 </footer>
 
 <dialog id="sheet" class="sheet">
-  <form method="dialog" class="sheet-head"><h2 id="sheetTitle"></h2><button class="ibtn" aria-label="Close">✕</button></form>
+  <form method="dialog" class="sheet-head"><div class="sh-t"><h2 id="sheetTitle"></h2><p id="sheetSub" hidden></p></div><button class="ibtn sh-x" aria-label="Close">✕</button></form>
   <div id="sheetBody"></div>
 </dialog>
 

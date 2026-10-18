@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v2.2';
+const VERSION = 'v2.3';
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -210,20 +210,167 @@ function moonInfo(obs, now, win) {
   return { angle, illum, name, next, events, path, hourly, ageDays: (angle / 360) * 29.530589 };
 }
 
+/* ---------- night sampling & 40° windows ---------- */
+const MIN_ALT = 40;          // Seestar minimum: only list targets that reach this altitude in darkness
+const STEP = 5 * 60e3;       // 5-minute sampling through the night
+const SEESTAR = { w: 1.28, h: 0.72, scale: 2.39 }; // S50 field in degrees, arcsec per pixel
+const MOON_DEG = 0.52;       // full Moon diameter
+
+function nightSamples(obs, win) {
+  const s = [];
+  for (let t = win.set.getTime(); t <= win.rise.getTime() + 1; t += STEP) {
+    const d = new Date(t), m = altAz('Moon', d, obs);
+    s.push({ d, sun: altAz('Sun', d, obs).alt, moon: m.alt, moonAz: m.az });
+  }
+  // Full darkness, falling back to nautical darkness at high latitude in summer.
+  const darkLim = s.some((p) => p.sun <= -18) ? -18 : s.some((p) => p.sun <= -12) ? -12 : null;
+  return { s, darkLim };
+}
+const lerpT = (a, b, f) => new Date(a.getTime() + (b.getTime() - a.getTime()) * f);
+
+/* Track an object through the night: altitude curve, the windows when it is ≥40° in darkness, and its peak. */
+function track(S, pos) {
+  const { s, darkLim } = S;
+  const curve = s.map((p) => { const h = pos(p.d); return { d: p.d, sun: p.sun, moon: p.moon, moonAz: p.moonAz, alt: h.alt, az: h.az }; });
+  const dark = (p) => darkLim != null && p.sun <= darkLim;
+  const ok = (p) => dark(p) && p.alt >= MIN_ALT;
+  const segs = [];
+  let cur = null, peak = null;
+  curve.forEach((p, k) => {
+    if (dark(p) && (!peak || p.alt > peak.alt)) peak = p;
+    if (!ok(p)) return;
+    const prev = curve[k - 1], next = curve[k + 1];
+    if (!cur) {
+      const up = prev && dark(prev) && prev.alt < MIN_ALT; // climbed through 40° during darkness
+      cur = { s: up ? lerpT(prev.d, p.d, (MIN_ALT - prev.alt) / (p.alt - prev.alt)) : p.d, why: up ? 'alt' : 'dark', altS: up ? MIN_ALT : p.alt };
+    }
+    if (!next || !ok(next)) {
+      const down = next && dark(next) && next.alt < MIN_ALT;
+      cur.e = down ? lerpT(p.d, next.d, (p.alt - MIN_ALT) / (p.alt - next.alt)) : p.d;
+      cur.why2 = down ? 'alt' : 'dark';
+      segs.push(cur); cur = null;
+    }
+  });
+  const hrs = segs.reduce((a, g) => a + (g.e - g.s), 0) / 3600e3;
+  const first = segs[0], last = segs[segs.length - 1];
+  return {
+    curve, segs, hrs, peak, darkLim,
+    start: first ? first.s : null, startWhy: first ? first.why : null, startAlt: first ? first.altS : null,
+    end: last ? last.e : null, endWhy: last ? last.why2 : null,
+  };
+}
+function moonSepAt(p) {
+  return p && p.moon > 0 ? angSep(p, { alt: p.moon, az: p.moonAz }) : null;
+}
+/* Crossing times of an altitude (e.g. 0° = rise/set) along a curve. */
+function crossings(curve, alt) {
+  const out = [];
+  for (let k = 1; k < curve.length; k++) {
+    const a = curve[k - 1], b = curve[k];
+    if ((a.alt < alt) !== (b.alt < alt)) out.push({ kind: b.alt >= alt ? 'rise' : 'set', d: lerpT(a.d, b.d, (alt - a.alt) / (b.alt - a.alt)) });
+  }
+  return out;
+}
+
 const PLANETS = ['Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'];
-function planetsTonight(obs, win) {
+const PLANET_KM = { Mercury: 4879, Venus: 12104, Mars: 6779, Jupiter: 139820, Saturn: 116460, Uranus: 50724, Neptune: 49244 };
+const PLANET_WIKI = { Mercury: 'Mercury (planet)' };
+function planetsTonight(obs, S) {
   const out = [];
   for (const p of PLANETS) {
+    const tr = track(S, (d) => altAz(p, d, obs));
+    // Best placement once the sky is reasonably dark (sun below −6°).
     let best = null;
-    for (let t = win.set.getTime(); t <= win.rise.getTime(); t += 15 * 60e3) {
-      const d = new Date(t);
-      if (altAz('Sun', d, obs).alt > -6) continue;
-      const h = altAz(p, d, obs);
-      if (!best || h.alt > best.alt) best = { d, ...h };
-    }
-    if (best && best.alt > 5) out.push({ name: p, ...best, mag: A.Illumination(p, best.d).mag });
+    for (const c of tr.curve) if (c.sun <= -6 && (!best || c.alt > best.alt)) best = c;
+    if (!best || best.alt <= 5) continue;
+    const il = A.Illumination(p, best.d);
+    const distAU = il.geo_dist;
+    out.push({
+      kind: 'planet', id: p, name: p, type: 'Planet', ...tr, peak: best, d: best.d, alt: best.alt, az: best.az,
+      mag: il.mag, phase: il.phase_fraction, distAU, size: (206265 * PLANET_KM[p]) / (distAU * 149597870.7),
+      moonSep: moonSepAt(best),
+    });
   }
   return out.sort((a, b) => a.d - b.d);
+}
+
+/* ---------- comets ----------
+   Osculating heliocentric elements (ecliptic J2000) from JPL Horizons, each taken near the comet's
+   best apparition, so two-body motion is accurate for months. Brightness: m = H + 5·log Δ + K·log r,
+   with H and K fitted to published predictions for the apparition (comet brightness is never exact). */
+const KM_AU = 149597870.7;
+const COMETS = [
+  { id: '161P', name: 'Hartley–IRAS', wiki: '161P/Hartley–IRAS', e: 0.8361681179993331, q: 1.892587535102966e8 / KM_AU, inc: 95.79191664116654, node: 1.473521009996639, peri: 47.06488486978249, tp: 2461371.678606211673, H: 9.38, K: 19.46 },
+  { id: '10P', name: 'Tempel 2', wiki: '10P/Tempel', e: 0.5374246119408251, q: 2.120911443309039e8 / KM_AU, inc: 12.02706054930059, node: 117.7967585729341, peri: 195.4698312346460, tp: 2461254.616015025880, H: 9.78, K: 5.49 },
+  { id: '2P', name: 'Encke', wiki: '2P/Encke', e: 0.8473340638414451, q: 5.065083253790976e7 / KM_AU, inc: 11.34784086782815, node: 334.0194576625117, peri: 187.2890785797148, tp: 2461446.726827991661, H: 11.48, K: 10.08 },
+  { id: 'C/2025 Y1', name: 'ATLAS', wiki: null, e: 1.000118294982386, q: 3.892757552483266e8 / KM_AU, inc: 14.55564311402980, node: 166.5470759820520, peri: 124.2847724407763, tp: 2461692.436876253225, H: 4.96, K: 10.71 },
+  { id: '45P', name: 'Honda–Mrkos–Pajdušáková', wiki: '45P/Honda–Mrkos–Pajdušáková', e: 0.8172071616460846, q: 8.355766393563002e7 / KM_AU, inc: 4.323084023780162, node: 87.66434595425542, peri: 327.9580341553426, tp: 2461648.493411391042, H: 8.45, K: 14.14 },
+  { id: '104P', name: 'Kowal 2', wiki: '104P/Kowal', e: 0.6655180060584900, q: 1.604468700319012e8 / KM_AU, inc: 5.699625978696875, node: 207.1284782570459, peri: 227.3620030123528, tp: 2461691.118663450237, H: 9.84, K: 21.1 },
+];
+const COMET_MAG_LIMIT = 11.5; // "prominent" for a Seestar: brighter than about magnitude 11.5
+const KGAUSS = 0.01720209895;
+function cometHelioEcl(el, jd) {
+  const q = el.q, e = el.e, dt = jd - el.tp;
+  let r, nu;
+  if (Math.abs(e - 1) < 1e-3) { // near-parabolic: Barker's equation
+    const W = (3 * KGAUSS / Math.sqrt(2 * q * q * q)) * dt;
+    const Y = Math.cbrt(W / 2 + Math.sqrt(W * W / 4 + 1));
+    const s = Y - 1 / Y;
+    nu = 2 * Math.atan(s); r = q * (1 + s * s);
+  } else if (e < 1) {
+    const a = q / (1 - e), n = KGAUSS / Math.pow(a, 1.5);
+    const M = (n * dt) % (2 * Math.PI);
+    let E = e < 0.8 ? M : Math.PI * Math.sign(M || 1);
+    for (let k = 0; k < 60; k++) { const d = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); E -= d; if (Math.abs(d) < 1e-13) break; }
+    r = a * (1 - e * Math.cos(E));
+    nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
+  } else {
+    const a = q / (e - 1), n = KGAUSS / Math.pow(a, 1.5), M = n * dt;
+    let Hh = Math.asinh(M / e);
+    for (let k = 0; k < 80; k++) { const d = (e * Math.sinh(Hh) - Hh - M) / (e * Math.cosh(Hh) - 1); Hh -= d; if (Math.abs(d) < 1e-13) break; }
+    r = a * (e * Math.cosh(Hh) - 1);
+    nu = 2 * Math.atan2(Math.sqrt(e + 1) * Math.sinh(Hh / 2), Math.sqrt(e - 1) * Math.cosh(Hh / 2));
+  }
+  const D = Math.PI / 180, O = el.node * D, i = el.inc * D, u = el.peri * D + nu;
+  return {
+    x: r * (Math.cos(O) * Math.cos(u) - Math.sin(O) * Math.sin(u) * Math.cos(i)),
+    y: r * (Math.sin(O) * Math.cos(u) + Math.cos(O) * Math.sin(u) * Math.cos(i)),
+    z: r * Math.sin(u) * Math.sin(i), r,
+  };
+}
+/* Geocentric position with light-time correction. ra/dec of date (for altitude) and J2000 (for star charts). */
+function cometPos(el, date) {
+  const time = A.MakeTime(date), jd = time.tt + 2451545.0;
+  const earth = A.HelioVector('Earth', time);
+  const eps = 23.4392911 * Math.PI / 180;
+  let p = cometHelioEcl(el, jd), g, delta = 0;
+  for (let k = 0; k < 2; k++) {
+    const c = { x: p.x, y: p.y * Math.cos(eps) - p.z * Math.sin(eps), z: p.y * Math.sin(eps) + p.z * Math.cos(eps) };
+    g = { x: c.x - earth.x, y: c.y - earth.y, z: c.z - earth.z };
+    delta = Math.hypot(g.x, g.y, g.z);
+    p = cometHelioEcl(el, jd - delta / 173.1446);
+  }
+  const vJ = new A.Vector(g.x, g.y, g.z, time);
+  const j2000 = A.EquatorFromVector(vJ);
+  const ofDate = A.EquatorFromVector(A.RotateVector(A.Rotation_EQJ_EQD(time), vJ));
+  return { ra: ofDate.ra, dec: ofDate.dec, ra2000: j2000.ra, dec2000: j2000.dec, r: p.r, delta, mag: el.H + 5 * Math.log10(delta) + el.K * Math.log10(p.r) };
+}
+function cometsTonight(obs, S, win) {
+  const mid = new Date((win.set.getTime() + win.rise.getTime()) / 2);
+  const out = [];
+  for (const c of COMETS) {
+    const p0 = cometPos(c, mid);
+    if (!(p0.mag <= COMET_MAG_LIMIT)) continue;
+    const tr = track(S, (d) => { const p = cometPos(c, d); return altAzRaDec(p.ra, p.dec, d, obs); });
+    if (tr.hrs < 0.5) continue;
+    const pk = tr.peak;
+    const at = cometPos(c, pk.d);
+    out.push({
+      kind: 'comet', id: c.id, name: c.name, type: 'Comet', el: c, ...tr, d: pk.d, alt: pk.alt, az: pk.az,
+      ra: at.ra2000, dec: at.dec2000, mag: at.mag, r: at.r, delta: at.delta, moonSep: moonSepAt(pk),
+    });
+  }
+  return out.sort((a, b) => a.mag - b.mag);
 }
 
 /* Seestar-friendly deep-sky objects (J2000 RA hours, Dec degrees). */
@@ -284,35 +431,15 @@ function angSep(a, b) {
   const c = Math.sin(a.alt * r) * Math.sin(b.alt * r) + Math.cos(a.alt * r) * Math.cos(b.alt * r) * Math.cos((a.az - b.az) * r);
   return Math.acos(Math.max(-1, Math.min(1, c))) / r;
 }
-function targetsTonight(obs, win) {
-  // Sample times in full darkness, falling back to nautical darkness at high latitude in summer.
-  const times = [];
-  for (const limit of [-18, -12]) {
-    for (let t = win.set.getTime(); t <= win.rise.getTime(); t += 15 * 60e3) {
-      const d = new Date(t);
-      if (altAz('Sun', d, obs).alt <= limit) times.push(d);
-    }
-    if (times.length) break;
-  }
-  if (!times.length) return [];
-  const moons = times.map((d) => altAz('Moon', d, obs));
-  const all = [];
-  for (let t = win.set.getTime(); t <= win.rise.getTime(); t += 15 * 60e3) {
-    const d = new Date(t);
-    all.push({ d, sun: altAz('Sun', d, obs).alt, moon: altAz('Moon', d, obs).alt });
-  }
+/* Deep-sky targets that reach 40° in darkness for at least half an hour, longest window first. */
+function targetsTonight(obs, S) {
+  if (S.darkLim == null) return [];
   const out = [];
   for (const [id, name, type, ra, dec] of DSO) {
-    let best = null, hrs = 0;
-    times.forEach((d, i) => {
-      const h = altAzRaDec(ra, dec, d, obs);
-      if (h.alt >= 30) hrs += 0.25;
-      if (!best || h.alt > best.alt) best = { d, ...h, moon: moons[i] };
-    });
-    if (best && best.alt >= 30) {
-      const curve = all.map((p) => ({ ...p, alt: altAzRaDec(ra, dec, p.d, obs).alt }));
-      out.push({ id, name, type, ra, dec, ...best, hrs, curve, moonSep: best.moon.alt > 0 ? angSep(best, best.moon) : null });
-    }
+    const tr = track(S, (d) => altAzRaDec(ra, dec, d, obs));
+    if (tr.hrs < 0.5) continue;
+    const pk = tr.peak;
+    out.push({ kind: 'dso', id, name, type, ra, dec, ...tr, d: pk.d, alt: pk.alt, az: pk.az, moonSep: moonSepAt(pk) });
   }
   return out.sort((a, b) => b.hrs - a.hrs || b.alt - a.alt).slice(0, 15);
 }
@@ -501,11 +628,15 @@ function renderForecast(hours) {
   f.innerHTML = html;
 }
 
-function showSheet(title, body) {
+function showSheet(title, body, sub = '', wide = false) {
   $('#sheetTitle').textContent = title;
+  $('#sheetSub').textContent = sub;
+  $('#sheetSub').hidden = !sub;
   $('#sheetBody').innerHTML = body;
   const d = $('#sheet');
+  d.classList.toggle('wide', wide);
   if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
+  $('#sheetBody').scrollTop = 0;
 }
 
 function showHour(i) {
@@ -595,56 +726,280 @@ function renderPath(moon, lat, now) {
 }
 
 function renderPlanets(list) {
-  $('#planets').innerHTML = list.length ? list.map((p) => `<div class="row"><div class="nm"><b>${p.name}</b><span class="tag">mag ${p.mag.toFixed(1)}</span></div>
-    <div class="r">${esc(fmtTime(p.d))}<span class="sub2">${Math.round(p.alt)}° ${compass(p.az)}</span></div></div>`).join('')
+  $('#planets').innerHTML = list.length ? list.map((p, i) => `<button type="button" class="row tgt" data-p="${i}">
+    <div class="nm"><span class="t1"><b>${p.name}</b><span class="tag">mag ${p.mag.toFixed(1)}</span></span>
+    <span class="sub2">${p.start ? `40°+ from ${esc(fmtTime(p.start))}` : `Stays below ${MIN_ALT}°`}</span></div>
+    <div class="r">${esc(fmtTime(p.d))}<span class="sub2">${Math.round(p.alt)}° ${compass(p.az)}</span></div></button>`).join('')
     : '<p class="empty">None well placed after dusk.</p>';
 }
 
 function renderTargets(list) {
-  $('#targets').innerHTML = list.length ? list.map((o) => {
+  const now = state.data ? state.data.now : new Date();
+  $('#targets').innerHTML = list.length ? list.map((o, i) => {
     const neb = /Emission|Supernova|Planetary/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
-    return `<button type="button" class="row tgt" data-t="${list.indexOf(o)}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="sub2">${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}</span></div>
-      <div class="r">${esc(fmtTime(o.d))}<span class="sub2">${Math.round(o.alt)}° · ${o.hrs.toFixed(1)} h</span></div></button>`;
-  }).join('') : '<p class="empty">No full darkness tonight here.</p>';
+    const upNow = o.start <= now && now < o.end, past = o.end <= now;
+    const sub = o.kind === 'comet'
+      ? `Comet · mag ≈${o.mag.toFixed(1)}${o.moonSep == null ? '' : ' · ' + moonTxt}`
+      : `${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}`;
+    const when = esc(fmtTime(o.start));
+    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `up now · to ${esc(fmtTime(o.end))}` : `${o.startWhy === 'dark' ? 'at dark · ' : ''}${o.hrs.toFixed(1)} h`;
+    return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
+      <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
+  }).join('') : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness tonight.`}</p>`;
 }
 
-function showTarget(i) {
-  const D = state.data; const o = D && D.nights[state.night].targets[i];
-  if (!o) return;
-  const info = DSO_INFO[o.id] || [null, '–', '–'];
-  let con = '';
-  try { con = A.Constellation(o.ra, o.dec).name; } catch (e) { /* not available */ }
-  const c = o.curve, n = c.length;
-  const above = c.filter((p) => p.alt >= 30 && p.sun <= -18);
-  const raStr = `${Math.floor(o.ra)}h ${String(Math.round((o.ra % 1) * 60)).padStart(2, '0')}m`;
-  const decStr = `${o.dec >= 0 ? '+' : '−'}${Math.abs(o.dec).toFixed(1)}°`;
-  const fitsFov = (() => { const m = /^([\d.]+)′/.exec(info[1]); return m ? +m[1] <= 70 : true; })();
-  // Altitude chart across the night: dark band, 30° line, target curve and the Moon.
-  const W = 500, H = 170, x = (k) => (k / Math.max(1, n - 1)) * W, y = (a) => H - (Math.max(0, a) / 90) * H;
-  let dark = '';
-  c.forEach((p, k) => { if (p.sun <= -18) dark += `<rect x="${x(k) - W / (2 * (n - 1))}" y="0" width="${W / (n - 1) + .5}" height="${H}" fill="var(--card2)"/>`; });
-  const line = (key) => c.map((p, k) => `${x(k).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' ');
-  const ticks = c.map((p, k) => ({ p, k })).filter(({ p }) => p.d.getMinutes() === 0 && p.d.getHours() % 2 === 0)
-    .map(({ p, k }) => `<text x="${x(k)}" y="${H + 14}" text-anchor="${x(k) < 20 ? 'start' : x(k) > W - 20 ? 'end' : 'middle'}" font-size="11" fill="var(--muted)">${esc(fmtHour(p.d).replace(/\s?([AP])\.?M\.?/i, (m, q) => q.toLowerCase()))}</text>`).join('');
-  const kv = [
-    ['Type', o.type], ['Constellation', con || '–'], ['Magnitude', info[0] == null ? 'Faint (nebula)' : info[0].toFixed(1)],
-    ['Size', info[1]], ['Distance', info[2]], ['RA / Dec', `${raStr} / ${decStr}`],
-    ['Highest', `${Math.round(o.alt)}° ${compass(o.az)} at ${fmtTime(o.d)}`],
-    ['Above 30° in dark', above.length ? `${fmtTime(above[0].d)} – ${fmtTime(above[above.length - 1].d)} (${o.hrs.toFixed(1)} h)` : '–'],
-    ['Moon', o.moonSep == null ? 'Down at best time' : `${Math.round(o.moonSep)}° away at best time`],
-    ['Fits Seestar frame', fitsFov ? 'Yes (S50 field ≈ 78′ × 44′)' : 'Larger than the frame — use mosaic'],
-  ];
-  showSheet(`${o.id} · ${o.name}`, `<svg class="alt-chart" viewBox="0 -4 ${W} ${H + 22}" aria-label="Altitude through the night">
-      ${dark}<line x1="0" x2="${W}" y1="${y(30)}" y2="${y(30)}" stroke="var(--fair)" stroke-dasharray="4 4"/>
-      <text x="4" y="${y(30) - 4}" font-size="11" fill="var(--fair)">30°</text>
-      <polyline points="${line('moon')}" fill="none" stroke="var(--moon-lit)" stroke-width="1.5" stroke-dasharray="3 3" opacity=".6"/>
-      <polyline points="${line('alt')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>${ticks}</svg>
-    <p class="note" style="margin:2px 0 10px">Blue: ${esc(o.id)} altitude · dashed: Moon · shaded: full dark</p>
-    <dl class="kv tkv">${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-    <p class="note"><b>Seestar tip:</b> ${esc(TYPE_TIP(o.type))}</p>
-    <p class="note">Catalog figures are approximate.</p>`);
+/* ---------- object pop-up ---------- */
+const fmtHourShort = (d) => fmtHour(d).replace(/\s?([AP])\.?\s?M\.?/i, (m, p) => ' ' + p.toUpperCase() + 'M');
+const raHM = (ra) => { const m = Math.round(ra * 60) % 1440; return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
+const decDM = (dec) => `${dec >= 0 ? '+' : '−'}${Math.abs(dec).toFixed(1)}°`;
+const constellation = (ra, dec) => { try { return A.Constellation(ra, dec).name; } catch (e) { return '–'; } };
+/* Apparent size string like "170′ × 140′" → [major, minor] in arcminutes. */
+function parseSize(s) {
+  const m = /^([\d.]+)′(?:\s*×\s*([\d.]+)′)?/.exec(s || '');
+  return m ? [+m[1], m[2] ? +m[2] : +m[1]] : null;
 }
+const nice = (v) => (v >= 10 ? Math.round(v) : v >= 1 ? v.toFixed(1).replace(/\.0$/, '') : v.toFixed(1));
+/* Plain-English scale: arcminutes → degrees and full-Moon widths. */
+function sizeScale(sz) {
+  if (!sz) return '';
+  const [a, b] = sz, deg = (v) => nice(v / 60), moons = (v) => nice(v / (MOON_DEG * 60));
+  if (a === b) return `${deg(a)}° across — about ${moons(a)}× the full Moon`;
+  return `${deg(a)}° × ${deg(b)}° — about ${moons(a)} × ${moons(b)} full Moons`;
+}
+function frameFit(sz) {
+  if (!sz) return ['–', ''];
+  const fw = SEESTAR.w * 60, fh = SEESTAR.h * 60, [a, b] = sz;
+  if (a <= fw * 0.9 && b <= fh * 0.9) {
+    const pct = Math.round((a / fw) * 100);
+    return [pct < 15 ? 'Yes — small in frame' : 'Yes', `fills about ${pct}% of the frame width`];
+  }
+  if (a <= fw && b <= fh) return ['Just fits', 'tight — centre carefully'];
+  const nx = Math.ceil(a / (fw * 0.85)), ny = Math.ceil(b / (fh * 0.85));
+  return ['Mosaic', `about ${nx} × ${ny} panels to cover it`];
+}
+function skyCutout(raHours, dec, fovDeg) {
+  return 'https://alasky.cds.unistra.fr/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=900&height=600'
+    + `&fov=${fovDeg.toFixed(3)}&projection=TAN&coordsys=icrs&ra=${(raHours * 15).toFixed(4)}&dec=${dec.toFixed(4)}&format=jpg`;
+}
+/* Survey image with the Seestar frame and a full Moon drawn to the same scale. */
+function heroSky(raHours, dec, majorArcmin, caption, marker) {
+  const fov = Math.max(SEESTAR.w * 1.35, ((majorArcmin || 0) / 60) * 1.5); // width of the image in degrees
+  const fovH = (fov * 2) / 3;
+  const fw = (SEESTAR.w / fov) * 100, fh = (SEESTAR.h / fovH) * 100, mw = (MOON_DEG / fov) * 100;
+  return `<figure class="hero"><div class="hero-img">
+      <img src="${skyCutout(raHours, dec, fov)}" alt="Sky survey image of the target" decoding="async">
+      ${marker ? '<div class="xhair"></div>' : ''}
+      <div class="frame" style="width:${fw.toFixed(2)}%;height:${fh.toFixed(2)}%"><span>Seestar frame</span></div>
+      <div class="moonscale" style="width:${mw.toFixed(2)}%"><span>Full Moon</span></div>
+    </div><figcaption>${caption} · image ${nice(fov)}° wide</figcaption></figure>`;
+}
+function heroPhoto(wikiTitle, fallback) {
+  return `<figure class="hero photo"><div class="hero-img"><img data-wiki="${esc(wikiTitle)}" alt="Photo of the target" decoding="async"></div>
+    <figcaption>Photo: Wikipedia</figcaption></figure>${fallback ? `<template class="hero-fallback">${fallback}</template>` : ''}`;
+}
+const wikiCache = {};
+async function wikiImage(title) {
+  if (title in wikiCache) return wikiCache[title];
+  let url = null;
+  try {
+    const j = await getJSON('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title.replace(/ /g, '_')), 10000);
+    const o = j.originalimage, t = j.thumbnail;
+    if (t && t.source) url = o && o.width > 800 ? t.source.replace(/\/\d+px-/, '/800px-') : (o ? o.source : t.source);
+  } catch (e) { /* offline or no page */ }
+  return (wikiCache[title] = url);
+}
+function wireHero(root) {
+  root.querySelectorAll('.hero-img img').forEach((img) => {
+    const fig = img.closest('.hero');
+    img.addEventListener('load', () => fig.classList.add('loaded'));
+    img.addEventListener('error', () => fig.classList.add('failed'));
+  });
+  root.querySelectorAll('img[data-wiki]').forEach(async (img) => {
+    const fig = img.closest('.hero');
+    const url = await wikiImage(img.dataset.wiki);
+    if (url) { img.src = url; return; }
+    const fb = fig.nextElementSibling;
+    if (fb && fb.classList.contains('hero-fallback')) { fig.outerHTML = fb.innerHTML; wireHero(root); }
+    else fig.classList.add('failed');
+  });
+}
+
+/* Altitude chart: twilight shading, hour axis, 40° line, the usable window and when the target reaches 40°. */
+function altChart(el, o, now) {
+  const c = o.curve;
+  if (!el || !c || c.length < 2) return;
+  const fs = parseFloat(getComputedStyle(el).fontSize) || 14;
+  const W = Math.max(280, Math.round(el.clientWidth));
+  const H = Math.round(Math.min(330, Math.max(210, W * 0.4)));
+  const L = fs * 2.7, R = fs * 0.9, T = fs * 2.2, B = fs * 2.2;
+  const pw = W - L - R, ph = H - T - B;
+  const t0 = c[0].d.getTime(), t1 = c[c.length - 1].d.getTime();
+  const X = (d) => L + ((+d - t0) / (t1 - t0)) * pw;
+  const Y = (a) => T + (1 - a / 90) * ph;
+  const altAt = (d) => {
+    const k = Math.min(c.length - 2, Math.max(0, Math.floor((+d - t0) / STEP)));
+    const a = c[k], b = c[k + 1];
+    return a.alt + (b.alt - a.alt) * ((+d - a.d) / (b.d - a.d));
+  };
+  const f = (v) => v.toFixed(1);
+  const sm = fs * 0.78, md = fs * 0.86;
+  let s = `<defs><clipPath id="plotClip"><rect x="${f(L)}" y="${f(T)}" width="${f(pw)}" height="${f(ph)}"/></clipPath></defs>`;
+  // Twilight bands
+  const half = pw / (c.length - 1) / 2;
+  let k0 = 0;
+  for (let k = 1; k <= c.length; k++) {
+    if (k < c.length && skyState(c[k].sun).k === skyState(c[k0].sun).k) continue;
+    const x0 = k0 === 0 ? L : X(c[k0].d) - half, x1 = k === c.length ? L + pw : X(c[k].d) - half;
+    s += `<rect x="${f(x0)}" y="${f(T)}" width="${f(x1 - x0 + 0.5)}" height="${f(ph)}" fill="var(--band-${skyState(c[k0].sun).k})"/>`;
+    k0 = k;
+  }
+  // Altitude grid
+  for (const a of [20, 60, 80]) s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(Y(a))}" y2="${f(Y(a))}" stroke="var(--grid)" stroke-width="1"/>`;
+  for (const a of [0, 20, 40, 60, 80]) s += `<text x="${f(L - 6)}" y="${f(Y(a) + sm * 0.35)}" font-size="${f(sm)}" text-anchor="end" fill="var(--muted)">${a}°</text>`;
+  // Usable window: ≥40° in darkness
+  for (const g of o.segs || []) {
+    const pts = [[X(g.s), Y(MIN_ALT)], [X(g.s), Y(altAt(g.s))]];
+    c.forEach((p) => { if (p.d > g.s && p.d < g.e) pts.push([X(p.d), Y(p.alt)]); });
+    pts.push([X(g.e), Y(altAt(g.e))], [X(g.e), Y(MIN_ALT)]);
+    s += `<polygon points="${pts.map(([x, y]) => f(x) + ',' + f(y)).join(' ')}" fill="var(--go)" fill-opacity=".22"/>`;
+  }
+  // 40° minimum line
+  s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(Y(MIN_ALT))}" y2="${f(Y(MIN_ALT))}" stroke="var(--fair)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+  // Moon and target curves
+  const poly = (key) => c.map((p) => f(X(p.d)) + ',' + f(Y(p[key]))).join(' ');
+  s += `<g clip-path="url(#plotClip)"><polyline points="${poly('moon')}" fill="none" stroke="var(--moon-lit)" stroke-width="1.6" stroke-dasharray="4 4" opacity=".55"/>
+    <polyline points="${poly('alt')}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/></g>`;
+  // Time axis: baseline, hourly ticks, labels
+  const nH = (t1 - t0) / 3600e3, every = pw / nH < fs * 2.6 ? 3 : pw / nH < fs * 4.2 ? 2 : 1;
+  s += `<line x1="${f(L)}" x2="${f(L + pw)}" y1="${f(T + ph)}" y2="${f(T + ph)}" stroke="var(--muted)" stroke-width="1.2"/>`;
+  for (let t = Math.ceil(t0 / 3600e3) * 3600e3; t <= t1; t += 3600e3) {
+    const d = new Date(t), x = X(d), hr = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: state.tz }).format(d);
+    const lab = hr % every === 0;
+    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T + ph)}" y2="${f(T + ph + (lab ? 6 : 3.5))}" stroke="var(--muted)" stroke-width="1"/>`;
+    if (lab && x > L + fs * 1.2 && x < L + pw - fs * 1.2) s += `<text x="${f(x)}" y="${f(T + ph + 7 + sm)}" font-size="${f(sm)}" text-anchor="middle" fill="var(--muted)">${esc(fmtHourShort(d))}</text>`;
+  }
+  // Now marker
+  if (now && +now > t0 && +now < t1) {
+    const x = X(now);
+    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-opacity=".55" stroke-width="1" stroke-dasharray="2 3"/>
+      <text x="${f(x + 4)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" fill="var(--text)" opacity=".75">Now</text>`;
+  }
+  // Callout pill helper
+  const pill = (x, y, txt, color, anchor) => {
+    const w = txt.length * md * 0.56 + md * 1.1, h = md * 1.7;
+    let x0 = anchor === 'end' ? x - w : anchor === 'start' ? x : x - w / 2;
+    x0 = Math.max(L + 2, Math.min(L + pw - w - 2, x0));
+    const y0 = Math.max(2, Math.min(T + ph - h - 2, y - h / 2));
+    return `<rect x="${f(x0)}" y="${f(y0)}" width="${f(w)}" height="${f(h)}" rx="${f(h / 2)}" fill="var(--card)" stroke="${color}" stroke-width="1.2"/>
+      <text x="${f(x0 + w / 2)}" y="${f(y0 + h / 2 + md * 0.34)}" font-size="${f(md)}" font-weight="700" text-anchor="middle" fill="${color}">${esc(txt)}</text>`;
+  };
+  // When it reaches 40° (or is already above it when darkness starts)
+  if (o.start) {
+    const x = X(o.start), y = Y(altAt(o.start));
+    const label = o.startWhy === 'alt' ? `Reaches 40° · ${fmtTime(o.start)}` : `Dark · ${fmtTime(o.start)} · ${Math.round(o.startAlt)}°`;
+    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(y)}" y2="${f(T + ph)}" stroke="var(--go)" stroke-width="1.4" stroke-dasharray="3 3"/>
+      <circle cx="${f(x)}" cy="${f(y)}" r="${f(fs * 0.38)}" fill="var(--go)" stroke="var(--card)" stroke-width="2"/>`;
+    s += pill(x + fs * 0.6, Math.min(y, Y(MIN_ALT)) - fs * 1.5, label, 'var(--go)', x > L + pw * 0.6 ? 'end' : 'start');
+    if (o.end) {
+      const xe = X(o.end), ye = Y(altAt(o.end));
+      s += `<circle cx="${f(xe)}" cy="${f(ye)}" r="${f(fs * 0.3)}" fill="var(--card)" stroke="var(--go)" stroke-width="2"/>`;
+      if (xe - x > fs * 9) s += pill(xe - fs * 0.6, Y(MIN_ALT) + fs * 1.3, `${o.endWhy === 'alt' ? 'Below 40°' : 'Dawn'} · ${fmtTime(o.end)}`, 'var(--muted)', 'end');
+    }
+  }
+  // Peak
+  if (o.peak && o.peak.alt > 0) {
+    const x = X(o.peak.d), y = Y(o.peak.alt);
+    s += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(fs * 0.26)}" fill="var(--accent)"/>`;
+    if (!o.start || Math.abs(x - X(o.start)) > fs * 11) s += `<text x="${f(x)}" y="${f(y - fs * 0.7)}" font-size="${f(sm)}" font-weight="700" text-anchor="middle" fill="var(--accent)">Peak ${Math.round(o.peak.alt)}°</text>`;
+  }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Altitude through the night">${s}</svg>`;
+}
+
+const tile = (lbl, val, sub = '', cls = '') => `<div class="tile ${cls}"><span class="lbl">${esc(lbl)}</span><b>${esc(val)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+function windowTiles(o) {
+  const now = state.data ? state.data.now : new Date();
+  const upNow = o.start && o.start <= now && now < o.end;
+  return o.start
+    ? tile(o.startWhy === 'alt' ? 'Reaches 40°' : 'Above 40° at dark', fmtTime(o.start), (o.startWhy === 'alt' ? 'rising through 40°' : `already ${Math.round(o.startAlt)}° when dark begins`) + (upNow ? ' · up now' : ''), 'key')
+      + tile('Imaging window', `${o.hrs.toFixed(1)} h`, `until ${fmtTime(o.end)}${o.endWhy === 'dark' ? ' (dawn)' : ''}`, 'key')
+    : tile('Reaches 40°', 'Not tonight', `in darkness`, 'warn');
+}
+function openObject(o) {
+  if (!o) return;
+  const now = state.data.now;
+  const peakTxt = o.peak ? `${Math.round(o.peak.alt)}° ${compass(o.peak.az)}` : '–'; // planets: peak = best after dusk
+  let title, sub, hero, tiles, rows, tip;
+  if (o.kind === 'dso') {
+    const info = DSO_INFO[o.id] || [null, '', '–'];
+    const sz = parseSize(info[1]);
+    const [fit, fitSub] = frameFit(sz);
+    title = `${o.id} · ${o.name}`;
+    sub = `${o.type} in ${constellation(o.ra, o.dec)}`;
+    hero = heroSky(o.ra, o.dec, sz ? sz[0] : 0, 'DSS2 sky survey · dashed box = Seestar S50 frame · circle = full Moon');
+    tiles = windowTiles(o) + tile('Peak', peakTxt, o.peak ? `at ${fmtTime(o.peak.d)}` : '') + tile('Fits Seestar frame', fit, fitSub);
+    rows = [
+      ['Size', info[1] ? `${info[1]} (arcminutes)` : '–'], ['In plain terms', sizeScale(sz) || '–'],
+      ['Seestar frame', `${SEESTAR.w}° × ${SEESTAR.h}° (77′ × 43′)`],
+      ['Magnitude', info[0] == null ? 'Faint, diffuse nebula' : info[0].toFixed(1)], ['Distance', info[2]],
+      ['RA / Dec (J2000)', `${raHM(o.ra)} / ${decDM(o.dec)}`],
+      ['Moon at peak', o.moonSep == null ? 'Below horizon' : `${Math.round(o.moonSep)}° away`],
+    ];
+    tip = TYPE_TIP(o.type);
+  } else if (o.kind === 'planet') {
+    const px = o.size / SEESTAR.scale;
+    title = o.name;
+    const eq = A.Equator(o.name, o.d, state.data.obs, false, true);
+    sub = `Planet in ${constellation(eq.ra, eq.dec)}`;
+    hero = heroPhoto(PLANET_WIKI[o.name] || o.name);
+    const rs = crossings(o.curve, 0);
+    const rise = rs.find((x) => x.kind === 'rise'), set = rs.find((x) => x.kind === 'set');
+    tiles = windowTiles(o) + tile('Highest', peakTxt, `at ${fmtTime(o.d)}`) + tile('Magnitude', o.mag.toFixed(1), o.mag < 0 ? 'very bright' : '')
+      + (o.start ? '' : tile('Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″`, `≈ ${Math.max(1, Math.round(px))} px in the Seestar`));
+    rows = [
+      ['Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″ (arcseconds${o.name === 'Saturn' ? ', globe' : ''})`],
+      ['In the Seestar', `≈ ${Math.max(1, Math.round(px))} px across (frame 1080 × 1920 px)`],
+      ['Lit', `${Math.round(o.phase * 100)}%`],
+      ['Distance', `${o.distAU.toFixed(2)} AU · ${Math.round((o.distAU * 149.5978707) * 10) / 10} million km`],
+      ['Rises / sets', `${rise ? fmtTime(rise.d) : '–'} / ${set ? fmtTime(set.d) : '–'}`],
+      ['Moon at best time', o.moonSep == null ? 'Below horizon' : `${Math.round(o.moonSep)}° away`],
+    ];
+    tip = `Planets are tiny at the S50's 250 mm focal length — ${o.name} will be a small bright disc (about ${Math.max(1, Math.round(px))} px), not a detailed close-up. Higher is sharper: shoot near ${fmtTime(o.d)}.`;
+  } else {
+    const c = o.el;
+    title = `${o.id} · ${o.name}`;
+    sub = `Comet in ${constellation(o.ra, o.dec)}`;
+    const sky = heroSky(o.ra, o.dec, 0, 'Star field at the comet’s position tonight (DSS2) · the comet moves nightly', true);
+    hero = c.wiki ? heroPhoto(c.wiki, sky) : sky;
+    const tp = new Date((c.tp - 2440587.5) * 86400e3);
+    tiles = windowTiles(o) + tile('Peak', peakTxt, `at ${fmtTime(o.peak.d)}`) + tile('Brightness', `≈ ${o.mag.toFixed(1)}`, 'predicted magnitude');
+    rows = [
+      ['Perihelion', `${fmtDay(tp)}, ${tp.getFullYear()}`],
+      ['From Earth', `${o.delta.toFixed(2)} AU · ${Math.round(o.delta * 149.6)} million km`],
+      ['From Sun', `${o.r.toFixed(2)} AU`],
+      ['RA / Dec (J2000)', `${raHM(o.ra)} / ${decDM(o.dec)} at peak`],
+      ['Moon at peak', o.moonSep == null ? 'Below horizon' : `${Math.round(o.moonSep)}° away`],
+    ];
+    tip = 'Comets drift against the stars, so 15–30 minute sessions keep the head sharp. LP filter off. Brightness predictions are uncertain — comets can surprise either way.';
+  }
+  showSheet(title, `<div class="obj">
+      <div class="obj-top">${hero}<div class="tiles">${tiles}</div></div>
+      <section class="chart-card">
+        <div class="chart-head"><h3>Altitude tonight</h3><span>${o.start ? `In view ≥40° for ${o.hrs.toFixed(1)} h` : `Never reaches ${MIN_ALT}° in darkness`}</span></div>
+        <div class="chart" id="objChart"></div>
+        <div class="chart-key"><span><i class="k-tgt"></i>${esc(o.kind === 'planet' ? o.name : o.id)}</span><span><i class="k-moon"></i>Moon</span><span><i class="k-min"></i>40° minimum</span><span><i class="k-win"></i>Imaging window</span><span><i class="k-dark"></i>Full dark</span></div>
+      </section>
+      <dl class="facts">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+      <div class="tip"><b>Seestar tip</b>${esc(tip)}</div>
+      <p class="fine">${o.kind === 'comet' ? 'Orbit: JPL Horizons. Positions computed on device.' : o.kind === 'dso' ? 'Catalog sizes and magnitudes are approximate.' : 'Positions computed on device (Astronomy Engine).'}</p>
+    </div>`, sub, true);
+  state.openObj = o;
+  const draw = () => altChart($('#objChart'), o, now);
+  requestAnimationFrame(draw);
+  wireHero($('#sheetBody'));
+}
+function showTarget(i) { const D = state.data; openObject(D && D.nights[state.night].targets[i]); }
+function showPlanet(i) { const D = state.data; openObject(D && D.nights[state.night].planets[i]); }
 
 function showSources() {
   const src = state.data && state.data.src;
@@ -712,10 +1067,14 @@ async function load() {
   const night = (win, from) => {
     const mid = new Date((win.set.getTime() + win.rise.getTime()) / 2);
     const moon = moonInfo(obs, mid, win);
-    return { win, moon, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day'), planets: planetsTonight(obs, win), targets: targetsTonight(obs, win) };
+    const S = nightSamples(obs, win);
+    return {
+      win, moon, darkLim: S.darkLim, hours: buildHours(from, win.rise, src, obs, moon.illum).filter((h) => h.sky.k !== 'day'),
+      planets: planetsTonight(obs, S), targets: [...cometsTonight(obs, S, win), ...targetsTonight(obs, S)],
+    };
   };
   const nights = [night(w0, w0.set > now ? w0.set : now), night(w1, w1.set)];
-  state.data = { now, lat: +loc.lat, src, nights };
+  state.data = { now, lat: +loc.lat, obs, src, nights };
   renderAll();
   if (Object.keys(src.om).length || met) setStatus('');
 }
@@ -812,9 +1171,14 @@ function init() {
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   $('#sourcesBtn').addEventListener('click', showSources);
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
+  $('#planets').addEventListener('click', (e) => { const t = e.target.closest('[data-p]'); if (t) showPlanet(+t.dataset.p); });
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   let rz;
-  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { const D = state.data; if (D) renderPath(D.nights[state.night].moon, D.lat, D.now); }, 150); });
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
+    const D = state.data; if (!D) return;
+    renderPath(D.nights[state.night].moon, D.lat, D.now);
+    if ($('#sheet').open && $('#objChart') && state.openObj) altChart($('#objChart'), state.openObj, D.now);
+  }, 150); });
   $('#searchInput').addEventListener('input', onSearch);
   $('#spotSelect').addEventListener('change', (e) => {
     const v = e.target.value;
