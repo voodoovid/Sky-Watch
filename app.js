@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.14';
+const VERSION = 'v3.15';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -798,20 +798,28 @@ function renderForecast(hours) {
   skyChart(hours);
 }
 
-/* One cumulus cloud per hour, as tall as the cloud cover. Clouds overlap their neighbours so the
-   night reads as one continuous cloud bank; a lighting filter shades the merged shape so it looks 3-D. */
-function puffs(i, x0, w, top, bottom) {
-  const h = bottom - top;
-  if (h < 1.5) return '';
-  const f = (v) => v.toFixed(1), j = (k) => ((Math.sin((i + 1) * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1; // stable jitter
-  const R = Math.max(1.4, Math.min(w * 0.34, h / 2, 26)), xm = x0 + w / 2 + (j(1) - 0.5) * w * 0.12;
-  const lobe = (cx, r, lift) => { r = Math.max(1.2, Math.min(r, h / 2)); const cy = Math.min(bottom - r * 0.35, top + R + lift); return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>`; };
-  const bodyTop = Math.min(bottom - 1, top + R * 1.4), inset = Math.min(R * 0.45, w * 0.05);
-  return lobe(xm, R, 0)                                                        // crown
-    + lobe(xm - R * (0.85 + j(2) * 0.2), R * (0.7 + j(3) * 0.12), R * 0.45)   // left shoulder
-    + lobe(xm + R * (0.8 + j(4) * 0.2), R * (0.62 + j(5) * 0.12), R * 0.6)    // right shoulder
-    + lobe(x0 + R * 0.45, R * 0.5, R * 1.05) + lobe(x0 + w - R * 0.45, R * 0.48, R * 1.1) // outer puffs
-    + `<rect x="${f(x0 + inset)}" y="${f(bodyTop)}" width="${f(w - inset * 2)}" height="${f(bottom - bodyTop + 4)}"/>`;
+/* One free-floating cumulus cloud per hour. Its top sits at the cloud-cover % and it grows with the
+   cover; every hour gets its own lobe pattern (seeded by the hour) so no two look alike. */
+function puffs(seed, cx, maxW, top, bottom, pct) {
+  if (bottom - top < 1.5) return '';
+  let k = 0;
+  const f = (v) => v.toFixed(2), rnd = () => ((Math.sin(seed * 12.9898 + ++k * 78.233) * 43758.5453) % 1 + 1) % 1;
+  // Build the cloud in a unit box (base at y = 0, rising to negative y), then fit it to its slot.
+  const L = [];
+  const er = 0.13 + rnd() * 0.06, er2 = 0.12 + rnd() * 0.07;
+  L.push([0.12 + er * 0.3, -er, er], [0.88 - er2 * 0.3, -er2, er2]);           // rounded ends
+  const n = 2 + Math.floor(rnd() * 2.6);                                        // 2-4 crown lobes
+  for (let i = 0; i < n; i++) {
+    const x = 0.3 + (0.4 * (i + 0.5)) / n + (rnd() - 0.5) * 0.12, r = 0.17 + rnd() * 0.15;
+    L.push([x, -r * (0.75 + rnd() * 0.35) - 0.05, r]);
+  }
+  let x1 = 1, x2 = 0, y1 = 0;
+  for (const [x, y, r] of L) { x1 = Math.min(x1, x - r); x2 = Math.max(x2, x + r); y1 = Math.min(y1, y - r); }
+  const w = maxW * (0.6 + 0.4 * Math.min(100, pct) / 100), hgt = Math.min(w * (0.55 + rnd() * 0.15), bottom - top);
+  const sx = w / (x2 - x1), sy = hgt / -y1, tx = cx - w / 2 - x1 * sx, ty = top + hgt;
+  return `<g transform="translate(${f(tx)} ${f(ty)}) scale(${f(sx)} ${f(sy)})">`
+    + L.map(([x, y, r]) => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}"/>`).join('')
+    + `<rect x="${f(L[0][0])}" y="${f(-Math.min(er, er2))}" width="${f(L[1][0] - L[0][0])}" height="${f(Math.min(er, er2))}"/></g>`;
 }
 function skyChart(hours) {
   const box = $('#skyChart');
@@ -821,7 +829,7 @@ function skyChart(hours) {
   let night = '', day = '', pts = [], dots = '';
   hours.forEach((h, i) => {
     if (!isNum(h.cloud) || h.cloud < 0.5) return;
-    const p = puffs(i, i * cw - cw * 0.1, cw * 1.2, Y(h.cloud), H);
+    const p = puffs((isNum(h.t) ? Math.round(h.t / 3600) : i) % 9973 + 1, i * cw + cw / 2, cw * 0.88, Y(h.cloud), H, h.cloud);
     if (h.sky.k === 'day') day += p; else night += p;
   });
   hours.forEach((h, i) => {
@@ -841,6 +849,7 @@ function skyChart(hours) {
       <feComposite in="lit" in2="sp" operator="arithmetic" k2="1" k3=".8" result="all"/>
       <feComposite in="all" in2="SourceAlpha" operator="in"/>
     </filter></defs>
+    ${hours.slice(1).map((_, i) => `<line x1="${((i + 1) * cw).toFixed(1)}" x2="${((i + 1) * cw).toFixed(1)}" y1="0" y2="${H}" stroke="var(--line2)" stroke-width="1"/>`).join('')}
     <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/>
     <g fill="var(--cloud)" opacity=".35" filter="url(#puff3d)">${day}</g><g fill="var(--cloud)" opacity=".85" filter="url(#puff3d)">${night}</g>
     <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
