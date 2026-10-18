@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.13';
+const VERSION = 'v3.14';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -798,26 +798,30 @@ function renderForecast(hours) {
   skyChart(hours);
 }
 
-/* One puffy cloud per hour, as tall as the cloud cover; adjacent hours merge into a cloud bank. */
-function puffs(x0, w, top, bottom) {
+/* One cumulus cloud per hour, as tall as the cloud cover. Clouds overlap their neighbours so the
+   night reads as one continuous cloud bank; a lighting filter shades the merged shape so it looks 3-D. */
+function puffs(i, x0, w, top, bottom) {
   const h = bottom - top;
   if (h < 1.5) return '';
-  const r = Math.max(1.2, Math.min(w * 0.3, h / 2, 22)), sr = r * 0.74, xm = x0 + w / 2, f = (v) => v.toFixed(1);
-  const bodyTop = Math.min(bottom, top + r);
-  return `<circle cx="${f(xm)}" cy="${f(top + r)}" r="${f(r)}"/>`
-    + `<circle cx="${f(x0 + sr)}" cy="${f(Math.min(bottom - sr * 0.4, top + r + sr * 0.55))}" r="${f(sr)}"/>`
-    + `<circle cx="${f(x0 + w - sr)}" cy="${f(Math.min(bottom - sr * 0.4, top + r + sr * 0.65))}" r="${f(sr)}"/>`
-    + `<rect x="${f(x0)}" y="${f(bodyTop)}" width="${f(w)}" height="${f(bottom - bodyTop)}" rx="${f(Math.min(sr, (bottom - bodyTop) / 2))}"/>`;
+  const f = (v) => v.toFixed(1), j = (k) => ((Math.sin((i + 1) * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1; // stable jitter
+  const R = Math.max(1.4, Math.min(w * 0.34, h / 2, 26)), xm = x0 + w / 2 + (j(1) - 0.5) * w * 0.12;
+  const lobe = (cx, r, lift) => { r = Math.max(1.2, Math.min(r, h / 2)); const cy = Math.min(bottom - r * 0.35, top + R + lift); return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>`; };
+  const bodyTop = Math.min(bottom - 1, top + R * 1.4), inset = Math.min(R * 0.45, w * 0.05);
+  return lobe(xm, R, 0)                                                        // crown
+    + lobe(xm - R * (0.85 + j(2) * 0.2), R * (0.7 + j(3) * 0.12), R * 0.45)   // left shoulder
+    + lobe(xm + R * (0.8 + j(4) * 0.2), R * (0.62 + j(5) * 0.12), R * 0.6)    // right shoulder
+    + lobe(x0 + R * 0.45, R * 0.5, R * 1.05) + lobe(x0 + w - R * 0.45, R * 0.48, R * 1.1) // outer puffs
+    + `<rect x="${f(x0 + inset)}" y="${f(bodyTop)}" width="${f(w - inset * 2)}" height="${f(bottom - bodyTop + 4)}"/>`;
 }
 function skyChart(hours) {
   const box = $('#skyChart');
   if (!box) return;
   const W = Math.max(120, Math.round(box.clientWidth)), H = Math.max(30, Math.round(box.clientHeight));
-  const n = hours.length, cw = W / n, top = 3, Y = (v) => top + (1 - v / 100) * (H - top);
+  const n = hours.length, cw = W / n, top = 4, Y = (v) => top + (1 - v / 100) * (H - top);
   let night = '', day = '', pts = [], dots = '';
   hours.forEach((h, i) => {
     if (!isNum(h.cloud) || h.cloud < 0.5) return;
-    const p = puffs(i * cw + cw * 0.06, cw * 0.88, Y(h.cloud), H);
+    const p = puffs(i, i * cw - cw * 0.1, cw * 1.2, Y(h.cloud), H);
     if (h.sky.k === 'day') day += p; else night += p;
   });
   hours.forEach((h, i) => {
@@ -826,9 +830,19 @@ function skyChart(hours) {
     pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
     if (Math.round(h.pop) >= RAIN_SHOW) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${h.pop >= RAIN_FLAG ? 4.5 : 3.2}" fill="var(--rain)" stroke="var(--card2)" stroke-width="1.5"/>`;
   });
+  const blur = Math.max(2, Math.min(6, cw * 0.14)).toFixed(1);
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+    <defs><filter id="puff3d" x="-2%" y="-10%" width="104%" height="120%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="${blur}" result="b"/>
+      <feDiffuseLighting in="b" surfaceScale="5" diffuseConstant="1.3" lighting-color="#fff" result="d"><feDistantLight azimuth="235" elevation="48"/></feDiffuseLighting>
+      <feSpecularLighting in="b" surfaceScale="5" specularConstant=".55" specularExponent="16" lighting-color="#fff" result="s"><feDistantLight azimuth="235" elevation="58"/></feSpecularLighting>
+      <feComposite in="SourceGraphic" in2="d" operator="arithmetic" k1="1" result="lit"/>
+      <feComposite in="s" in2="SourceAlpha" operator="in" result="sp"/>
+      <feComposite in="lit" in2="sp" operator="arithmetic" k2="1" k3=".8" result="all"/>
+      <feComposite in="all" in2="SourceAlpha" operator="in"/>
+    </filter></defs>
     <line x1="0" x2="${W}" y1="${Y(50)}" y2="${Y(50)}" stroke="var(--line2)" stroke-dasharray="2 3"/>
-    <g fill="var(--cloud)" opacity=".3">${day}</g><g fill="var(--cloud)" opacity=".72">${night}</g>
+    <g fill="var(--cloud)" opacity=".35" filter="url(#puff3d)">${day}</g><g fill="var(--cloud)" opacity=".85" filter="url(#puff3d)">${night}</g>
     <polyline points="${pts.join(' ')}" fill="none" stroke="var(--rain)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
 }
 
