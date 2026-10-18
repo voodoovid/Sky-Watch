@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.1';
+const VERSION = 'v3.2';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -21,6 +21,7 @@ const PT16 = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW'
 const state = {
   units: store.get('units', 'metric'),
   red: store.get('red', false),
+  theme: store.get('theme', 'auto'), // 'auto' follows the system; 'light' / 'dark' override it
   spots: store.get('spots', []),
   loc: store.get('lastLoc', null), // {name, lat, lon, gps?}
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -1306,7 +1307,12 @@ function applyMinAlt() {
   if (t) t.textContent = `Reaches ${MIN_ALT}°`;
 }
 function showOptions() {
-  showSheet('Options', `<section class="opt" id="optAlt" title="Targets, planets and comets only count while at least this high in darkness">
+  showSheet('Options', `<section class="opt" id="optTheme">
+      <h3 class="opt-h">Appearance</h3>
+      <div class="night-seg theme-seg" role="group" aria-label="Appearance">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<button type="button" data-theme="${v}" aria-pressed="${state.theme === v}">${l}</button>`).join('')}</div>
+      <p class="note opt-note">Auto follows your device. Red night mode still overrides this.</p>
+    </section>
+    <section class="opt" id="optAlt" title="Targets, planets and comets only count while at least this high in darkness">
       <h3 class="opt-h">Min elevation</h3>
       <div class="alt-row">
         <input type="range" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation in degrees">
@@ -1321,6 +1327,13 @@ function showOptions() {
       <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
       <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
     </section>`);
+  $('#optTheme').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-theme]');
+    if (!b) return;
+    state.theme = b.dataset.theme; store.set('theme', state.theme);
+    $('#optTheme').querySelectorAll('[data-theme]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    applyRed(); renderAll();
+  });
   const ab = $('#optAlt');
   const rng = ab.querySelector('input[type=range]'), num = ab.querySelector('input[type=number]');
   rng.addEventListener('input', () => setMinAlt(rng.value));
@@ -1491,11 +1504,13 @@ function onSearch() {
 }
 
 /* ---------- settings ---------- */
+const isLight = () => state.theme === 'light' || (state.theme === 'auto' && LIGHT.matches);
 function applyRed() {
   document.documentElement.classList.toggle('red', state.red);
+  document.documentElement.classList.toggle('light', isLight());
   $('#redBtn').setAttribute('aria-pressed', String(state.red));
   $('#redBtn .lbl').textContent = state.red ? 'Normal' : 'Red';
-  document.querySelector('meta[name=theme-color]').setAttribute('content', state.red ? '#000000' : LIGHT.matches ? '#eef2f8' : '#070b16');
+  document.querySelector('meta[name=theme-color]').setAttribute('content', state.red ? '#000000' : isLight() ? '#eef2f8' : '#070b16');
 }
 function applyUnits() {
   document.querySelectorAll('#unitsBtn span').forEach((s) => s.classList.toggle('on', s.dataset.u === state.units));

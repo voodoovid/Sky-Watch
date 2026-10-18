@@ -67,48 +67,46 @@ html.red {
   --band-astro: #0d0101;
   --band-dark: #050000;
 }
-/* Day mode: follows the system light/dark setting. Red mode still wins. */
-@media (prefers-color-scheme: light) {
-  :root:not(.red) {
-    color-scheme: light;
-    --bg: #eef2f8;
-    --bg2: #e3e9f2;
-    --card: #ffffff;
-    --card2: #eef2f8;
-    --line: #d8dfea;
-    --line2: #c2ccdc;
-    --text: #13203a;
-    --muted: #56658a;
-    --dim: #8a97b0;
-    --accent: #2563d8;
-    --go: #17a463;
-    --go2: #6cb535;
-    --fair: #e09c1a;
-    --nogo: #d8404b;
-    --day: #cfd7e5;
-    --cloud: #7d8fb2;
-    --rain: #1d78e0;
-    --moon-lit: #f6e8c1;
-    --moon-dark: #3b4766;
-    --sky-top: #b9cbef;
-    --sky-bot: #e4ecf9;
-    --ground: #cdd5e2;
-    --path: #b5760f;
-    --chip-ink: #04110b;
-    --grid: rgba(40, 60, 110, .16);
-    --band-day: #eef2f8;
-    --band-civil: #dfe6f3;
-    --band-nautical: #cdd9ee;
-    --band-astro: #bccbe7;
-    --band-dark: #aabde0;
-  }
-  :root:not(.red) .sheet::backdrop { background: rgba(30, 45, 75, .35); }
-  :root:not(.red) .sheet, :root:not(.red) .search-panel { box-shadow: 0 20px 50px rgba(20, 35, 70, .22); }
-  :root:not(.red) .red-btn { color: #c62f3a; }
-  :root:not(.red) .tag-comet { color: #12804f; border-color: color-mix(in srgb, #12804f 40%, var(--line2)); }
-  :root:not(.red) .alt-row input[type=range]::-webkit-slider-thumb { background: #fff; }
-  :root:not(.red) .alt-row input[type=range]::-moz-range-thumb { background: #fff; }
+/* Day mode: system setting or the Theme option in Options (sets html.light). Red mode still wins. */
+:root.light:not(.red) {
+  color-scheme: light;
+  --bg: #eef2f8;
+  --bg2: #e3e9f2;
+  --card: #ffffff;
+  --card2: #eef2f8;
+  --line: #d8dfea;
+  --line2: #c2ccdc;
+  --text: #13203a;
+  --muted: #56658a;
+  --dim: #8a97b0;
+  --accent: #2563d8;
+  --go: #17a463;
+  --go2: #6cb535;
+  --fair: #e09c1a;
+  --nogo: #d8404b;
+  --day: #cfd7e5;
+  --cloud: #7d8fb2;
+  --rain: #1d78e0;
+  --moon-lit: #f6e8c1;
+  --moon-dark: #3b4766;
+  --sky-top: #b9cbef;
+  --sky-bot: #e4ecf9;
+  --ground: #cdd5e2;
+  --path: #b5760f;
+  --chip-ink: #04110b;
+  --grid: rgba(40, 60, 110, .16);
+  --band-day: #eef2f8;
+  --band-civil: #dfe6f3;
+  --band-nautical: #cdd9ee;
+  --band-astro: #bccbe7;
+  --band-dark: #aabde0;
 }
+:root.light:not(.red) .sheet::backdrop { background: rgba(30, 45, 75, .35); }
+:root.light:not(.red) .sheet, :root.light:not(.red) .search-panel { box-shadow: 0 20px 50px rgba(20, 35, 70, .22); }
+:root.light:not(.red) .red-btn { color: #c62f3a; }
+:root.light:not(.red) .tag-comet { color: #12804f; border-color: color-mix(in srgb, #12804f 40%, var(--line2)); }
+:root.light:not(.red) .alt-row input[type=range]::-webkit-slider-thumb { background: #fff; }
+:root.light:not(.red) .alt-row input[type=range]::-moz-range-thumb { background: #fff; }
 
 html.red .logo { filter: grayscale(1) sepia(1) saturate(8) hue-rotate(-50deg) brightness(.7); }
 
@@ -478,6 +476,10 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 .alt-row { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .alt-reset { flex: none; padding: 4px 9px; font-size: .85em; }
 .opt-note { margin: 0 0 .4em !important; }
+#optTheme { margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
+#optTheme .opt-note { margin: .45em 0 0 !important; }
+.theme-seg { display: flex; width: 100%; }
+.theme-seg button { flex: 1; height: 28px; }
 .alt-row input[type=range] {
   flex: 1; min-width: 0; height: 32px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; touch-action: pan-y;
 }
