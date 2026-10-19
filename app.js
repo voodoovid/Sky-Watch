@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.31';
+const VERSION = 'v3.32';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -81,9 +81,13 @@ async function getJSON(url, ms = 15000) {
     return await r.json();
   } finally { clearTimeout(t); }
 }
+// Fallback URLs exist for rejected parameters (fast HTTP errors). A timeout means the server is slow,
+// so stop there instead of waiting out every fallback in turn.
 async function firstOK(urls, ms) {
   let last;
-  for (const u of urls) { try { return await getJSON(u, ms); } catch (e) { last = e; } }
+  for (const u of urls) {
+    try { return await getJSON(u, ms); } catch (e) { last = e; if (e.name === 'AbortError') break; }
+  }
   throw last || new Error('failed');
 }
 
@@ -110,7 +114,7 @@ function hourlyToMap(h) {
 async function fetchOM(model, lat, lon) {
   const base = `https://api.open-meteo.com/v1/${model.path}?latitude=${lat}&longitude=${lon}&timezone=auto&timeformat=unixtime`;
   const urls = [OM_FULL, OM_MID, OM_MIN].flatMap((v) => [base + '&past_days=1&forecast_days=4&hourly=' + v, base + '&forecast_days=4&hourly=' + v]);
-  const j = await firstOK(urls);
+  const j = await firstOK(urls, 10000);
   return { tz: j.timezone, rows: hourlyToMap(j.hourly) };
 }
 
@@ -123,7 +127,7 @@ const ENSEMBLES = [
 ];
 async function fetchEnsemble(ens, lat, lon) {
   const urls = ens.ids.map((id) => `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&timeformat=unixtime&forecast_days=4&hourly=precipitation&models=${id}`);
-  const j = await firstOK(urls, 20000);
+  const j = await firstOK(urls, 12000);
   const h = j.hourly;
   const keys = Object.keys(h).filter((k) => k.startsWith('precipitation'));
   if (!keys.length) throw new Error('no members');
@@ -1641,20 +1645,13 @@ async function load() {
   $('#locLabel').textContent = `${loc.name} · ${(+loc.lat).toFixed(3)}, ${(+loc.lon).toFixed(3)}`;
   setStatus('Loading forecasts…');
   loadBortle(loc);
-  const settle = (p) => p.then((v) => v, () => null);
   // 7Timer! is slow, so it never holds up the forecast: it's started now and filled in when it arrives.
-  const t7p = settle(fetch7Timer(lat, lon));
-  const [omRes, ensRes, met] = await Promise.all([
-    Promise.all(OM_MODELS.map((m) => settle(fetchOM(m, lat, lon)))),
-    Promise.all(ENSEMBLES.map((e) => settle(fetchEnsemble(e, lat, lon)))),
-    settle(fetchMET(lat, lon)),
-  ]);
-  if (run !== loading) return; // a newer load started
+  const t7p = fetch7Timer(lat, lon).then((v) => v, () => null);
   const key = t7Key(loc.lat, loc.lon);
   clearTimeout(t7Retry); t7Tries = 0;
   // Until 7Timer! answers, show this session's last good data for the same spot (if any).
   const hasCache = t7Cache && t7Cache.key === key;
-  const src = { om: {}, ens: {}, met, t7: hasCache ? t7Cache.data : null, t7cached: hasCache ? t7Cache.at : null, t7pending: true };
+  const src = { om: {}, ens: {}, met: null, t7: hasCache ? t7Cache.data : null, t7cached: hasCache ? t7Cache.at : null, t7pending: true };
   t7p.then((t7) => {
     if (run !== loading) return;
     src.t7pending = false;
@@ -1662,15 +1659,33 @@ async function load() {
     else if (hasCache) scheduleT7Retry(lat, lon, key);
     if (state.data && state.data.key === key) buildNights(src, state.data.now, key);
   });
-  OM_MODELS.forEach((m, i) => { if (omRes[i]) src.om[m.id] = omRes[i]; });
-  ENSEMBLES.forEach((e, i) => { if (ensRes[i]) src.ens[e.name] = ensRes[i]; });
-  const tz = (Object.values(src.om)[0] || {}).tz;
-  state.tz = tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (!Object.keys(src.om).length && !met) {
-    setStatus('Could not reach any weather service. Check your connection and tap ↻.', true);
-  }
-  buildNights(src, new Date(), key);
-  if (Object.keys(src.om).length || met) setStatus('');
+  // Show the forecast as soon as the first model answers, then refresh as each further source lands,
+  // so one slow service can't hold the whole screen hostage.
+  let pending = OM_MODELS.length + ENSEMBLES.length + 1, now = null, rt = null;
+  const render = () => {
+    rt = null;
+    if (run !== loading) return;
+    const tz = (Object.values(src.om)[0] || {}).tz;
+    state.tz = tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!now) now = new Date();
+    buildNights(src, now, key);
+  };
+  const landed = () => {
+    if (run !== loading) return;
+    pending--;
+    const have = Object.keys(src.om).length || src.met;
+    if (have) {
+      if (!now) render(); else if (!rt) rt = setTimeout(render, 400);
+      setStatus(pending ? `Loading ${pending} more source${pending > 1 ? 's' : ''}…` : '');
+    } else if (!pending) {
+      setStatus('Could not reach any weather service. Check your connection and tap ↻.', true);
+      render();
+    }
+    if (!pending && rt) { clearTimeout(rt); render(); }
+  };
+  OM_MODELS.forEach((m) => fetchOM(m, lat, lon).then((r) => { src.om[m.id] = r; }, () => {}).then(landed));
+  ENSEMBLES.forEach((e) => fetchEnsemble(e, lat, lon).then((r) => { src.ens[e.name] = r; }, () => {}).then(landed));
+  fetchMET(lat, lon).then((r) => { src.met = r; }, () => {}).then(landed);
 }
 
 /* Build the three nights from fetched data (also re-run when a 7Timer! retry succeeds). */
