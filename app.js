@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.28';
+const VERSION = 'v3.29';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -763,7 +763,7 @@ function renderVerdict(win, moon, hours) {
     chips.push([moonUp ? 'Moon up' : 'Moon', moonUp ? Math.round(moon.illum * 100) : 'Down', moonUp ? '%' : '', moonUp && moon.illum > 0.5 ? 'bad' : !moonUp || moon.illum < 0.25 ? 'ok' : '']);
     chips.push([dew < 2 ? 'Dew · heater on' : 'Dew gap', dew < 99 ? tempDiff(dew) : '–', '', dew < 2 ? 'bad' : dew >= 5 ? 'ok' : '']);
     chips.push(bortleChip());
-    if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s), '', s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
+    if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s), `(${s})`, s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
   }
   $('#verdict').innerHTML = `<div class="v-badge ${cls}">${txt}</div>
     <div class="v-text"><div class="v-win">${line}</div>${note ? `<div class="v-note">${esc(note)}</div>` : ''}</div>
@@ -951,7 +951,7 @@ function showHour(i) {
     h.moonAlt > 0 ? `Moon ${Math.round(h.moonAlt)}° up` : 'Moon down',
     `Cloud spread ${pct(h.cloudMin)}–${pct(h.cloudMax)} (low ${r0(h.low)} · mid ${r0(h.midc)} · high ${r0(h.high)})`,
     `Wind ${wind(h.wind)} ${windU()}, gusts ${wind(h.gust)}`,
-    isNum(h.seeing) ? `Seeing ${SEEING[h.seeing]} (${QUAL(h.seeing)}) · transparency ${QUAL(h.transparency)}` : '',
+    isNum(h.seeing) ? `Seeing ${QUAL(h.seeing)} (${h.seeing}) · ${SEEING[h.seeing]} · transparency ${QUAL(h.transparency)}` : '',
     isNum(h.rh) ? `Humidity ${Math.round(h.rh)}%` : '',
     isNum(h.dewGap) && h.dewGap < 2 ? 'Dew likely — run the dew heater' : '',
   ].filter(Boolean);
@@ -1096,7 +1096,7 @@ function thumbUrl(o) {
 const TOP_N = 3;      // fill the Top targets card; these leave the Seestar list
 const TOP_MORE = 10;  // scroll down in the card for more; ranks 4+ also stay in the Seestar list
 function renderTop(list, topIdx, now) {
-  $('#topTitle').firstChild.textContent = `Top targets ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow' : nightName(2)}`;
+  $('#topTitle').firstChild.textContent = `Top Ten Targets ${state.night === 0 ? 'Tonight' : state.night === 1 ? 'Tomorrow' : nightName(2)}`;
   $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
     const o = list[i];
     const upNow = o.start <= now && now < o.end;
@@ -1138,7 +1138,7 @@ function renderTargets(list) {
     const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `${o.hrs.toFixed(1)} h` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
-  }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow night' : 'that night'}.`}</p>`;
+  }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top Ten Targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow night' : 'that night'}.`}</p>`;
 }
 
 /* ---------- object pop-up ---------- */
