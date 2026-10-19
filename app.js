@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.36';
+const VERSION = 'v3.37';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1927,8 +1927,10 @@ function altChart(el, o, now) {
   let drag = false;
   svg.style.touchAction = 'pan-y';
   svg.style.cursor = 'ew-resize';
-  svg.addEventListener('pointerdown', (e) => { drag = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} setT(tAt(e)); });
-  svg.addEventListener('pointermove', (e) => { if (drag || e.pointerType === 'mouse') setT(tAt(e)); });
+  // Only moves while pressed and dragged: no hover tracking, no jump on a plain tap or click.
+  let x0 = 0;
+  svg.addEventListener('pointerdown', (e) => { if (e.button > 0) return; drag = true; x0 = e.clientX; try { svg.setPointerCapture(e.pointerId); } catch (_) {} });
+  svg.addEventListener('pointermove', (e) => { if (drag && Math.abs(e.clientX - x0) > 2) { x0 = -1e9; setT(tAt(e)); } });
   const stop = () => { drag = false; };
   svg.addEventListener('pointerup', stop);
   svg.addEventListener('pointercancel', stop);
