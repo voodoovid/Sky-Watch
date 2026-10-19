@@ -630,11 +630,19 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .dash {
     /* Narrow Tonight/Moon column; Dark hours and Top targets get the room the target list gave up. */
     grid-template-columns: minmax(215px, .8fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(265px, 1fr);
-    grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
-    grid-template-areas: "verdict fc fc obj" "moon path top obj";
+    /* Tonight runs a little past Dark hours (taking it from Moon) so the rain note fits without squeezing the tiles. */
+    grid-template-rows: minmax(0, 1.45fr) minmax(0, .2fr) minmax(0, .8fr);
+    grid-template-areas: "verdict fc fc obj" "verdict path top obj" "moon path top obj";
   }
   .verdict { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
-  .verdict .vstats { grid-template-columns: 1fr 1fr; flex: 1 1 auto; }
+  /* Tiles are locked to a fixed size; any spare room goes between the text and the tiles. */
+  .verdict .vstats { grid-template-columns: 1fr 1fr; flex: none; grid-auto-rows: 3.4rem; margin-top: auto; }
+  .v-text { min-height: 0; }
+  .v-note { font-size: .8rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .moon-card .eyebrow { margin-bottom: 4px; }
+  .moon-info { gap: 6px !important; }
+  .moon-txt { gap: 4px; }
+  .kv { gap: 1px 10px; }
   .vstats > .vs:last-child:nth-child(3n+1) { grid-column: auto; }
   .vstats > .vs:last-child:nth-child(odd) { grid-column: span 2; }
   .v-badge { align-self: center; text-align: center; }
@@ -643,7 +651,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .stat.prime b { font-size: 1.15rem; }
   .row.tgt .r .sub2 { font-size: .7rem; }
   .moon-info { flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; }
-  .moon-info > svg { width: 84px; height: 84px; align-self: center; }
+  .moon-info > svg { width: 72px; height: 72px; align-self: center; }
 }
 
 /* Large screens: a bit more room */
@@ -665,6 +673,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .chip { padding: 2px 7px; font-size: .68rem; }
   .timeline { padding-top: 8px; gap: 5px; }
   .stat { padding: 4px 8px; }
+  .verdict .vstats { grid-auto-rows: 3.1rem; }
   .moon-info > svg { width: 60px !important; height: 60px !important; }
   .kv { font-size: .76rem; }
   .top-it .th { width: 72px; height: 54px; }

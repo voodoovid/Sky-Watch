@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.20';
+const VERSION = 'v3.21';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -730,9 +730,10 @@ function renderVerdict(win, moon, hours) {
       const after = best ? wet.filter((h) => h.t > best.end.t) : [];
       const before = best ? wet.filter((h) => h.t < best.start.t) : [];
       const peak = Math.round(Math.max(...wet.map(popOf)));
-      if (after.length) note = `Rain risk from ${fmtTime(after[0].d)} (up to ${peak}%) — pack up before then`;
-      else if (before.length) note = `Rain risk until ${fmtTime(new Date((before[before.length - 1].t + 3600) * 1000))} (up to ${peak}%)`;
-      else note = `Rain risk ${fmtTime(wet[0].d)} – ${fmtTime(new Date((wet[wet.length - 1].t + 3600) * 1000))} (up to ${peak}%)`;
+      const st = (d) => fmtTime(d).replace(/:00(?=\s?[AP]\.?M)/i, '');   // "12 AM", keeps the note short
+      if (after.length) note = `Rain risk from ${st(after[0].d)} · up to ${peak}% — pack up before then`;
+      else if (before.length) note = `Rain risk until ${st(new Date((before[before.length - 1].t + 3600) * 1000))} · up to ${peak}%`;
+      else note = `Rain risk ${st(wet[0].d)} – ${st(new Date((wet[wet.length - 1].t + 3600) * 1000))} · up to ${peak}%`;
     } else if (cls === 'partial' && poor.length) {
       const after = poor.filter((h) => h.t > best.end.t);
       note = after.length ? `Conditions worsen from ${fmtTime(after[0].d)}` : `Poor until ${fmtTime(best.start.d)}`;
@@ -851,7 +852,9 @@ function drawCloud(img, W, Hc, px, py, sc, shape, cols, alpha) {
     if (v <= 0.18) continue;
     let acc = 0;                                                   // trace toward the light (up, a bit left)
     for (let s = 1; s <= 5; s++) acc += Math.max(0, dens(ux - step * s * 0.45, uy - step * s, 2));
-    const lit = Math.min(1, Math.exp(-acc * 0.55) * 1.05 + Math.max(0, -uy / -y1) * 0.18 - (uy > -0.12 ? Math.min(0.45, (0.12 + uy) * 1.6) : 0));
+    // Shadowed base: a soft, ragged gradient (wobbled by noise) instead of a level edge.
+    const bz = Math.min(1, Math.max(0, (uy + 0.26 + (noise2(ux * 5 + oy, uy * 5 + ox) - 0.5) * 0.3) / 0.4)), shade = 0.36 * bz * bz * (3 - 2 * bz);
+    const lit = Math.min(1, Math.exp(-acc * 0.55) * 1.05 + Math.max(0, -uy / -y1) * 0.18 - shade);
     const t = Math.max(0, lit), c = t > 0.5 ? [0, 1, 2].map((i) => mid[i] + (hi[i] - mid[i]) * (t - 0.5) * 2) : [0, 1, 2].map((i) => lo[i] + (mid[i] - lo[i]) * t * 2);
     const a = Math.min(1, (v - 0.18) / 0.22) * alpha, j = (Y * W + X) * 4, da = d[j + 3] / 255 * (1 - a), oa = a + da;
     for (let ch = 0; ch < 3; ch++) d[j + ch] = (c[ch] * a + d[j + ch] * da) / oa;
