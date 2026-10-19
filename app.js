@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.23';
+const VERSION = 'v3.24';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -569,7 +569,7 @@ function scoreHour(h) {
   if (h.sky.k === 'civil') s -= 30; else if (h.sky.k === 'nautical') s -= 15; else if (h.sky.k === 'astro') s -= 5;
   if (h.moonAlt > 0) s -= 12 * h.moonIllum;
   s = Math.max(0, Math.min(100, s));
-  if (isNum(h.pop) && h.pop >= RAIN_FLAG) s = Math.min(s, 34); // rain risk: never a usable hour
+  if (isNum(h.pop) && Math.round(h.pop) >= RAIN_SHOW) s = Math.min(s, 34); // any rain risk: never a usable hour
   const k = s >= 75 ? 'great' : s >= 55 ? 'good' : s >= 35 ? 'fair' : 'poor';
   return { k, label: k[0].toUpperCase() + k.slice(1), score: Math.round(s) };
 }
@@ -642,16 +642,17 @@ const qShort = (v) => (!isNum(v) ? '–' : v <= 2 ? 'Exc' : v <= 4 ? 'Good' : v 
 const SKY_SHORT = { day: 'day', civil: 'twi', nautical: 'twi', astro: 'twi', dark: 'dark' };
 
 /* Rain thresholds (ensemble % chance in the hour). Rain kills the Seestar, clouds alone don't:
-   an hour at RAIN_FLAG or more is rated NO and can never be part of the go window (nor can the hour
-   before it, to pack up dry). RAIN_STOP only marks the heaviest risk in the display. */
+   ANY rain chance (RAIN_SHOW, 1% or more as displayed) rates the hour NO, and it can never be part of
+   the go window (nor can the hour before it, to pack up dry). RAIN_FLAG / RAIN_STOP only grade the display. */
 const RAIN_SHOW = 1, RAIN_FLAG = 15, RAIN_STOP = 30;
 const popOf = (h) => (isNum(h.pop) ? h.pop : 0);
+const rainy = (h) => Math.round(popOf(h)) >= RAIN_SHOW;
 /* Best run of Good-or-better hours that stay clear of rain. */
 function bestWindow(hours) {
   let best = null, cur = null;
   hours.forEach((h, i) => {
     const next = hours[i + 1];
-    const dry = popOf(h) < RAIN_FLAG && !(next && popOf(next) >= RAIN_FLAG);
+    const dry = !rainy(h) && !(next && rainy(next));
     if (h.rating.score != null && h.rating.score >= 55 && dry) {
       cur = cur ? { ...cur, end: h } : { start: h, end: h };
       if (!best || cur.end.t - cur.start.t > best.end.t - best.start.t) best = cur;
@@ -723,7 +724,7 @@ function renderVerdict(win, moon, hours) {
     line = 'No forecast available for this night yet';
   } else {
     const inWin = (h) => best && h.t >= best.start.t && h.t <= best.end.t;
-    const wet = night.filter((h) => popOf(h) >= RAIN_FLAG);
+    const wet = night.filter(rainy);
     const poor = night.filter((h) => !inWin(h) && h.rating.k === 'poor');
     if (best && best.hrs >= 2) {
       // A solid window — but anything risky elsewhere in the night makes it only a partial go.
