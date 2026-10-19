@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.24';
+const VERSION = 'v3.25';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -726,10 +726,10 @@ function renderVerdict(win, moon, hours) {
     const inWin = (h) => best && h.t >= best.start.t && h.t <= best.end.t;
     const wet = night.filter(rainy);
     const poor = night.filter((h) => !inWin(h) && h.rating.k === 'poor');
-    if (best && best.hrs >= 2) {
-      // A solid window — but anything risky elsewhere in the night makes it only a partial go.
-      if (wet.length || poor.length) { cls = 'partial'; txt = 'PARTIAL GO'; } else { cls = 'go'; txt = 'GO'; }
-    } else if (best || night.some((h) => h.rating.k === 'fair')) { cls = 'fair'; txt = 'MARGINAL'; }
+    if (best && best.hrs >= 2 && !wet.length && !poor.length) { cls = 'go'; txt = 'GO'; }
+    // Rain or poor hours elsewhere in the night: only a partial go, and only with at least 3 dry, usable hours.
+    else if (best && best.hrs >= 3) { cls = 'partial'; txt = 'PARTIAL GO'; }
+    else if (best || night.some((h) => h.rating.k === 'fair')) { cls = 'fair'; txt = 'MARGINAL'; }
     else { cls = 'nogo'; txt = 'NO GO'; }
     const winEnd = best ? new Date((best.end.t + 3600) * 1000) : null;
     line = best
