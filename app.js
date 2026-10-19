@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.25';
+const VERSION = 'v3.26';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1757,8 +1757,26 @@ function toggleSearch(open) {
   else $('#searchResults').hidden = true;
 }
 
+// Home-screen (standalone) iPad apps keep a cached index.html, so they can sit on an old version.
+// Ask the server for the live version (never cached); if it's newer, reload once with a cache-busting URL.
+function checkUpdate() {
+  fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      if (!j || !j.v || j.v === VERSION) return;
+      let tried = null; try { tried = sessionStorage.getItem('updTried'); } catch (e) { /* ignore */ }
+      if (tried === j.v) return; // already tried this version this session; don't loop if the CDN is still catching up
+      try { sessionStorage.setItem('updTried', j.v); } catch (e) { /* ignore */ }
+      location.replace(location.pathname + '?u=' + encodeURIComponent(j.v) + '-' + Date.now());
+    })
+    .catch(() => { /* offline: keep running the current version */ });
+}
+
 function init() {
   $('#ver').textContent = VERSION; $('#verTop').textContent = VERSION;
+  checkUpdate();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+  window.addEventListener('pageshow', (e) => { if (e.persisted) checkUpdate(); });
   applyRed(); applyUnits(); applyNight(); applyHome(); applyMinAlt(); renderSpots();
   const onScheme = () => applyRed();
   if (LIGHT.addEventListener) LIGHT.addEventListener('change', onScheme); else if (LIGHT.addListener) LIGHT.addListener(onScheme);
