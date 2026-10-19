@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.34';
+const VERSION = 'v3.35';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1558,7 +1558,12 @@ function altChart(el, o, now) {
     if (o.end) {
       const xe = X(o.end);
       const txt = `${o.endWhy === 'alt' ? `Below ${MIN_ALT}°` : o.endWhy === 'dir' ? 'Leaves home sky' : 'Dawn'} · ${fmtTime(o.end)}`;
-      pill([[xe - fs * 0.6, y40 + gap, 'end'], [xe + fs * 0.6, y40 + gap, 'start'], [xe - fs * 0.6, y40 + gap * 2.6, 'end'], [xe + fs * 0.6, y40 + gap * 2.6, 'start'], [xe, T + ph - gap * 2, 'middle'], [xe, T + fs * 2.8, 'middle']], txt, 'var(--muted)');
+      // Always end the pill at its own drop line (window sits between the two pills); drop a row rather than flip sides.
+      const ye = Y(altAt(o.end));
+      marks += `<line x1="${f(xe)}" x2="${f(xe)}" y1="${f(ye)}" y2="${f(T + ph)}" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+      obst.push(box(xe - 2, ye, 4, T + ph - ye));
+      const es = xe < L + pw * 0.4 ? 'start' : 'end', ex = es === 'end' ? xe - fs * 0.6 : xe + fs * 0.6;
+      pill([[ex, y40 + gap, es], [ex, y40 + gap * 2.6, es], [ex, y40 + gap * 4, es], [ex, y40 - gap, es], [ex, T + fs, es]], txt, 'var(--muted)');
     }
   }
   if (peakTxt) {
@@ -1566,7 +1571,67 @@ function altChart(el, o, now) {
     if (y - fs * 0.7 - sm > T && !obst.some((o2) => hit(b, o2) > 0)) labels += `<text x="${f(x)}" y="${f(y - fs * 0.7)}" font-size="${f(sm)}" font-weight="700" text-anchor="middle" fill="var(--accent)">Peak ${Math.round(o.peak.alt)}°</text>`;
   }
   s += marks + labels;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Altitude through the night">${s}</svg>`;
+  // Time slider: drag (or tap, or arrow keys) to read altitude and direction at any moment of the night.
+  const ph2 = md * 1.75;
+  s += `<g class="scrub" pointer-events="none">
+    <line class="sc-line" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-width="1.6"/>
+    <circle class="sc-moon" r="${f(fs * 0.24)}" fill="var(--moon-lit)" stroke="var(--card)" stroke-width="1.5"/>
+    <circle class="sc-dot" r="${f(fs * 0.36)}" fill="var(--card)" stroke="var(--accent)" stroke-width="3"/>
+    <circle class="sc-knob" cy="${f(T + ph)}" r="${f(fs * 0.5)}" fill="var(--text)" stroke="var(--card)" stroke-width="2"/>
+    <rect class="sc-box" height="${f(ph2)}" rx="${f(ph2 / 2)}"/>
+    <text class="sc-txt" font-size="${f(md)}" font-weight="700" text-anchor="middle" fill="var(--card)"></text></g>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="slider" tabindex="0" aria-label="Time slider: altitude through the night" aria-valuemin="0" aria-valuemax="100">${s}</svg>`;
+  const svg = el.querySelector('svg'), g = svg.querySelector('.scrub'), q = (k) => g.querySelector(k);
+  const lerp = (t, key) => {
+    const k = Math.min(c.length - 2, Math.max(0, Math.floor((t - t0) / STEP))), a = c[k], b = c[k + 1];
+    return a[key] + (b[key] - a[key]) * ((t - a.d) / (b.d - a.d));
+  };
+  const setT = (t) => {
+    t = Math.max(t0, Math.min(t1, t));
+    el._scrub = t;
+    const d = new Date(t), x = X(d), alt = lerp(t, 'alt'), moon = lerp(t, 'moon'), az = azAt(d), y = Y(Math.max(0, alt));
+    const inWin = (o.segs || []).some((g2) => t >= +g2.s && t <= +g2.e);
+    const txt = `${fmtTime(d)} · ${alt < 0 ? 'below horizon' : `${Math.round(alt)}° ${compass(az)}`}`;
+    q('.sc-line').setAttribute('x1', f(x)); q('.sc-line').setAttribute('x2', f(x));
+    q('.sc-dot').setAttribute('cx', f(x)); q('.sc-dot').setAttribute('cy', f(y));
+    q('.sc-dot').setAttribute('opacity', alt < 0 ? '0' : '1');
+    q('.sc-knob').setAttribute('cx', f(x));
+    q('.sc-moon').setAttribute('cx', f(x)); q('.sc-moon').setAttribute('cy', f(Y(Math.max(0, moon))));
+    q('.sc-moon').setAttribute('opacity', moon > 0 ? '.9' : '0');
+    // Readout pill rides just above the dot (below it if there's no room), clamped inside the chart.
+    const w = txt.length * md * 0.56 + md * 1.3;
+    const bx = Math.max(L, Math.min(L + pw - w, x - w / 2));
+    let by = y - ph2 - fs * 0.7;
+    if (by < 2) by = y + fs * 0.7;
+    const box2 = q('.sc-box');
+    box2.setAttribute('x', f(bx)); box2.setAttribute('y', f(by)); box2.setAttribute('width', f(w));
+    box2.setAttribute('fill', inWin ? 'var(--go)' : 'var(--text)');
+    const tx = q('.sc-txt');
+    tx.setAttribute('x', f(bx + w / 2)); tx.setAttribute('y', f(by + ph2 / 2 + md * 0.34));
+    tx.textContent = txt;
+    svg.setAttribute('aria-valuenow', Math.round(((t - t0) / (t1 - t0)) * 100));
+    svg.setAttribute('aria-valuetext', txt);
+  };
+  const tAt = (e) => {
+    const r = svg.getBoundingClientRect();
+    return t0 + (((e.clientX - r.left) * (W / r.width) - L) / pw) * (t1 - t0);
+  };
+  let drag = false;
+  svg.style.touchAction = 'pan-y';
+  svg.style.cursor = 'ew-resize';
+  svg.addEventListener('pointerdown', (e) => { drag = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} setT(tAt(e)); });
+  svg.addEventListener('pointermove', (e) => { if (drag || e.pointerType === 'mouse') setT(tAt(e)); });
+  const stop = () => { drag = false; };
+  svg.addEventListener('pointerup', stop);
+  svg.addEventListener('pointercancel', stop);
+  svg.addEventListener('keydown', (e) => {
+    const step = (e.shiftKey ? 30 : 5) * 60e3;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setT(el._scrub + (e.key === 'ArrowLeft' ? -step : step)); }
+  });
+  // Start at now (if it is night), else at the peak.
+  const keep = el._scrub != null && el._scrubFor === o ? el._scrub : null;
+  el._scrubFor = o;
+  setT(keep ?? (now && +now > t0 && +now < t1 ? +now : o.peak ? +o.peak.d : o.start ? +o.start : (t0 + t1) / 2));
 }
 
 const tile = (lbl, val, sub = '', cls = '') => `<div class="tile ${cls}"><span class="lbl">${esc(lbl)}</span><b>${esc(val)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
