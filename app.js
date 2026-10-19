@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.30';
+const VERSION = 'v3.31';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1759,6 +1759,9 @@ function applyRed() {
   $('#redBtn').setAttribute('aria-pressed', String(state.red));
   $('#redBtn .lbl').textContent = state.red ? 'Normal' : 'Red';
   document.querySelector('meta[name=theme-color]').setAttribute('content', state.red ? '#000000' : isLight() ? '#eef2f8' : '#070b16');
+  // The cloud chart is painted on a canvas with the theme's colours baked in, so repaint it for the new theme.
+  const D = state.data;
+  if (D && D.nights[state.night]) skyChart(D.nights[state.night].hours);
 }
 function applyUnits() {
   document.querySelectorAll('#unitsBtn span').forEach((s) => s.classList.toggle('on', s.dataset.u === state.units));
