@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.21';
+const VERSION = 'v3.22';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -251,9 +251,17 @@ function skyState(sunAlt) {
 }
 const tdate = (t) => (t ? t.date : null);
 
-function nightWindow(obs, now) {
+/* Local hour (0-23) at the forecast location. */
+function localHour(d) {
+  const h = +new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: state.tz }).format(d);
+  return isNum(h) ? h % 24 : d.getHours();
+}
+/* After 1 AM the night in progress is treated as over, so "Tonight" moves to the coming evening. */
+const ROLLOVER_HOUR = 1;
+function nightWindow(obs, now, rollover) {
   const sunNow = altAz('Sun', now, obs).alt;
-  const from = sunNow > -0.833 ? now : new Date(now.getTime() - 86400000);
+  const pastRollover = rollover && localHour(now) >= ROLLOVER_HOUR && localHour(now) < 12;
+  const from = sunNow > -0.833 || pastRollover ? now : new Date(now.getTime() - 86400000);
   const set = tdate(A.SearchRiseSet('Sun', obs, -1, from, 1.5));
   if (!set) return { set: now, rise: new Date(now.getTime() + 12 * 3600e3), polar: true };
   const rise = tdate(A.SearchRiseSet('Sun', obs, +1, set, 1.5)) || new Date(set.getTime() + 12 * 3600e3);
@@ -1641,8 +1649,8 @@ function buildNights(src, now, key) {
   const loc = state.loc;
   key = key || (state.data && state.data.key);
   const obs = new A.Observer(+loc.lat, +loc.lon, 0);
-  // Tonight (the night in progress, or the next one if it's daytime), tomorrow night and the night after.
-  const w0 = nightWindow(obs, now);
+  // Tonight (the night in progress until 1 AM, otherwise the coming evening), tomorrow night and the night after.
+  const w0 = nightWindow(obs, now, true);
   const w1 = nightWindow(obs, new Date(w0.rise.getTime() + 3600e3));
   const w2 = nightWindow(obs, new Date(w1.rise.getTime() + 3600e3));
   const night = (win, from) => {
