@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.38';
+const VERSION = 'v3.39';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -900,7 +900,7 @@ function angSep(a, b) {
 function appeal(id, type) {
   const [mag, size] = DSO_INFO[id] || [];
   const sz = parseSize(size);
-  return (sz ? Math.log2(Math.min(sz[0], 77)) : 0) - 0.35 * (mag != null ? mag : type === 'Nebula' ? 9.5 : 7);
+  return (sz ? Math.log2(Math.min(sz[0], 120)) : 0) - 0.35 * (mag != null ? mag : type === 'Nebula' ? 9.5 : 7);
 }
 /* Deep-sky targets that reach MIN_ALT in darkness for at least half an hour, longest window first. */
 function targetsTonight(obs, S) {
