@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.27';
+const VERSION = 'v3.28';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -28,6 +28,7 @@ const state = {
   data: null,
   night: 0, // 0 = tonight, 1 = tomorrow night, 2 = the night after
   home: store.get('home', false), // only count the part of the sky set in Options
+  homeLoc: store.get('homeLoc', null), // {lat, lon} where Home sky was turned on; Home is on only near here
   homeSky: (() => {
     const v = store.get('homeSky2', null);
     if (Array.isArray(v) && v.length === 16) return v.map(Boolean);
@@ -1607,6 +1608,20 @@ function findTargets() {
     N.targets = [...cometsTonight(D.obs, N.S, N.win), ...targetsTonight(D.obs, N.S)];
   }
 }
+/* Home sky belongs to one place: it's on only when the user wants it AND the current location is that place. */
+const HOME_KM = 3; // GPS without high accuracy can wander, so allow a few km
+function nearHome(loc) {
+  const h = state.homeLoc; if (!h || !loc) return false;
+  const R = Math.PI / 180, dLat = (loc.lat - h.lat) * R, dLon = (loc.lon - h.lon) * R;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(h.lat * R) * Math.cos(loc.lat * R) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a)) <= HOME_KM;
+}
+function syncHome() {
+  const want = store.get('home', false);
+  if (want && !state.homeLoc && state.loc) { state.homeLoc = { lat: state.loc.lat, lon: state.loc.lon }; store.set('homeLoc', state.homeLoc); }
+  state.home = want && (!state.loc || nearHome(state.loc));
+  applyHome();
+}
 function applyHome() {
   const b = $('#homeBtn');
   b.setAttribute('aria-pressed', String(state.home));
@@ -1702,6 +1717,7 @@ function renderSpots() {
 function setLoc(loc) {
   state.loc = loc;
   store.set('lastLoc', loc);
+  syncHome(); // leaving home turns Home off; coming back to it turns it back on
   renderSpots();
   load();
 }
@@ -1789,10 +1805,14 @@ function init() {
   checkUpdate();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
   window.addEventListener('pageshow', (e) => { if (e.persisted) checkUpdate(); });
-  applyRed(); applyUnits(); applyNight(); applyHome(); applyMinAlt(); renderSpots();
+  applyRed(); applyUnits(); applyNight(); syncHome(); applyMinAlt(); renderSpots();
   const onScheme = () => applyRed();
   if (LIGHT.addEventListener) LIGHT.addEventListener('change', onScheme); else if (LIGHT.addListener) LIGHT.addListener(onScheme);
-  $('#homeBtn').addEventListener('click', () => { state.home = !state.home; store.set('home', state.home); applyHome(); findTargets(); renderAll(); });
+  $('#homeBtn').addEventListener('click', () => {
+    state.home = !state.home; store.set('home', state.home);
+    if (state.home && state.loc) { state.homeLoc = { lat: state.loc.lat, lon: state.loc.lon }; store.set('homeLoc', state.homeLoc); }
+    applyHome(); findTargets(); renderAll();
+  });
   $('#redBtn').addEventListener('click', () => { state.red = !state.red; store.set('red', state.red); applyRed(); });
   $('#refreshBtn').addEventListener('click', () => (state.loc && state.loc.gps ? useGPS() : load()));
   $('#gpsBtn').addEventListener('click', useGPS);
