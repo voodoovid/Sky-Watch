@@ -482,31 +482,53 @@ function cometsTonight(obs, S, win) {
 
 /* Seestar-friendly deep-sky objects (J2000 RA hours, Dec degrees). */
 const DSO = [
-  ['M31', 'Andromeda Galaxy', 'Galaxy', 0.712, 41.27], ['M33', 'Triangulum Galaxy', 'Galaxy', 1.564, 30.66],
-  ['M45', 'Pleiades', 'Cluster + reflection', 3.79, 24.12], ['M42', 'Orion Nebula', 'Emission nebula', 5.588, -5.39],
-  ['M1', 'Crab Nebula', 'Supernova remnant', 5.575, 22.01], ['NGC 2237', 'Rosette Nebula', 'Emission nebula', 6.53, 4.95],
-  ['IC 434', 'Horsehead Nebula', 'Emission nebula', 5.683, -2.46], ['NGC 1499', 'California Nebula', 'Emission nebula', 4.05, 36.42],
-  ['IC 1805', 'Heart Nebula', 'Emission nebula', 2.555, 61.45], ['IC 1848', 'Soul Nebula', 'Emission nebula', 2.85, 60.43],
-  ['NGC 281', 'Pacman Nebula', 'Emission nebula', 0.88, 56.62], ['NGC 869/884', 'Double Cluster', 'Open cluster', 2.33, 57.13],
-  ['NGC 7000', 'North America Nebula', 'Emission nebula', 20.98, 44.33], ['NGC 6960', 'Western Veil', 'Supernova remnant', 20.76, 30.71],
-  ['NGC 6992', 'Eastern Veil', 'Supernova remnant', 20.94, 31.72], ['M27', 'Dumbbell Nebula', 'Planetary nebula', 19.993, 22.72],
-  ['M57', 'Ring Nebula', 'Planetary nebula', 18.893, 33.03], ['M13', 'Hercules Cluster', 'Globular cluster', 16.695, 36.46],
-  ['M92', 'Globular in Hercules', 'Globular cluster', 17.285, 43.14], ['M15', 'Pegasus Cluster', 'Globular cluster', 21.50, 12.17],
-  ['M2', 'Aquarius Cluster', 'Globular cluster', 21.558, -0.82], ['IC 1396', 'Elephant’s Trunk', 'Emission nebula', 21.65, 57.5],
-  ['NGC 7635', 'Bubble Nebula', 'Emission nebula', 23.347, 61.2], ['IC 5146', 'Cocoon Nebula', 'Emission + dark nebula', 21.893, 47.27],
-  ['NGC 7023', 'Iris Nebula', 'Reflection nebula', 21.027, 68.17], ['NGC 7293', 'Helix Nebula', 'Planetary nebula', 22.494, -20.84],
-  ['NGC 7331', 'Deer Lick Galaxy', 'Galaxy', 22.616, 34.42], ['NGC 891', 'Silver Sliver Galaxy', 'Galaxy', 2.376, 42.35],
-  ['M74', 'Phantom Galaxy', 'Galaxy', 1.611, 15.78], ['M77', 'Cetus A', 'Galaxy', 2.711, -0.01],
-  ['M81', 'Bode’s Galaxy', 'Galaxy', 9.926, 69.07], ['M82', 'Cigar Galaxy', 'Galaxy', 9.931, 69.68],
-  ['M51', 'Whirlpool Galaxy', 'Galaxy', 13.498, 47.2], ['M101', 'Pinwheel Galaxy', 'Galaxy', 14.054, 54.35],
-  ['M97', 'Owl Nebula', 'Planetary nebula', 11.247, 55.02], ['M106', 'Spiral in Canes Venatici', 'Galaxy', 12.316, 47.3],
-  ['M63', 'Sunflower Galaxy', 'Galaxy', 13.264, 42.03], ['M64', 'Black Eye Galaxy', 'Galaxy', 12.946, 21.68],
-  ['M3', 'Globular in Canes Venatici', 'Globular cluster', 13.703, 28.38], ['M8', 'Lagoon Nebula', 'Emission nebula', 18.06, -24.38],
-  ['M20', 'Trifid Nebula', 'Emission nebula', 18.04, -23.03], ['M16', 'Eagle Nebula', 'Emission nebula', 18.313, -13.79],
-  ['M17', 'Omega Nebula', 'Emission nebula', 18.346, -16.17], ['M11', 'Wild Duck Cluster', 'Open cluster', 18.851, -6.27],
-  ['M35', 'Open cluster in Gemini', 'Open cluster', 6.15, 24.33], ['M44', 'Beehive Cluster', 'Open cluster', 8.67, 19.67],
+  // Curated favourites first, then every other NGC/IC/Messier object from OpenNGC that is at least 6′ across
+  // and reasonably bright (galaxies mag ≤ 10, open clusters ≤ 7.5, globulars ≤ 9; nebulae by size alone), north of −40°.
+  ['M31', 'Andromeda Galaxy', 'Galaxy', 0.712, 41.27],
+  ['M33', 'Triangulum Galaxy', 'Galaxy', 1.564, 30.66],
+  ['M45', 'Pleiades', 'Cluster + reflection', 3.79, 24.12],
+  ['M42', 'Orion Nebula', 'Emission nebula', 5.588, -5.39],
+  ['M1', 'Crab Nebula', 'Supernova remnant', 5.575, 22.01],
+  ['NGC 2237', 'Rosette Nebula', 'Emission nebula', 6.53, 4.95],
+  ['IC 434', 'Horsehead Nebula', 'Emission nebula', 5.683, -2.46],
+  ['NGC 1499', 'California Nebula', 'Emission nebula', 4.05, 36.42],
+  ['IC 1805', 'Heart Nebula', 'Emission nebula', 2.555, 61.45],
+  ['IC 1848', 'Soul Nebula', 'Emission nebula', 2.85, 60.43],
+  ['NGC 281', 'Pacman Nebula', 'Emission nebula', 0.88, 56.62],
+  ['NGC 869/884', 'Double Cluster', 'Open cluster', 2.33, 57.13],
+  ['NGC 7000', 'North America Nebula', 'Emission nebula', 20.98, 44.33],
+  ['NGC 6960', 'Western Veil', 'Supernova remnant', 20.76, 30.71],
+  ['NGC 6992', 'Eastern Veil', 'Supernova remnant', 20.94, 31.72],
+  ['M27', 'Dumbbell Nebula', 'Planetary nebula', 19.993, 22.72],
+  ['M13', 'Hercules Cluster', 'Globular cluster', 16.695, 36.46],
+  ['M92', 'Globular in Hercules', 'Globular cluster', 17.285, 43.14],
+  ['M15', 'Pegasus Cluster', 'Globular cluster', 21.5, 12.17],
+  ['M2', 'Aquarius Cluster', 'Globular cluster', 21.558, -0.82],
+  ['IC 1396', 'Elephant’s Trunk', 'Emission nebula', 21.65, 57.5],
+  ['NGC 7635', 'Bubble Nebula', 'Emission nebula', 23.347, 61.2],
+  ['IC 5146', 'Cocoon Nebula', 'Emission + dark nebula', 21.893, 47.27],
+  ['NGC 7023', 'Iris Nebula', 'Reflection nebula', 21.027, 68.17],
+  ['NGC 7293', 'Helix Nebula', 'Planetary nebula', 22.494, -20.84],
+  ['NGC 7331', 'Deer Lick Galaxy', 'Galaxy', 22.616, 34.42],
+  ['NGC 891', 'Silver Sliver Galaxy', 'Galaxy', 2.376, 42.35],
+  ['M74', 'Phantom Galaxy', 'Galaxy', 1.611, 15.78],
+  ['M77', 'Cetus A', 'Galaxy', 2.711, -0.01],
+  ['M81', 'Bode’s Galaxy', 'Galaxy', 9.926, 69.07],
+  ['M82', 'Cigar Galaxy', 'Galaxy', 9.931, 69.68],
+  ['M51', 'Whirlpool Galaxy', 'Galaxy', 13.498, 47.2],
+  ['M101', 'Pinwheel Galaxy', 'Galaxy', 14.054, 54.35],
+  ['M106', 'Spiral in Canes Venatici', 'Galaxy', 12.316, 47.3],
+  ['M63', 'Sunflower Galaxy', 'Galaxy', 13.264, 42.03],
+  ['M64', 'Black Eye Galaxy', 'Galaxy', 12.946, 21.68],
+  ['M3', 'Globular in Canes Venatici', 'Globular cluster', 13.703, 28.38],
+  ['M8', 'Lagoon Nebula', 'Emission nebula', 18.06, -24.38],
+  ['M20', 'Trifid Nebula', 'Emission nebula', 18.04, -23.03],
+  ['M16', 'Eagle Nebula', 'Emission nebula', 18.313, -13.79],
+  ['M17', 'Omega Nebula', 'Emission nebula', 18.346, -16.17],
+  ['M11', 'Wild Duck Cluster', 'Open cluster', 18.851, -6.27],
+  ['M35', 'Open cluster in Gemini', 'Open cluster', 6.15, 24.33],
+  ['M44', 'Beehive Cluster', 'Open cluster', 8.67, 19.67],
   ['NGC 253', 'Sculptor Galaxy', 'Galaxy', 0.793, -25.29],
-  // Rest of the Messier catalog plus popular Seestar targets (positions, sizes, magnitudes from OpenNGC).
   ['M4', 'Globular in Scorpius', 'Globular cluster', 16.393, -26.53],
   ['M5', 'Globular in Serpens', 'Globular cluster', 15.309, 2.08],
   ['M6', 'Butterfly Cluster', 'Open cluster', 17.672, -32.25],
@@ -523,8 +545,6 @@ const DSO = [
   ['M24', 'Small Sagittarius Star Cloud', 'Star cloud', 18.282, -18.51],
   ['M25', 'Open cluster in Sagittarius', 'Open cluster', 18.53, -19.11],
   ['M26', 'Open cluster in Scutum', 'Open cluster', 18.755, -9.38],
-  ['M28', 'Globular in Sagittarius', 'Globular cluster', 18.409, -24.87],
-  ['M29', 'Cooling Tower Cluster', 'Open cluster', 20.399, 38.51],
   ['M30', 'Globular in Capricornus', 'Globular cluster', 21.673, -23.18],
   ['M32', 'Andromeda satellite', 'Galaxy', 0.712, 40.87],
   ['M34', 'Open cluster in Perseus', 'Open cluster', 2.702, 42.75],
@@ -537,15 +557,11 @@ const DSO = [
   ['M46', 'Open cluster in Puppis', 'Open cluster', 7.696, -14.81],
   ['M47', 'Open cluster in Puppis', 'Open cluster', 7.61, -14.48],
   ['M48', 'Open cluster in Hydra', 'Open cluster', 8.229, -5.75],
-  ['M49', 'Galaxy in Virgo', 'Galaxy', 12.496, 8.0],
+  ['M49', 'Galaxy in Virgo', 'Galaxy', 12.496, 8],
   ['M50', 'Open cluster in Monoceros', 'Open cluster', 7.045, -8.36],
   ['M52', 'Open cluster in Cassiopeia', 'Open cluster', 23.413, 61.59],
   ['M53', 'Globular in Coma Berenices', 'Globular cluster', 13.215, 18.17],
-  ['M54', 'Globular in Sagittarius', 'Globular cluster', 18.918, -30.48],
   ['M55', 'Globular in Sagittarius', 'Globular cluster', 19.666, -30.96],
-  ['M56', 'Globular in Lyra', 'Globular cluster', 19.277, 30.18],
-  ['M58', 'Galaxy in Virgo', 'Galaxy', 12.629, 11.82],
-  ['M59', 'Galaxy in Virgo', 'Galaxy', 12.701, 11.65],
   ['M60', 'Galaxy in Virgo', 'Galaxy', 12.728, 11.55],
   ['M61', 'Galaxy in Virgo', 'Galaxy', 12.365, 4.47],
   ['M62', 'Globular in Ophiuchus', 'Globular cluster', 17.02, -30.11],
@@ -553,15 +569,9 @@ const DSO = [
   ['M66', 'Galaxy in Leo', 'Galaxy', 11.337, 12.99],
   ['M67', 'Open cluster in Cancer', 'Open cluster', 8.856, 11.81],
   ['M68', 'Globular in Hydra', 'Globular cluster', 12.658, -26.74],
-  ['M69', 'Globular in Sagittarius', 'Globular cluster', 18.523, -32.35],
   ['M70', 'Globular in Sagittarius', 'Globular cluster', 18.72, -32.29],
   ['M71', 'Globular in Sagitta', 'Globular cluster', 19.896, 18.78],
-  ['M72', 'Globular in Aquarius', 'Globular cluster', 20.891, -12.54],
-  ['M75', 'Globular in Sagittarius', 'Globular cluster', 20.101, -21.92],
-  ['M76', 'Little Dumbbell Nebula', 'Planetary nebula', 1.705, 51.58],
-  ['M78', 'Reflection nebula in Orion', 'Reflection nebula', 5.779, 0.08],
   ['M79', 'Globular in Lepus', 'Globular cluster', 5.403, -24.52],
-  ['M80', 'Globular in Scorpius', 'Globular cluster', 16.284, -22.98],
   ['M83', 'Southern Pinwheel Galaxy', 'Galaxy', 13.617, -29.87],
   ['M84', 'Galaxy in Virgo', 'Galaxy', 12.418, 12.89],
   ['M85', 'Galaxy in Coma Berenices', 'Galaxy', 12.423, 18.19],
@@ -570,20 +580,15 @@ const DSO = [
   ['M88', 'Galaxy in Coma Berenices', 'Galaxy', 12.533, 14.42],
   ['M89', 'Galaxy in Virgo', 'Galaxy', 12.594, 12.56],
   ['M90', 'Galaxy in Virgo', 'Galaxy', 12.614, 13.16],
-  ['M91', 'Galaxy in Coma Berenices', 'Galaxy', 12.591, 14.5],
   ['M93', 'Open cluster in Puppis', 'Open cluster', 7.741, -23.85],
   ['M94', 'Galaxy in Canes Venatici', 'Galaxy', 12.848, 41.12],
   ['M95', 'Galaxy in Leo', 'Galaxy', 10.733, 11.7],
   ['M96', 'Galaxy in Leo', 'Galaxy', 10.779, 11.82],
   ['M98', 'Galaxy in Coma Berenices', 'Galaxy', 12.23, 14.9],
-  ['M99', 'Coma Pinwheel', 'Galaxy', 12.314, 14.42],
   ['M100', 'Galaxy in Coma Berenices', 'Galaxy', 12.382, 15.82],
   ['M102', 'Spindle Galaxy', 'Galaxy', 15.108, 55.76],
-  ['M103', 'Open cluster in Cassiopeia', 'Open cluster', 1.556, 60.66],
   ['M104', 'Sombrero Galaxy', 'Galaxy', 12.667, -11.62],
-  ['M105', 'Galaxy in Leo', 'Galaxy', 10.797, 12.58],
   ['M107', 'Globular in Ophiuchus', 'Globular cluster', 16.542, -13.05],
-  ['M108', 'Galaxy in Ursa Major', 'Galaxy', 11.192, 55.67],
   ['M109', 'Galaxy in Ursa Major', 'Galaxy', 11.96, 53.37],
   ['M110', 'Andromeda satellite', 'Galaxy', 0.673, 41.69],
   ['NGC 6888', 'Crescent Nebula', 'Emission nebula', 20.202, 38.35],
@@ -596,35 +601,205 @@ const DSO = [
   ['IC 410', 'Tadpoles Nebula', 'Emission nebula', 5.378, 33.37],
   ['IC 405', 'Flaming Star Nebula', 'Emission + reflection nebula', 5.275, 34.36],
   ['NGC 2359', 'Thor’s Helmet', 'Emission nebula', 7.309, -13.23],
-  ['NGC 6543', 'Cat’s Eye Nebula', 'Planetary nebula', 17.976, 66.63],
-  ['NGC 2392', 'Eskimo Nebula', 'Planetary nebula', 7.486, 20.91],
   ['NGC 4631', 'Whale Galaxy', 'Galaxy', 12.702, 32.54],
   ['NGC 2403', 'Galaxy in Camelopardalis', 'Galaxy', 7.614, 65.6],
   ['NGC 3628', 'Hamburger Galaxy', 'Galaxy', 11.338, 13.59],
   ['NGC 5907', 'Splinter Galaxy', 'Galaxy', 15.265, 56.33],
   ['IC 63', 'Ghost of Cassiopeia', 'Emission + reflection nebula', 0.991, 60.91],
-  ['NGC 7662', 'Blue Snowball Nebula', 'Planetary nebula', 23.432, 42.53],
   ['NGC 2903', 'Galaxy in Leo', 'Galaxy', 9.536, 21.5],
   ['NGC 1333', 'Embryo Nebula', 'Reflection nebula', 3.482, 31.37],
+  ['NGC 1909', 'Witch Head Nebula', 'Reflection nebula', 5.082, -7.27],
+  ['NGC 6727', 'Reflection nebula in Corona Australis', 'Reflection nebula', 19.028, -36.88],
+  ['IC 4592', 'Reflection nebula in Scorpius', 'Reflection nebula', 16.2, -19.45],
+  ['IC 4604', 'Rho Oph Nebula', 'Nebula', 16.425, -23.44],
+  ['IC 4701', 'Nebula in Sagittarius', 'Nebula', 18.277, -16.65],
+  ['IC 5070', 'Pelican Nebula', 'Emission nebula', 20.85, 44.4],
+  ['IC 443', 'Gem A', 'Supernova remnant', 6.277, 22.53],
+  ['Caldwell 9', 'Cave Nebula', 'Emission nebula', 22.965, 62.52],
+  ['IC 5068', 'Emission nebula in Cygnus', 'Emission nebula', 20.842, 42.48],
+  ['NGC 2174', 'Monkey Head Nebula', 'Emission nebula', 6.157, 20.66],
+  ['NGC 752', 'Open cluster in Andromeda', 'Open cluster', 1.96, 37.83],
+  ['IC 4605', 'Nebula in Scorpius', 'Nebula', 16.503, -25.12],
+  ['NGC 2024', 'Flame Nebula', 'Emission nebula', 5.695, -1.86],
+  ['NGC 55', 'Galaxy in Sculptor', 'Galaxy', 0.248, -39.2],
+  ['NGC 1647', 'Open cluster in Taurus', 'Open cluster', 4.765, 19.1],
+  ['IC 1340', 'Supernova remnant in Cygnus', 'Supernova remnant', 20.936, 31.05],
+  ['IC 447', 'Emission nebula in Monoceros', 'Emission nebula', 6.517, 9.9],
+  ['IC 4665', 'Open cluster in Ophiuchus', 'Open cluster', 17.774, 5.65],
+  ['IC 4756', 'Open cluster in Se2', 'Open cluster', 18.648, 5.46],
+  ['NGC 4236', 'Galaxy in Draco', 'Galaxy', 12.278, 69.46],
+  ['IC 1274', 'Emission nebula in Sagittarius', 'Emission nebula', 18.164, -23.65],
+  ['IC 1287', 'Reflection nebula in Scutum', 'Reflection nebula', 18.524, -10.8],
+  ['IC 4601', 'Nebula in Scorpius', 'Nebula', 16.338, -20.09],
+  ['IC 4603', 'Nebula in Ophiuchus', 'Nebula', 16.423, -24.47],
+  ['NGC 7822', 'Cederblad 214 complex', 'Emission nebula', 0.06, 67.16],
+  ['IC 342', 'Hidden Galaxy', 'Galaxy', 3.78, 68.1],
+  ['NGC 247', 'Galaxy in Cetus', 'Galaxy', 0.786, -20.76],
+  ['NGC 300', 'Galaxy in Sculptor', 'Galaxy', 0.915, -37.68],
+  ['NGC 2477', 'Open cluster in Puppis', 'Open cluster', 7.869, -38.53],
+  ['IC 1613', 'Galaxy in Cetus', 'Galaxy', 1.08, 2.12],
+  ['NGC 1746', 'Open cluster in Taurus', 'Open cluster', 5.064, 23.77],
+  ['IC 1284', 'Nebula in Sagittarius', 'Nebula', 18.294, -19.67],
+  ['NGC 2546', 'Open cluster in Puppis', 'Open cluster', 8.204, -37.59],
+  ['ESO 351-030', 'Sculptor Dwarf Elliptical', 'Galaxy', 1.003, -33.71],
+  ['IC 359A', 'Reflection nebula in Taurus', 'Reflection nebula', 4.311, 28.29],
+  ['IC 448', 'Emission nebula in Monoceros', 'Emission nebula', 6.546, 7.39],
+  ['IC 1310', 'Cluster + nebula in Cygnus', 'Cluster + nebula', 20.167, 34.97],
+  ['IC 4685', 'Nebula in Sagittarius', 'Nebula', 18.155, -23.99],
+  ['NGC 6559', 'Nebula in Sagittarius', 'Nebula', 18.166, -24.11],
+  ['NGC 7243', 'Open cluster in Lacerta', 'Open cluster', 22.252, 49.9],
+  ['NGC 7789', 'Caroline’s Rose Cluster', 'Open cluster', 23.957, 56.71],
+  ['Mel 71', 'Open cluster in Puppis', 'Open cluster', 7.626, -12.06],
+  ['NGC 1662', 'Open cluster in Orion', 'Open cluster', 4.808, 10.93],
+  ['NGC 1316', 'Fornax A', 'Galaxy', 3.378, -37.21],
+  ['IC 417', 'Emission nebula in Auriga', 'Emission nebula', 5.468, 34.42],
+  ['NGC 185', 'Galaxy in Cassiopeia', 'Galaxy', 0.649, 48.34],
+  ['ESO 356-004', 'Fornax Dwarf Spheroidal', 'Galaxy', 2.666, -34.45],
+  ['NGC 2539', 'Open cluster in Puppis', 'Open cluster', 8.177, -12.82],
+  ['IC 1795', 'Fish Head Nebula', 'Emission nebula', 2.442, 62.04],
+  ['IC 4591', 'Emission nebula in Scorpius', 'Emission nebula', 16.205, -27.93],
+  ['NGC 2183', 'Emission nebula in Monoceros', 'Emission nebula', 6.18, -6.21],
+  ['NGC 6633', 'Open cluster in Ophiuchus', 'Open cluster', 18.454, 6.51],
+  ['NGC 2423', 'Open cluster in Puppis', 'Open cluster', 7.619, -13.87],
+  ['IC 430', 'Nebula in Orion', 'Nebula', 5.643, -7.08],
+  ['NGC 2281', 'Open cluster in Auriga', 'Open cluster', 6.805, 41.08],
+  ['NGC 6940', 'Open cluster in Vulpecula', 'Open cluster', 20.574, 28.28],
+  ['NGC 1097', 'Galaxy in Fornax', 'Galaxy', 2.772, -30.27],
+  ['NGC 4559', 'Galaxy in Coma Berenices', 'Galaxy', 12.599, 27.96],
+  ['NGC 7793', 'Galaxy in Sculptor', 'Galaxy', 23.964, -32.59],
+  ['NGC 2997', 'Galaxy in Antlia', 'Galaxy', 9.761, -31.19],
+  ['NGC 1502', 'Open cluster in Camelopardalis', 'Open cluster', 4.13, 62.33],
+  ['NGC 1579', 'Cluster + nebula in Perseus', 'Cluster + nebula', 4.504, 35.27],
+  ['NGC 2301', 'Great Bird Cluster', 'Open cluster', 6.863, 0.46],
+  ['NGC 6281', 'Open cluster in Scorpius', 'Open cluster', 17.078, -37.99],
+  ['IC 348', 'Omi Per Cloud', 'Cluster + nebula', 3.743, 32.16],
+  ['IC 426', 'Nebula in Orion', 'Nebula', 5.609, -0.3],
+  ['IC 432', 'Reflection nebula in Orion', 'Reflection nebula', 5.682, -1.51],
+  ['NGC 2023', 'Reflection nebula in Orion', 'Reflection nebula', 5.694, -2.26],
+  ['NGC 2064', 'Reflection nebula in Orion', 'Reflection nebula', 5.772, 0.01],
+  ['NGC 6847', 'Cluster + nebula in Cygnus', 'Cluster + nebula', 19.944, 30.21],
+  ['NGC 2232', 'Open cluster in Monoceros', 'Open cluster', 6.467, -4.85],
+  ['NGC 5897', 'Globular in Libra', 'Globular cluster', 15.29, -21.01],
+  ['NGC 3621', 'Galaxy in Hydra', 'Galaxy', 11.305, -32.81],
+  ['NGC 4725', 'Galaxy in Coma Berenices', 'Galaxy', 12.841, 25.5],
+  ['NGC 5102', 'Galaxy in Centaurus', 'Galaxy', 13.366, -36.63],
+  ['NGC 4526', 'Galaxy in Virgo', 'Galaxy', 12.568, 7.7],
+  ['NGC 288', 'Globular in Sculptor', 'Globular cluster', 0.88, -26.59],
+  ['NGC 1528', 'Open cluster in Perseus', 'Open cluster', 4.255, 51.21],
+  ['NGC 2683', 'Galaxy in Lynx', 'Galaxy', 8.878, 33.42],
+  ['NGC 147', 'Galaxy in Cassiopeia', 'Galaxy', 0.553, 48.51],
+  ['NGC 1980', 'Lower Sword', 'Cluster + nebula', 5.591, -5.91],
+  ['NGC 2520', 'Open cluster in Puppis', 'Open cluster', 8.083, -28.15],
+  ['NGC 6871', 'Open cluster in Cygnus', 'Open cluster', 20.1, 35.78],
+  ['NGC 1491', 'Fossil Footprint Nebula', 'Emission nebula', 4.054, 51.32],
+  ['NGC 1981', 'Upper Sword', 'Cluster + nebula', 5.586, -4.43],
+  ['NGC 2360', 'Caroline’s Cluster', 'Open cluster', 7.295, -15.64],
+  ['NGC 7082', 'Open cluster in Cygnus', 'Open cluster', 21.488, 47.13],
+  ['NGC 2335', 'Open cluster in Monoceros', 'Open cluster', 7.114, -10.03],
+  ['NGC 2439', 'Open cluster in Puppis', 'Open cluster', 7.679, -31.69],
+  ['NGC 6709', 'Open cluster in Aquila', 'Open cluster', 18.855, 10.32],
+  ['NGC 1399', 'Galaxy in Fornax', 'Galaxy', 3.641, -35.45],
+  ['NGC 6334', 'Cat’s Paw Nebula', 'Emission nebula', 17.347, -36.1],
+  ['NGC 3521', 'Galaxy in Leo', 'Galaxy', 11.097, -0.04],
+  ['NGC 4535', 'Galaxy in Virgo', 'Galaxy', 12.572, 8.2],
+  ['IC 431', 'Reflection nebula in Orion', 'Reflection nebula', 5.671, -1.46],
+  ['IC 444', 'Reflection nebula in Gemini', 'Reflection nebula', 6.309, 23.31],
+  ['NGC 2067', 'Reflection nebula in Orion', 'Reflection nebula', 5.776, 0.13],
+  ['NGC 7538', 'Northern Lagoon', 'Cluster + nebula', 23.227, 61.51],
+  ['NGC 4216', 'Galaxy in Virgo', 'Galaxy', 12.265, 13.15],
+  ['NGC 457', 'Owl Cluster', 'Open cluster', 1.326, 58.29],
+  ['NGC 1027', 'Open cluster in Cassiopeia', 'Open cluster', 2.71, 61.59],
+  ['NGC 1582', 'Open cluster in Perseus', 'Open cluster', 4.53, 43.78],
+  ['IC 5134', 'Nebula in Cepheus', 'Nebula', 21.716, 66.1],
+  ['NGC 2343', 'Open cluster in Monoceros', 'Open cluster', 7.135, -10.62],
+  ['NGC 1023', 'Galaxy in Perseus', 'Galaxy', 2.673, 39.06],
+  ['NGC 3184', 'Galaxy in Ursa Major', 'Galaxy', 10.305, 41.42],
+  ['NGC 2169', 'Open cluster in Orion', 'Open cluster', 6.14, 13.96],
+  ['NGC 2571', 'Open cluster in Puppis', 'Open cluster', 8.316, -29.75],
+  ['NGC 6716', 'Open cluster in Sagittarius', 'Open cluster', 18.91, -19.9],
+  ['NGC 6811', 'Open cluster in Cygnus', 'Open cluster', 19.622, 46.39],
+  ['NGC 4697', 'Galaxy in Virgo', 'Galaxy', 12.81, -5.8],
+  ['IC 5076', 'Reflection nebula in Cygnus', 'Reflection nebula', 20.926, 47.4],
+  ['NGC 2071', 'Cluster + nebula in Orion', 'Cluster + nebula', 5.785, 0.29],
+  ['NGC 6979', 'Supernova remnant in Cygnus', 'Supernova remnant', 20.841, 32.03],
+  ['NGC 1398', 'Galaxy in Fornax', 'Galaxy', 3.648, -26.34],
+  ['NGC 2818A', 'Cluster + nebula in Pyxis', 'Cluster + nebula', 9.268, -36.63],
+  ['NGC 6374', 'Open cluster in Scorpius', 'Open cluster', 17.578, -32.58],
+  ['NGC 6819', 'Foxhead Cluster', 'Open cluster', 19.688, 40.19],
+  ['NGC 6997', 'Cluster + nebula in Cygnus', 'Cluster + nebula', 20.944, 44.63],
+  ['NGC 3923', 'Galaxy in Hydra', 'Galaxy', 11.85, -28.81],
+  ['NGC 4214', 'Galaxy in Canes Venatici', 'Galaxy', 12.261, 36.33],
+  ['NGC 4490', 'Cocoon Galaxy', 'Galaxy', 12.51, 41.64],
+  ['NGC 3344', 'Galaxy in Leo Minor', 'Galaxy', 10.725, 24.92],
+  ['NGC 3585', 'Galaxy in Hydra', 'Galaxy', 11.221, -26.75],
+  ['NGC 2353', 'Open cluster in Monoceros', 'Open cluster', 7.242, -10.27],
+  ['NGC 2396', 'Open cluster in Puppis', 'Open cluster', 7.467, -11.72],
+  ['NGC 2482', 'Open cluster in Puppis', 'Open cluster', 7.92, -24.25],
+  ['NGC 6242', 'Open cluster in Scorpius', 'Open cluster', 16.926, -39.46],
+  ['NGC 6284', 'Globular in Ophiuchus', 'Globular cluster', 17.075, -24.76],
+  ['NGC 4753', 'Galaxy in Virgo', 'Galaxy', 12.873, -1.2],
+  ['NGC 1360', 'Planetary nebula in Fornax', 'Planetary nebula', 3.554, -25.87],
+  ['NGC 4636', 'Galaxy in Virgo', 'Galaxy', 12.714, 2.69],
+  ['NGC 654', 'Open cluster in Cassiopeia', 'Open cluster', 1.733, 61.88],
+  ['NGC 1342', 'Open cluster in Perseus', 'Open cluster', 3.528, 37.38],
+  ['NGC 6605', 'Open cluster in Se2', 'Open cluster', 18.273, -15.02],
+  ['NGC 6910', 'Open cluster in Cygnus', 'Open cluster', 20.387, 40.78],
+  ['NGC 7063', 'Open cluster in Cygnus', 'Open cluster', 21.406, 36.49],
+  ['IC 420', 'Nebula in Orion', 'Nebula', 5.536, -4.5],
+  ['IC 423', 'Nebula in Orion', 'Nebula', 5.556, -0.61],
+  ['IC 4996', 'Open cluster in Cygnus', 'Open cluster', 20.276, 37.56],
+  ['NGC 663', 'Open cluster in Cassiopeia', 'Open cluster', 1.771, 61.22],
+  ['NGC 2567', 'Open cluster in Puppis', 'Open cluster', 8.31, -30.64],
+  ['NGC 6755', 'Open cluster in Aquila', 'Open cluster', 19.13, 4.27],
+  ['NGC 6823', 'Cluster + nebula in Vulpecula', 'Cluster + nebula', 19.719, 23.3],
 ];
 /* Approximate catalog details: [visual magnitude or null, apparent size, distance]. */
 const DSO_INFO = {
-  'M31': [3.4, "190′ × 60′", '2.5 million ly'], 'M33': [5.7, "70′ × 40′", '2.7 million ly'],
-  'M45': [1.6, "110′", '444 ly'], 'M42': [4.0, "65′ × 60′", '1,344 ly'], 'M1': [8.4, "6′ × 4′", '6,500 ly'],
-  'NGC 2237': [null, "80′", '5,200 ly'], 'IC 434': [null, "60′ × 10′", '1,375 ly'], 'NGC 1499': [null, "145′ × 40′", '1,000 ly'],
-  'IC 1805': [6.5, "150′", '7,500 ly'], 'IC 1848': [6.5, "150′ × 75′", '7,500 ly'], 'NGC 281': [7.4, "35′ × 30′", '9,500 ly'],
-  'NGC 869/884': [3.7, "60′ (pair)", '7,500 ly'], 'NGC 7000': [4.0, "120′ × 100′", '2,600 ly'],
-  'NGC 6960': [7.0, "70′ × 6′", '2,400 ly'], 'NGC 6992': [7.0, "60′ × 8′", '2,400 ly'], 'M27': [7.5, "8′ × 6′", '1,360 ly'],
-  'M57': [8.8, "1.4′ × 1′", '2,300 ly'], 'M13': [5.8, "20′", '22,200 ly'], 'M92': [6.3, "14′", '26,700 ly'],
-  'M15': [6.2, "18′", '35,000 ly'], 'M2': [6.5, "16′", '37,500 ly'], 'IC 1396': [3.5, "170′ × 140′", '2,400 ly'],
-  'NGC 7635': [10.0, "15′ × 8′", '7,100 ly'], 'IC 5146': [7.2, "12′", '4,000 ly'], 'NGC 7023': [6.8, "18′", '1,300 ly'],
-  'NGC 7293': [7.6, "25′", '650 ly'], 'NGC 7331': [9.5, "10′ × 4′", '40 million ly'], 'NGC 891': [10.0, "13′ × 3′", '30 million ly'],
-  'M74': [9.4, "10′ × 9′", '32 million ly'], 'M77': [8.9, "7′ × 6′", '47 million ly'], 'M81': [6.9, "27′ × 14′", '11.8 million ly'],
-  'M82': [8.4, "11′ × 5′", '12 million ly'], 'M51': [8.4, "11′ × 7′", '23 million ly'], 'M101': [7.9, "29′ × 27′", '21 million ly'],
-  'M97': [9.9, "3.4′", '2,030 ly'], 'M106': [8.4, "19′ × 8′", '24 million ly'], 'M63': [8.6, "13′ × 7′", '29 million ly'],
-  'M64': [8.5, "10′ × 5′", '17 million ly'], 'M3': [6.2, "18′", '33,900 ly'], 'M8': [6.0, "90′ × 40′", '4,100 ly'],
-  'M20': [6.3, "28′", '5,200 ly'], 'M16': [6.0, "35′ × 28′", '5,700 ly'], 'M17': [6.0, "46′ × 37′", '5,500 ly'],
-  'M11': [5.8, "14′", '6,200 ly'], 'M35': [5.3, "28′", '2,800 ly'], 'M44': [3.7, "95′", '577 ly'], 'NGC 253': [7.1, "27′ × 7′", '11.4 million ly'],
+  'M31': [3.4, "190′ × 60′", '2.5 million ly'],
+  'M33': [5.7, "70′ × 40′", '2.7 million ly'],
+  'M45': [1.6, "110′", '444 ly'],
+  'M42': [4.0, "65′ × 60′", '1,344 ly'],
+  'M1': [8.4, "6′ × 4′", '6,500 ly'],
+  'NGC 2237': [null, "80′", '5,200 ly'],
+  'IC 434': [null, "60′ × 10′", '1,375 ly'],
+  'NGC 1499': [null, "145′ × 40′", '1,000 ly'],
+  'IC 1805': [6.5, "150′", '7,500 ly'],
+  'IC 1848': [6.5, "150′ × 75′", '7,500 ly'],
+  'NGC 281': [7.4, "35′ × 30′", '9,500 ly'],
+  'NGC 869/884': [3.7, "60′ (pair)", '7,500 ly'],
+  'NGC 7000': [4.0, "120′ × 100′", '2,600 ly'],
+  'NGC 6960': [7.0, "70′ × 6′", '2,400 ly'],
+  'NGC 6992': [7.0, "60′ × 8′", '2,400 ly'],
+  'M27': [7.5, "8′ × 6′", '1,360 ly'],
+  'M13': [5.8, "20′", '22,200 ly'],
+  'M92': [6.3, "14′", '26,700 ly'],
+  'M15': [6.2, "18′", '35,000 ly'],
+  'M2': [6.5, "16′", '37,500 ly'],
+  'IC 1396': [3.5, "170′ × 140′", '2,400 ly'],
+  'NGC 7635': [10.0, "15′ × 8′", '7,100 ly'],
+  'IC 5146': [7.2, "12′", '4,000 ly'],
+  'NGC 7023': [6.8, "18′", '1,300 ly'],
+  'NGC 7293': [7.6, "25′", '650 ly'],
+  'NGC 7331': [9.5, "10′ × 4′", '40 million ly'],
+  'NGC 891': [10.0, "13′ × 3′", '30 million ly'],
+  'M74': [9.4, "10′ × 9′", '32 million ly'],
+  'M77': [8.9, "7′ × 6′", '47 million ly'],
+  'M81': [6.9, "27′ × 14′", '11.8 million ly'],
+  'M82': [8.4, "11′ × 5′", '12 million ly'],
+  'M51': [8.4, "11′ × 7′", '23 million ly'],
+  'M101': [7.9, "29′ × 27′", '21 million ly'],
+  'M106': [8.4, "19′ × 8′", '24 million ly'],
+  'M63': [8.6, "13′ × 7′", '29 million ly'],
+  'M64': [8.5, "10′ × 5′", '17 million ly'],
+  'M3': [6.2, "18′", '33,900 ly'],
+  'M8': [6.0, "90′ × 40′", '4,100 ly'],
+  'M20': [6.3, "28′", '5,200 ly'],
+  'M16': [6.0, "35′ × 28′", '5,700 ly'],
+  'M17': [6.0, "46′ × 37′", '5,500 ly'],
+  'M11': [5.8, "14′", '6,200 ly'],
+  'M35': [5.3, "28′", '2,800 ly'],
+  'M44': [3.7, "95′", '577 ly'],
+  'NGC 253': [7.1, "27′ × 7′", '11.4 million ly'],
   'M4': [5.4, "28′", '7,200 ly'],
   'M5': [6.0, "15′", '24,500 ly'],
   'M6': [4.2, "16′", '1,590 ly'],
@@ -641,8 +816,6 @@ const DSO_INFO = {
   'M24': [4.6, "120′ × 60′", '10,000 ly'],
   'M25': [4.6, "14′", '2,000 ly'],
   'M26': [8.9, "6′", '5,160 ly'],
-  'M28': [6.9, "5.1′", '18,260 ly'],
-  'M29': [6.6, "3.6′", '3,740 ly'],
   'M30': [7.1, "9′", '27,140 ly'],
   'M32': [8.1, "7.7′ × 4.9′", '2.49 million ly'],
   'M34': [5.2, "22′", '1,500 ly'],
@@ -659,11 +832,7 @@ const DSO_INFO = {
   'M50': [5.9, "14′", '2,870 ly'],
   'M52': [6.9, "9.9′", '4,600 ly'],
   'M53': [7.8, "9′", '58,000 ly'],
-  'M54': [7.7, "5.1′", '87,400 ly'],
   'M55': [6.5, "12′", '17,600 ly'],
-  'M56': [8.4, "5.8′", '32,900 ly'],
-  'M58': [10.3, "5′ × 3.8′", '60 million ly'],
-  'M59': [9.6, "4.5′ × 3.2′", '60 million ly'],
   'M60': [8.8, "6.8′ × 5.5′", '60 million ly'],
   'M61': [10.2, "6.9′", '60 million ly'],
   'M62': [6.5, "7.8′", '21,500 ly'],
@@ -671,15 +840,9 @@ const DSO_INFO = {
   'M66': [8.9, "10′ × 4.6′", '35 million ly'],
   'M67': [6.9, "33′", '2,700 ly'],
   'M68': [8.0, "6.6′", '33,300 ly'],
-  'M69': [7.6, "5.7′", '26,700 ly'],
   'M70': [7.9, "6.6′", '28,000 ly'],
   'M71': [8.3, "6.9′", '11,700 ly'],
-  'M72': [9.0, "4.5′", '52,800 ly'],
-  'M75': [8.3, "3.6′", '57,700 ly'],
-  'M76': [10.1, "1.1′", '3,400 ly'],
-  'M78': [8.0, "4.5′", '1,600 ly'],
   'M79': [8.2, "7.2′", '41,100 ly'],
-  'M80': [7.3, "5.7′", '27,400 ly'],
   'M83': [7.2, "14′", '15 million ly'],
   'M84': [9.8, "7.4′ × 6.4′", '60 million ly'],
   'M85': [9.1, "7′ × 5.3′", '60 million ly'],
@@ -688,20 +851,15 @@ const DSO_INFO = {
   'M88': [10.3, "8.7′ × 4.4′", '60 million ly'],
   'M89': [10.1, "8.1′", '60 million ly'],
   'M90': [9.5, "9.1′ × 3.8′", '60 million ly'],
-  'M91': [11.0, "5.5′ × 4.5′", '60 million ly'],
   'M93': [6.2, "15′", '3,600 ly'],
   'M94': [8.2, "7.7′ × 6.7′", '14.5 million ly'],
   'M95': [9.8, "7.2′ × 4.5′", '38 million ly'],
   'M96': [9.2, "8.3′ × 5.5′", '38 million ly'],
   'M98': [10.8, "11′ × 2.7′", '60 million ly'],
-  'M99': [9.8, "5′ × 4.7′", '60 million ly'],
   'M100': [9.5, "6.1′ × 5.6′", '60 million ly'],
   'M102': [9.9, "6.3′ × 2.7′", '40 million ly'],
-  'M103': [7.4, "4.5′", '8,000 ly'],
   'M104': [8.6, "8.4′ × 4.9′", '50 million ly'],
-  'M105': [9.3, "4.9′ × 4.2′", '38 million ly'],
   'M107': [7.9, "7.8′", '19,600 ly'],
-  'M108': [10.1, "4′ × 1.7′", '45 million ly'],
   'M109': [9.9, "8.1′ × 5.6′", '55 million ly'],
   'M110': [8.2, "16′ × 9.6′", '2.9 million ly'],
   'NGC 6888': [7.4, "20′ × 10′", '5,000 ly'],
@@ -714,18 +872,159 @@ const DSO_INFO = {
   'IC 410': [null, "40′ × 30′", '12,000 ly'],
   'IC 405': [null, "50′ × 30′", '1,500 ly'],
   'NGC 2359': [null, "10′ × 5′", '12,000 ly'],
-  'NGC 6543': [9.0, "0.9′", '3,300 ly'],
-  'NGC 2392': [9.6, "0.9′", '6,500 ly'],
   'NGC 4631': [9.2, "14′ × 2.2′", '30 million ly'],
   'NGC 2403': [8.4, "20′ × 10′", '9.7 million ly'],
   'NGC 3628': [9.4, "11′ × 3.4′", '35 million ly'],
   'NGC 5907': [10.4, "11′ × 1.8′", '46.5 million ly'],
   'IC 63': [null, "10′ × 3′", '–'],
-  'NGC 7662': [8.3, "0.3′", '5,730 ly'],
   'NGC 2903': [8.9, "12′ × 5.3′", '30 million ly'],
   'NGC 1333': [null, "20′", 'about 1,000 ly'],
+  'NGC 1909': [null, "180′ × 60′", '–'],
+  'NGC 6727': [null, "80′", '–'],
+  'IC 4592': [3.9, "60′ × 40′", '–'],
+  'IC 4604': [5.1, "60′ × 25′", '–'],
+  'IC 4701': [null, "60′ × 40′", '–'],
+  'IC 5070': [8.0, "60′ × 50′", '–'],
+  'IC 443': [12.0, "50′ × 40′", '–'],
+  'Caldwell 9': [null, "50′ × 30′", '–'],
+  'IC 5068': [null, "40′ × 30′", '–'],
+  'NGC 2174': [null, "40′ × 30′", '–'],
+  'NGC 752': [5.7, "39′", '–'],
+  'IC 4605': [4.7, "30′ × 15′", '–'],
+  'NGC 2024': [null, "30′", '–'],
+  'NGC 55': [8.5, "30′ × 3′", '–'],
+  'NGC 1647': [6.4, "27′", '–'],
+  'IC 1340': [null, "25′ × 20′", '–'],
+  'IC 447': [7.7, "25′ × 20′", '–'],
+  'IC 4665': [4.2, "25′", '–'],
+  'IC 4756': [4.6, "24′", '–'],
+  'NGC 4236': [9.8, "24′ × 6.8′", '–'],
+  'IC 1274': [null, "20′ × 5′", '–'],
+  'IC 1287': [6.1, "20′ × 10′", '–'],
+  'IC 4601': [null, "20′ × 10′", '–'],
+  'IC 4603': [null, "20′ × 5′", '–'],
+  'NGC 7822': [null, "20′ × 4′", '–'],
+  'IC 342': [9.7, "20′ × 19′", '–'],
+  'NGC 247': [9.2, "20′ × 5.5′", '–'],
+  'NGC 300': [8.7, "19′ × 13′", '–'],
+  'NGC 2477': [5.8, "19′", '–'],
+  'IC 1613': [9.5, "18′ × 17′", '–'],
+  'NGC 1746': [6.1, "18′", '–'],
+  'IC 1284': [7.7, "17′ × 15′", '–'],
+  'NGC 2546': [6.3, "16′", '–'],
+  'ESO 351-030': [8.6, "15′", '–'],
+  'IC 359A': [null, "15′ × 10′", '–'],
+  'IC 448': [null, "15′ × 10′", '–'],
+  'IC 1310': [null, "15′ × 3′", '–'],
+  'IC 4685': [null, "15′ × 10′", '–'],
+  'NGC 6559': [null, "15′ × 10′", '–'],
+  'NGC 7243': [6.4, "15′", '–'],
+  'NGC 7789': [6.7, "14′", '–'],
+  'Mel 71': [7.1, "14′", '–'],
+  'NGC 1662': [6.4, "14′", '–'],
+  'NGC 1316': [8.5, "13′ × 7.7′", '–'],
+  'IC 417': [null, "13′ × 10′", '–'],
+  'NGC 185': [9.2, "13′ × 11′", '–'],
+  'ESO 356-004': [7.4, "13′ × 10′", '–'],
+  'NGC 2539': [6.5, "12′", '–'],
+  'IC 1795': [null, "12′", '–'],
+  'IC 4591': [null, "12′ × 10′", '–'],
+  'NGC 2183': [15.2, "12′", '–'],
+  'NGC 6633': [4.6, "12′", '–'],
+  'NGC 2423': [6.7, "12′", '–'],
+  'IC 430': [14.4, "11′", '–'],
+  'NGC 2281': [5.4, "11′", '–'],
+  'NGC 6940': [6.3, "11′", '–'],
+  'NGC 1097': [9.8, "11′ × 6.4′", '–'],
+  'NGC 4559': [9.9, "11′ × 4.8′", '–'],
+  'NGC 7793': [9.3, "10′ × 6′", '–'],
+  'NGC 2997': [9.4, "10′ × 6.2′", '–'],
+  'NGC 1502': [6.9, "10′", '–'],
+  'NGC 1579': [null, "10′", '–'],
+  'NGC 2301': [6.0, "10′", '–'],
+  'NGC 6281': [5.4, "10′", '–'],
+  'IC 348': [null, "10′", '–'],
+  'IC 426': [null, "10′ × 3′", '–'],
+  'IC 432': [null, "10′", '–'],
+  'NGC 2023': [null, "10′ × 8′", '–'],
+  'NGC 2064': [null, "10′", '–'],
+  'NGC 6847': [null, "10′", '–'],
+  'NGC 2232': [3.9, "9.9′", '–'],
+  'NGC 5897': [8.5, "9.9′", '–'],
+  'NGC 3621': [9.6, "9.8′ × 4′", '–'],
+  'NGC 4725': [9.4, "9.7′ × 7.1′", '–'],
+  'NGC 5102': [9.9, "9.7′ × 3.7′", '–'],
+  'NGC 4526': [9.6, "9.6′ × 3.3′", '–'],
+  'NGC 288': [8.1, "9.6′", '–'],
+  'NGC 1528': [6.4, "9.6′", '–'],
+  'NGC 2683': [9.7, "9.5′ × 2.7′", '–'],
+  'NGC 147': [9.7, "9.4′ × 5.4′", '–'],
+  'NGC 1980': [2.5, "9.3′", '–'],
+  'NGC 2520': [6.5, "9.3′", '–'],
+  'NGC 6871': [5.2, "9.3′", '–'],
+  'NGC 1491': [null, "9′ × 6′", '–'],
+  'NGC 1981': [4.2, "9′", '–'],
+  'NGC 2360': [7.2, "9′", '–'],
+  'NGC 7082': [7.2, "9′", '–'],
+  'NGC 2335': [7.2, "8.7′", '–'],
+  'NGC 2439': [6.9, "8.7′", '–'],
+  'NGC 6709': [6.7, "8.7′", '–'],
+  'NGC 1399': [9.4, "8.5′ × 7.7′", '–'],
+  'NGC 6334': [null, "8.4′", '–'],
+  'NGC 3521': [9.1, "8.3′ × 4.5′", '–'],
+  'NGC 4535': [9.9, "8.2′ × 7.5′", '–'],
+  'IC 431': [null, "8′ × 5′", '–'],
+  'IC 444': [7.0, "8′ × 4′", '–'],
+  'NGC 2067': [null, "8′ × 3′", '–'],
+  'NGC 7538': [null, "8′ × 7′", '–'],
+  'NGC 4216': [9.9, "7.8′ × 1.8′", '–'],
+  'NGC 457': [6.4, "7.8′", '–'],
+  'NGC 1027': [6.7, "7.8′", '–'],
+  'NGC 1582': [7.0, "7.8′", '–'],
+  'IC 5134': [null, "7.6′", '–'],
+  'NGC 2343': [6.7, "7.5′", '–'],
+  'NGC 1023': [9.5, "7.4′ × 3.1′", '–'],
+  'NGC 3184': [9.8, "7.4′ × 7.2′", '–'],
+  'NGC 2169': [5.9, "7.2′", '–'],
+  'NGC 2571': [7.0, "7.2′", '–'],
+  'NGC 6716': [7.5, "7.2′", '–'],
+  'NGC 6811': [6.8, "7.2′", '–'],
+  'NGC 4697': [9.4, "7.1′ × 4.2′", '–'],
+  'IC 5076': [null, "7′", '–'],
+  'NGC 2071': [8.0, "7′ × 5′", '–'],
+  'NGC 6979': [null, "7′ × 3′", '–'],
+  'NGC 1398': [9.6, "7′ × 4.9′", '–'],
+  'NGC 2818A': [12.5, "6.9′", '–'],
+  'NGC 6374': [5.5, "6.9′", '–'],
+  'NGC 6819': [7.3, "6.9′", '–'],
+  'NGC 6997': [10.0, "6.9′", '–'],
+  'NGC 3923': [9.6, "6.9′ × 4.5′", '–'],
+  'NGC 4214': [9.8, "6.8′ × 5.3′", '–'],
+  'NGC 4490': [9.7, "6.7′ × 1.6′", '–'],
+  'NGC 3344': [10.0, "6.7′ × 6.4′", '–'],
+  'NGC 3585': [9.7, "6.6′ × 3.3′", '–'],
+  'NGC 2353': [7.1, "6.6′", '–'],
+  'NGC 2396': [7.4, "6.6′", '–'],
+  'NGC 2482': [7.3, "6.6′", '–'],
+  'NGC 6242': [6.4, "6.6′", '–'],
+  'NGC 6284': [7.4, "6.6′", '–'],
+  'NGC 4753': [9.7, "6.5′ × 3.1′", '–'],
+  'NGC 1360': [9.4, "6.4′", '–'],
+  'NGC 4636': [10.0, "6.3′ × 4.7′", '–'],
+  'NGC 654': [6.5, "6.3′", '–'],
+  'NGC 1342': [6.7, "6.3′", '–'],
+  'NGC 6605': [6.0, "6.3′", '–'],
+  'NGC 6910': [7.4, "6.3′", '–'],
+  'NGC 7063': [7.0, "6.3′", '–'],
+  'IC 420': [null, "6′", '–'],
+  'IC 423': [null, "6′ × 3.5′", '–'],
+  'IC 4996': [7.3, "6′", '–'],
+  'NGC 663': [7.1, "6′", '–'],
+  'NGC 2567': [7.4, "6′", '–'],
+  'NGC 6755': [7.5, "6′", '–'],
+  'NGC 6823': [7.1, "6′", '–'],
 };
-const TYPE_TIP = (type) => /Emission|Supernova/.test(type) ? 'Turn on the LP (light-pollution) filter. Nebulae reward long stacks: aim for 1–2 h or more.'
+const TYPE_TIP = (type) => /Emission|Supernova|^Nebula$|Cluster \+ nebula/.test(type) ? 'Turn on the LP (light-pollution) filter. Nebulae reward long stacks: aim for 1–2 h or more.'
   : /Planetary/.test(type) ? 'LP filter helps. Small and bright, so 20–40 min shows good detail.'
   : /Galaxy/.test(type) ? 'Leave the LP filter off (broadband target). Needs dark skies and a low or absent Moon; aim for 1 h+.'
   : /Globular/.test(type) ? 'LP filter off. Bright and compact: 15–30 min resolves stars nicely.'
@@ -737,6 +1036,13 @@ function angSep(a, b) {
   const c = Math.sin(a.alt * r) * Math.sin(b.alt * r) + Math.cos(a.alt * r) * Math.cos(b.alt * r) * Math.cos((a.az - b.az) * r);
   return Math.acos(Math.max(-1, Math.min(1, c))) / r;
 }
+/* How rewarding a target is in the Seestar frame: larger and brighter score higher. Named emission nebulae without a
+   magnitude count as mag 7; unclassified catalog nebulae (often faint dust) as mag 9.5. */
+function appeal(id, type) {
+  const [mag, size] = DSO_INFO[id] || [];
+  const sz = parseSize(size);
+  return (sz ? Math.log2(Math.min(sz[0], 77)) : 0) - 0.35 * (mag != null ? mag : type === 'Nebula' ? 9.5 : 7);
+}
 /* Deep-sky targets that reach MIN_ALT in darkness for at least half an hour, longest window first. */
 function targetsTonight(obs, S) {
   if (S.darkLim == null) return [];
@@ -747,7 +1053,9 @@ function targetsTonight(obs, S) {
     const pk = tr.peak;
     out.push({ kind: 'dso', id, name, type, ra, dec, ...tr, d: pk.d, alt: pk.alt, az: pk.az, moonSep: moonSepAt(pk) });
   }
-  return out.sort((a, b) => b.hrs - a.hrs || b.alt - a.alt).slice(0, 30); // Top Ten + 20 more
+  // Rank by how long it's up in darkness (up to 6 h counts — a full Seestar session) plus how rewarding it is.
+  const score = (o) => 0.6 * Math.min(o.hrs, 6) + appeal(o.id, o.type);
+  return out.sort((a, b) => score(b) - score(a) || b.alt - a.alt).slice(0, 30); // Top Ten + 20 more
 }
 
 /* ---------- combining & scoring ---------- */
@@ -1330,7 +1638,7 @@ function renderTargets(list) {
   renderTop(list, topIdx, now);
   const rest = list.map((o, i) => [o, i]).filter(([, i]) => !topIdx.includes(i));
   $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
-    const neb = /Emission|Supernova|Planetary/.test(o.type);
+    const neb = /Emission|Supernova|Planetary|^Nebula$|Cluster \+ nebula/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
     const upNow = o.start <= now && now < o.end, past = o.end <= now;
     const sub = o.kind === 'comet'
@@ -1558,12 +1866,7 @@ function altChart(el, o, now) {
     if (o.end) {
       const xe = X(o.end);
       const txt = `${o.endWhy === 'alt' ? `Below ${MIN_ALT}°` : o.endWhy === 'dir' ? 'Leaves home sky' : 'Dawn'} · ${fmtTime(o.end)}`;
-      // Always end the pill at its own drop line (window sits between the two pills); drop a row rather than flip sides.
-      const ye = Y(altAt(o.end));
-      marks += `<line x1="${f(xe)}" x2="${f(xe)}" y1="${f(ye)}" y2="${f(T + ph)}" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 3"/>`;
-      obst.push(box(xe - 2, ye, 4, T + ph - ye));
-      const es = xe < L + pw * 0.4 ? 'start' : 'end', ex = es === 'end' ? xe - fs * 0.6 : xe + fs * 0.6;
-      pill([[ex, y40 + gap, es], [ex, y40 + gap * 2.6, es], [ex, y40 + gap * 4, es], [ex, y40 - gap, es], [ex, T + fs, es]], txt, 'var(--muted)');
+      pill([[xe - fs * 0.6, y40 + gap, 'end'], [xe + fs * 0.6, y40 + gap, 'start'], [xe - fs * 0.6, y40 + gap * 2.6, 'end'], [xe + fs * 0.6, y40 + gap * 2.6, 'start'], [xe, T + ph - gap * 2, 'middle'], [xe, T + fs * 2.8, 'middle']], txt, 'var(--muted)');
     }
   }
   if (peakTxt) {
@@ -1571,67 +1874,7 @@ function altChart(el, o, now) {
     if (y - fs * 0.7 - sm > T && !obst.some((o2) => hit(b, o2) > 0)) labels += `<text x="${f(x)}" y="${f(y - fs * 0.7)}" font-size="${f(sm)}" font-weight="700" text-anchor="middle" fill="var(--accent)">Peak ${Math.round(o.peak.alt)}°</text>`;
   }
   s += marks + labels;
-  // Time slider: drag (or tap, or arrow keys) to read altitude and direction at any moment of the night.
-  const ph2 = md * 1.75;
-  s += `<g class="scrub" pointer-events="none">
-    <line class="sc-line" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-width="1.6"/>
-    <circle class="sc-moon" r="${f(fs * 0.24)}" fill="var(--moon-lit)" stroke="var(--card)" stroke-width="1.5"/>
-    <circle class="sc-dot" r="${f(fs * 0.36)}" fill="var(--card)" stroke="var(--accent)" stroke-width="3"/>
-    <circle class="sc-knob" cy="${f(T + ph)}" r="${f(fs * 0.5)}" fill="var(--text)" stroke="var(--card)" stroke-width="2"/>
-    <rect class="sc-box" height="${f(ph2)}" rx="${f(ph2 / 2)}"/>
-    <text class="sc-txt" font-size="${f(md)}" font-weight="700" text-anchor="middle" fill="var(--card)"></text></g>`;
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="slider" tabindex="0" aria-label="Time slider: altitude through the night" aria-valuemin="0" aria-valuemax="100">${s}</svg>`;
-  const svg = el.querySelector('svg'), g = svg.querySelector('.scrub'), q = (k) => g.querySelector(k);
-  const lerp = (t, key) => {
-    const k = Math.min(c.length - 2, Math.max(0, Math.floor((t - t0) / STEP))), a = c[k], b = c[k + 1];
-    return a[key] + (b[key] - a[key]) * ((t - a.d) / (b.d - a.d));
-  };
-  const setT = (t) => {
-    t = Math.max(t0, Math.min(t1, t));
-    el._scrub = t;
-    const d = new Date(t), x = X(d), alt = lerp(t, 'alt'), moon = lerp(t, 'moon'), az = azAt(d), y = Y(Math.max(0, alt));
-    const inWin = (o.segs || []).some((g2) => t >= +g2.s && t <= +g2.e);
-    const txt = `${fmtTime(d)} · ${alt < 0 ? 'below horizon' : `${Math.round(alt)}° ${compass(az)}`}`;
-    q('.sc-line').setAttribute('x1', f(x)); q('.sc-line').setAttribute('x2', f(x));
-    q('.sc-dot').setAttribute('cx', f(x)); q('.sc-dot').setAttribute('cy', f(y));
-    q('.sc-dot').setAttribute('opacity', alt < 0 ? '0' : '1');
-    q('.sc-knob').setAttribute('cx', f(x));
-    q('.sc-moon').setAttribute('cx', f(x)); q('.sc-moon').setAttribute('cy', f(Y(Math.max(0, moon))));
-    q('.sc-moon').setAttribute('opacity', moon > 0 ? '.9' : '0');
-    // Readout pill rides just above the dot (below it if there's no room), clamped inside the chart.
-    const w = txt.length * md * 0.56 + md * 1.3;
-    const bx = Math.max(L, Math.min(L + pw - w, x - w / 2));
-    let by = y - ph2 - fs * 0.7;
-    if (by < 2) by = y + fs * 0.7;
-    const box2 = q('.sc-box');
-    box2.setAttribute('x', f(bx)); box2.setAttribute('y', f(by)); box2.setAttribute('width', f(w));
-    box2.setAttribute('fill', inWin ? 'var(--go)' : 'var(--text)');
-    const tx = q('.sc-txt');
-    tx.setAttribute('x', f(bx + w / 2)); tx.setAttribute('y', f(by + ph2 / 2 + md * 0.34));
-    tx.textContent = txt;
-    svg.setAttribute('aria-valuenow', Math.round(((t - t0) / (t1 - t0)) * 100));
-    svg.setAttribute('aria-valuetext', txt);
-  };
-  const tAt = (e) => {
-    const r = svg.getBoundingClientRect();
-    return t0 + (((e.clientX - r.left) * (W / r.width) - L) / pw) * (t1 - t0);
-  };
-  let drag = false;
-  svg.style.touchAction = 'pan-y';
-  svg.style.cursor = 'ew-resize';
-  svg.addEventListener('pointerdown', (e) => { drag = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} setT(tAt(e)); });
-  svg.addEventListener('pointermove', (e) => { if (drag || e.pointerType === 'mouse') setT(tAt(e)); });
-  const stop = () => { drag = false; };
-  svg.addEventListener('pointerup', stop);
-  svg.addEventListener('pointercancel', stop);
-  svg.addEventListener('keydown', (e) => {
-    const step = (e.shiftKey ? 30 : 5) * 60e3;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setT(el._scrub + (e.key === 'ArrowLeft' ? -step : step)); }
-  });
-  // Start at now (if it is night), else at the peak.
-  const keep = el._scrub != null && el._scrubFor === o ? el._scrub : null;
-  el._scrubFor = o;
-  setT(keep ?? (now && +now > t0 && +now < t1 ? +now : o.peak ? +o.peak.d : o.start ? +o.start : (t0 + t1) / 2));
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Altitude through the night">${s}</svg>`;
 }
 
 const tile = (lbl, val, sub = '', cls = '') => `<div class="tile ${cls}"><span class="lbl">${esc(lbl)}</span><b>${esc(val)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
