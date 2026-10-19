@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.26';
+const VERSION = 'v3.27';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1092,7 +1092,8 @@ function thumbUrl(o) {
   const fov = Math.min(4, Math.max(0.4, ((sz ? sz[0] : 40) / 60) * 1.6));
   return skyCutout(o.ra, o.dec, fov, 240, 180);
 }
-const TOP_N = 3;
+const TOP_N = 3;      // fill the Top targets card; these leave the Seestar list
+const TOP_MORE = 10;  // scroll down in the card for more; ranks 4+ also stay in the Seestar list
 function renderTop(list, topIdx, now) {
   $('#topTitle').firstChild.textContent = `Top targets ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow' : nightName(2)}`;
   $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
@@ -1105,15 +1106,26 @@ function renderTop(list, topIdx, now) {
       <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
   }).join('') : `<p class="empty">No targets reach ${MIN_ALT}° in darkness.</p>`;
+  $('#topTargets').scrollTop = 0;
+  sizeTop();
+}
+
+/* Keep exactly three Top targets in view; the rest are reached by scrolling the card. */
+function sizeTop() {
+  const el = $('#topTargets'); if (!el) return;
+  if (innerWidth < 760) { el.style.removeProperty('--toph'); const its = [...el.querySelectorAll('.top-it')].slice(0, TOP_N); el.style.maxHeight = its.length ? `${its.reduce((a, i) => a + i.offsetHeight, 0) + 6 * (its.length - 1)}px` : ''; return; }
+  el.style.maxHeight = '';
+  el.style.setProperty('--toph', `${Math.max(48, (el.clientHeight - 6 * (TOP_N - 1)) / TOP_N)}px`);
 }
 
 function renderTargets(list) {
   const now = state.data ? state.data.now : new Date();
   // Top few still-visible targets go to their own card; the list continues with the rest.
   const topIdx = [];
-  list.forEach((o, i) => { if (topIdx.length < TOP_N && o.end > now) topIdx.push(i); });
+  list.forEach((o, i) => { if (topIdx.length < TOP_MORE && o.end > now) topIdx.push(i); });
   renderTop(list, topIdx, now);
-  const rest = list.map((o, i) => [o, i]).filter(([, i]) => !topIdx.includes(i));
+  const first = topIdx.slice(0, TOP_N);
+  const rest = list.map((o, i) => [o, i]).filter(([, i]) => !first.includes(i));
   $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
     const neb = /Emission|Supernova|Planetary/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
@@ -1806,6 +1818,7 @@ function init() {
   }, { passive: false });
   let rz;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
+    sizeTop();
     const D = state.data; if (!D) return;
     renderPath(D.nights[state.night], D.lat, D.now);
     skyChart(D.nights[state.night].hours);

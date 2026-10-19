@@ -390,9 +390,9 @@ html.red .tag-comet { color: var(--accent); border-color: var(--line2); }
 .empty { color: var(--muted); font-size: .82rem; margin: 0; }
 
 /* Top targets tonight */
-.toplist { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+.toplist { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; scrollbar-width: thin; }
 .top-it {
-  flex: 1 1 0; min-height: 0; display: flex; align-items: center; gap: 10px; width: 100%;
+  flex: 0 0 var(--toph, calc((100% - 12px) / 3)); min-height: 0; display: flex; align-items: center; gap: 10px; width: 100%;
   background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px 5px 5px;
   color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden;
 }
