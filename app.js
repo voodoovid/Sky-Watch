@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.49';
+const VERSION = 'v3.50';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1502,12 +1502,17 @@ function renderPlanets(list) {
     : '<p class="empty">None well placed after dusk.</p>';
 }
 
-/* A thumbnail that fails (the survey server drops requests while the Time Machine redraws quickly) is retried a few times before giving up. */
+/* A thumbnail that fails is retried, alternating between the two CDS survey servers (the main one and its mirror);
+   whichever server last delivered an image is tried first for the next ones. */
+let thumbMirror = false;
+const thumbHost = (u, mirror) => u.replace(/\/\/alaskybis?\./, '//alasky.').replace('//alasky.', mirror ? '//alaskybis.' : '//alasky.');
+function thumbOk(img) { thumbMirror = /\/\/alaskybis\./.test(img.src); img.parentNode.classList.add('ok'); }
 function thumbErr(img) {
   const n = +img.dataset.n || 0;
-  if (n >= 4 || !img.isConnected || !img.dataset.u) { img.remove(); return; }
+  if (n >= 5 || !img.isConnected || !img.dataset.u) { img.remove(); return; }
   img.dataset.n = n + 1;
-  setTimeout(() => { if (img.isConnected) img.src = `${img.dataset.u}&r=${n + 1}`; }, 500 * (n + 1));
+  const mirror = /\/\/alaskybis\./.test(img.src) ? false : true;   // flip to the other server
+  setTimeout(() => { if (img.isConnected) img.src = `${thumbHost(img.dataset.u, mirror)}&r=${n + 1}`; }, 400 * (n + 1));
 }
 /* Small survey image for the Top targets card, cropped to the object's size. */
 function thumbUrl(o) {
@@ -1647,7 +1652,7 @@ function renderTop(list, topIdx, now) {
     const what = o.kind === 'comet' ? `Comet · mag <span class="n">≈${o.mag.toFixed(1)}</span>` : esc(o.type);
     const when = `${upNow || !g ? '' : `${esc(fmtTime(g.s))} `}<span class="to">To</span> ${esc(fmtTime(g ? g.e : o.end))}<span class="hr">${hrsLeft(o, now).toFixed(1)} h</span>`;
     return `<button type="button" class="top-it" data-t="${i}">
-      <span class="th"><img src="${thumbUrl(o)}" alt="" data-u="${thumbUrl(o)}" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="thumbErr(this)"><i class="rk">${r + 1}</i></span>
+      <span class="th"><img src="${thumbHost(thumbUrl(o), thumbMirror)}" alt="" data-u="${thumbUrl(o)}" loading="lazy" decoding="async" onload="thumbOk(this)" onerror="thumbErr(this)"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
   }).join('') : `<p class="empty">No targets reach ${MIN_ALT}° in darkness.</p>`;
   $('#topTargets').scrollTop = 0;
