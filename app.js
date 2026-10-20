@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.43';
+const VERSION = 'v3.44';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -915,7 +915,8 @@ function targetsTonight(obs, S) {
   }
   // Rank by how long it's up in darkness (up to 6 h counts — a full Seestar session) plus how rewarding it is.
   const score = (o) => 0.6 * Math.min(o.hrs, 6) + appeal(o.id, o.type);
-  return out.sort((a, b) => score(b) - score(a) || b.alt - a.alt).slice(0, 30); // Top Ten + 20 more
+  // Keep the whole ranked pool: the page picks the Top Ten + 20 more from it at the chosen Time Machine time.
+  return out.sort((a, b) => score(b) - score(a) || b.alt - a.alt);
 }
 
 /* ---------- combining & scoring ---------- */
@@ -1587,10 +1588,12 @@ function renderTargets(list) {
   // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
   const tier = (o) => { const g = segAt(o, now); return g ? (g.e - now >= MIN_LEFT ? 0 : 2) : o.end <= now ? 3 : 1; };
   const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || a - b);
-  const topIdx = [];
-  order.forEach((i) => { if (topIdx.length < TOP_MORE && list[i].end > now) topIdx.push(i); });
+  // The list holds every candidate for the night; show the best 30 for the time being looked at (Top Ten + 20 more),
+  // so moving the Time Machine re-picks them rather than just reshuffling the same 30.
+  const live = order.filter((i) => list[i].end > now);
+  const topIdx = live.slice(0, TOP_MORE);
   renderTop(list, topIdx, now);
-  const rest = order.map((i) => [list[i], i]).filter(([, i]) => !topIdx.includes(i));
+  const rest = live.slice(TOP_MORE, TOP_MORE + 20).map((i) => [list[i], i]);
   $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
     const neb = /Emission|Supernova|Planetary|^Nebula$|Cluster \+ nebula/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;

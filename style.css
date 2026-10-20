@@ -659,7 +659,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   }
   .verdict { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
   /* Tiles are locked to a fixed size; any spare room goes between the text and the tiles. */
-  .verdict .vstats { grid-template-columns: 1fr 1fr; flex: none; grid-auto-rows: 3.4rem; margin-top: auto; }
+  /* Tiles sit just under the text and spread evenly down to the bottom; they only move down when the text above grows. */
+  .verdict .vstats { grid-template-columns: 1fr 1fr; flex: 1 0 auto; grid-auto-rows: 3.4rem; align-content: space-between; margin-top: 6px; }
   .v-text { min-height: 0; }
   .v-note { font-size: .8rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .moon-card .eyebrow { margin-bottom: 4px; }
