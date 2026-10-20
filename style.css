@@ -553,7 +553,8 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 #sheetGuide { margin-left: auto; }
 
 /* Comets list under Planets: one compact line per comet; dimmed when it never gets above the minimum elevation. */
-.cm-t.eyebrow.ttl.mt { margin-top: 10px; }
+/* A stronger rule above the Comets title sets it apart as its own section (clearly heavier than the hairlines between rows). */
+.cm-t.eyebrow.ttl.mt { margin-top: 6px; padding-top: 8px; border-top: 2px solid color-mix(in srgb, var(--accent) 40%, var(--line2)); }
 .cm-list .row.tgt { padding: 4px 0; }
 .cm-low { opacity: .55; }
 .cm-m { margin-right: .65em; color: var(--muted); font-size: .78rem; font-weight: 600; }
