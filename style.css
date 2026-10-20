@@ -859,7 +859,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .verdict { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
   /* Tiles are locked to a fixed size; any spare room goes between the text and the tiles. */
   /* Tiles sit just under the text and spread evenly down to the bottom; they only move down when the text above grows. */
-  .verdict .vstats { grid-template-columns: 1fr 1fr; flex: 1 0 auto; grid-auto-rows: 3.4rem; align-content: space-between; margin-top: 6px; }
+  /* Tiles are 3.4rem when there is room, but squeeze down to 2.8rem before anything gets clipped (min-height: auto = the squeezed size). */
+  .verdict .vstats { grid-template-columns: 1fr 1fr; flex: 0 1 auto; min-height: auto; grid-auto-rows: minmax(2.8rem, 3.4rem); align-content: space-between; margin-top: 6px; }
   /* Text never shrinks under the tiles: extra lines push the tiles down instead, and the card scrolls if it truly runs out of room. */
   .verdict { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
   .verdict::-webkit-scrollbar { display: none; }
@@ -873,7 +874,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .vstats > .vs:last-child:nth-child(odd) { grid-column: span 2; }
   .v-badge { align-self: center; text-align: center; }
   .vs b { font-size: 1.4rem; }
-  .vs { padding: 6px 8px; }
+  .vs { padding: 3px 8px; }
+  .vs b { line-height: 1.05; }
   .stat.prime b { font-size: 1.15rem; }
   .row.tgt .r .sub2 { font-size: .7rem; }
   .moon-info { flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; }
@@ -899,7 +901,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .chip { padding: 2px 7px; font-size: .68rem; }
   .timeline { padding-top: 8px; gap: 5px; }
   .stat { padding: 4px 8px; }
-  .verdict .vstats { grid-auto-rows: 3.1rem; }
+  .verdict .vstats { grid-auto-rows: minmax(2.8rem, 3.1rem); }
   .moon-info > svg { width: 60px !important; height: 60px !important; }
   .kv { font-size: .76rem; }
   .top-it .th { width: 72px; height: 54px; }

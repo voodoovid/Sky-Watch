@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.63';
+const VERSION = 'v3.64';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1252,7 +1252,7 @@ function renderVerdict(win, moon, hours) {
       const before = best ? wet.filter((h) => h.t < best.start.t) : [];
       const peak = Math.round(Math.max(...wet.map(popOf)));
       const st = (d) => fmtTime(d).replace(/:00(?=\s?[AP]\.?M)/i, '');   // "12 AM", keeps the note short
-      if (after.length) note = `Rain risk from ${st(after[0].d)} · up to ${peak}% — pack up before then`;
+      if (after.length) note = `Rain risk from ${st(after[0].d)} · up to ${peak}%`;
       else if (before.length) note = `Rain risk until ${st(new Date((before[before.length - 1].t + 3600) * 1000))} · up to ${peak}%`;
       else note = `Rain risk ${st(wet[0].d)} – ${st(new Date((wet[wet.length - 1].t + 3600) * 1000))} · up to ${peak}%`;
     } else if (cls === 'partial' && poor.length) {
