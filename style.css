@@ -273,6 +273,18 @@ html.red .night-seg button[aria-pressed="true"] { background: #300000; color: va
 .row.tgt .r { font-size: .95rem; font-weight: 750; }
 .eyebrow.ttl.mt { margin-top: 14px; }
 
+/* Target search (above Planets). 16px text stops iOS zooming the page when it is focused. */
+.tgt-search { position: relative; flex: none; margin-bottom: 8px; }
+.tgt-search input {
+  width: 100%; box-sizing: border-box; height: 34px; padding: 0 30px 0 10px; font: inherit; font-size: 16px;
+  background: var(--card2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+.tgt-search input:focus { border-color: var(--accent); }
+.tgt-search input::-webkit-search-cancel-button, .tgt-search input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
+.tq-x { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border: 0; background: none; color: var(--muted); font-size: .9rem; cursor: pointer; border-radius: 14px; }
+.tq-x[hidden] { display: none; }
+
 .status {
   position: absolute; z-index: 5; top: calc(var(--gap) + 6px); left: 50%; transform: translateX(-50%);
   max-width: calc(100% - 32px); padding: 7px 14px; border-radius: 999px;
@@ -759,7 +771,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .big-l.ico { font-size: .9rem; }
   .fc-h small { display: none; }
   .moonpath { min-height: 200px; }
-  .list.scroll { max-height: 340px; }
+  .list.scroll { max-height: 296px; }
   .top-it { flex: none; }
   .search-panel { top: calc(env(safe-area-inset-top) + 104px); }
 }

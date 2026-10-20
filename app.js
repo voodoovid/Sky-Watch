@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.53';
+const VERSION = 'v3.54';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -27,6 +27,7 @@ const state = {
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   data: null,
   night: 0, // 0 = tonight, 1 = tomorrow night, 2 = the night after
+  q: '', // target search text (not saved)
   tm: null, // Time Machine time (null = now); not saved, so the app always opens on Now
   home: store.get('home', false), // only count the part of the sky set in Options
   homeLoc: store.get('homeLoc', null), // {lat, lon} where Home sky was turned on; Home is on only near here
@@ -1658,8 +1659,11 @@ function sizeTop() {
   el.style.setProperty('--toph', `${Math.max(48, (el.clientHeight - 6 * (TOP_N - 1)) / TOP_N)}px`);
 }
 
-function renderTargets(list) {
+/* Target search: ignores case, spaces and punctuation, so "m 45", "M45" and "pleiades" all match. */
+const normQ = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+function renderTargets(list, skipTop) {
   const now = effNow();
+  const q = normQ(state.q);
   // The top ten still-visible targets go to their own card; the Seestar list starts at #11.
   // Targets that are up right now (with at least half an hour left) come first, so tonight's ranking favours
   // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
@@ -1669,8 +1673,13 @@ function renderTargets(list) {
   // so moving the Time Machine re-picks them rather than just reshuffling the same 30.
   const live = order.filter((i) => list[i].end > now);
   const topIdx = live.slice(0, TOP_MORE);
-  renderTop(list, topIdx, now);
-  const rest = live.slice(TOP_MORE, TOP_MORE + 20).map((i) => [list[i], i]);
+  if (!skipTop) renderTop(list, topIdx, now);
+  // While searching, look through every candidate for the night (Top Ten included) and list all matches.
+  const hits = q ? order.filter((i) => normQ(`${list[i].id} ${list[i].name} ${list[i].type || ''}`).includes(q)) : null;
+  const rest = (hits || live.slice(TOP_MORE, TOP_MORE + 20)).map((i) => [list[i], i]);
+  const tt = $('#tgtTitle .eb-r');
+  if (tt) tt.textContent = hits ? `${hits.length} found` : `Reaches ${MIN_ALT}°`;
+  if (hits && !hits.length) { $('#targets').innerHTML = '<p class="empty">No match among tonight’s targets.</p>'; return; }
   $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
     const neb = /Emission|Supernova|Planetary|^Nebula$|Cluster \+ nebula/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
@@ -2117,7 +2126,7 @@ function syncAltUI(commit) {
 }
 function applyMinAlt() {
   const t = $('#tgtTitle .eb-r');
-  if (t) t.textContent = `Reaches ${MIN_ALT}°`;
+  if (t && !normQ(state.q)) t.textContent = `Reaches ${MIN_ALT}°`;
 }
 function showOptions() {
   showSheet('Options', `<section class="opt" id="optUnits">
@@ -2472,6 +2481,11 @@ function init() {
   $('#optBtn').addEventListener('click', showOptions);
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
+  const tq = $('#tgtQ'), tqx = $('#tgtQx');
+  const redoSearch = () => { state.q = tq.value.trim(); tqx.hidden = !tq.value; const D = state.data; if (D) { renderTargets(D.nights[state.night].targets, true); $('#targets').scrollTop = 0; } };
+  tq.addEventListener('input', redoSearch);
+  tq.addEventListener('keydown', (e) => { if (e.key === 'Enter') tq.blur(); });
+  tqx.addEventListener('click', () => { tq.value = ''; redoSearch(); tq.focus(); });
   $('#planets').addEventListener('click', (e) => { const t = e.target.closest('[data-p]'); if (t) showPlanet(+t.dataset.p); });
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#sheet').addEventListener('close', () => document.documentElement.classList.remove('sheet-open'));
