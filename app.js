@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.47';
+const VERSION = 'v3.48';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2447,6 +2447,13 @@ function init() {
   $('#tmRange').addEventListener('input', () => onTM());
   $('#tmRange').addEventListener('change', () => onTM(true));
   $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(true); });
+  // iPad 13" landscape: make the title + location block exactly as wide as the buttons block, so the gap left of Time Machine equals the gap right of it.
+  (() => {
+    const ctl = $('.controls'), left = $('.top-l');
+    const sync = () => { left.style.width = matchMedia('(min-width: 1300px) and (min-height: 560px) and (min-aspect-ratio: 5/4)').matches ? ctl.offsetWidth + 'px' : ''; };
+    if (window.ResizeObserver) new ResizeObserver(sync).observe(ctl);
+    addEventListener('resize', sync); sync();
+  })();
   $('#sourcesBtn').addEventListener('click', showSources);
   $('#optBtn').addEventListener('click', showOptions);
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
