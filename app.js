@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.48';
+const VERSION = 'v3.49';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -262,19 +262,26 @@ function localHour(d) {
   const h = +new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: state.tz }).format(d);
   return isNum(h) ? h % 24 : d.getHours();
 }
-/* After 1 AM the night in progress is treated as over, so "Tonight" moves to the coming evening. */
-const ROLLOVER_HOUR = 1;
+/* "Tonight" stays the night in progress until less than 2 hours of darkness remain; then it moves to the coming evening. */
+const ROLLOVER_LEFT = 2 * 3600e3;
 function nightWindow(obs, now, rollover) {
   const sunNow = altAz('Sun', now, obs).alt;
-  const pastRollover = rollover && localHour(now) >= ROLLOVER_HOUR && localHour(now) < 12;
-  const from = sunNow > -0.833 || pastRollover ? now : new Date(now.getTime() - 86400000);
-  const set = tdate(A.SearchRiseSet('Sun', obs, -1, from, 1.5));
-  if (!set) return { set: now, rise: new Date(now.getTime() + 12 * 3600e3), polar: true };
-  const rise = tdate(A.SearchRiseSet('Sun', obs, +1, set, 1.5)) || new Date(set.getTime() + 12 * 3600e3);
-  let darkStart = tdate(A.SearchAltitude('Sun', obs, -1, set, 1, -18));
-  let darkEnd = darkStart ? tdate(A.SearchAltitude('Sun', obs, +1, darkStart, 1, -18)) : null;
-  if (darkStart && darkStart > rise) { darkStart = null; darkEnd = null; }
-  return { set, rise, darkStart, darkEnd };
+  const calc = (from) => {
+    const set = tdate(A.SearchRiseSet('Sun', obs, -1, from, 1.5));
+    if (!set) return { set: now, rise: new Date(now.getTime() + 12 * 3600e3), polar: true };
+    const rise = tdate(A.SearchRiseSet('Sun', obs, +1, set, 1.5)) || new Date(set.getTime() + 12 * 3600e3);
+    let darkStart = tdate(A.SearchAltitude('Sun', obs, -1, set, 1, -18));
+    let darkEnd = darkStart ? tdate(A.SearchAltitude('Sun', obs, +1, darkStart, 1, -18)) : null;
+    if (darkStart && darkStart > rise) { darkStart = null; darkEnd = null; }
+    return { set, rise, darkStart, darkEnd };
+  };
+  const dayNow = sunNow > -0.833;
+  let w = calc(dayNow ? now : new Date(now.getTime() - 86400000));
+  if (rollover && !dayNow && !w.polar) {
+    const end = (w.darkEnd || w.rise).getTime();   // end of the dark hours (or sunrise if it never gets fully dark)
+    if (now.getTime() > end - ROLLOVER_LEFT) w = calc(now);
+  }
+  return w;
 }
 
 const PHASES = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];
@@ -1495,6 +1502,13 @@ function renderPlanets(list) {
     : '<p class="empty">None well placed after dusk.</p>';
 }
 
+/* A thumbnail that fails (the survey server drops requests while the Time Machine redraws quickly) is retried a few times before giving up. */
+function thumbErr(img) {
+  const n = +img.dataset.n || 0;
+  if (n >= 4 || !img.isConnected || !img.dataset.u) { img.remove(); return; }
+  img.dataset.n = n + 1;
+  setTimeout(() => { if (img.isConnected) img.src = `${img.dataset.u}&r=${n + 1}`; }, 500 * (n + 1));
+}
 /* Small survey image for the Top targets card, cropped to the object's size. */
 function thumbUrl(o) {
   const sz = o.kind === 'dso' ? parseSize((DSO_INFO[o.id] || [])[1]) : null;
@@ -1633,7 +1647,7 @@ function renderTop(list, topIdx, now) {
     const what = o.kind === 'comet' ? `Comet · mag <span class="n">≈${o.mag.toFixed(1)}</span>` : esc(o.type);
     const when = `${upNow || !g ? '' : `${esc(fmtTime(g.s))} `}<span class="to">To</span> ${esc(fmtTime(g ? g.e : o.end))}<span class="hr">${hrsLeft(o, now).toFixed(1)} h</span>`;
     return `<button type="button" class="top-it" data-t="${i}">
-      <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
+      <span class="th"><img src="${thumbUrl(o)}" alt="" data-u="${thumbUrl(o)}" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="thumbErr(this)"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
   }).join('') : `<p class="empty">No targets reach ${MIN_ALT}° in darkness.</p>`;
   $('#topTargets').scrollTop = 0;
@@ -2291,7 +2305,7 @@ function buildNights(src, now, key) {
   const loc = state.loc;
   key = key || (state.data && state.data.key);
   const obs = new A.Observer(+loc.lat, +loc.lon, 0);
-  // Tonight (the night in progress until 1 AM, otherwise the coming evening), tomorrow night and the night after.
+  // Tonight (the night in progress until under 2 h of darkness remain, otherwise the coming evening), tomorrow night and the night after.
   const w0 = nightWindow(obs, now, true);
   const w1 = nightWindow(obs, new Date(w0.rise.getTime() + 3600e3));
   const w2 = nightWindow(obs, new Date(w1.rise.getTime() + 3600e3));
