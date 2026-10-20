@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.40';
+const VERSION = 'v3.41';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1528,10 +1528,14 @@ function sizeTop() {
 function renderTargets(list) {
   const now = state.data ? state.data.now : new Date();
   // The top ten still-visible targets go to their own card; the Seestar list starts at #11.
+  // Targets that are up right now (with at least half an hour left) come first, so tonight's ranking favours
+  // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
+  const tier = (o) => (o.start <= now && now < o.end ? (o.end - now >= 30 * 60e3 ? 0 : 2) : o.end <= now ? 3 : 1);
+  const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || a - b);
   const topIdx = [];
-  list.forEach((o, i) => { if (topIdx.length < TOP_MORE && o.end > now) topIdx.push(i); });
+  order.forEach((i) => { if (topIdx.length < TOP_MORE && list[i].end > now) topIdx.push(i); });
   renderTop(list, topIdx, now);
-  const rest = list.map((o, i) => [o, i]).filter(([, i]) => !topIdx.includes(i));
+  const rest = order.map((i) => [list[i], i]).filter(([, i]) => !topIdx.includes(i));
   $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
     const neb = /Emission|Supernova|Planetary|^Nebula$|Cluster \+ nebula/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
