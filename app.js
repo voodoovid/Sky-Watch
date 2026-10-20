@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.56';
+const VERSION = 'v3.57';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2138,20 +2138,20 @@ function showOptions() {
       <div class="night-seg theme-seg" role="group" aria-label="Appearance">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<button type="button" data-theme="${v}" aria-pressed="${state.theme === v}">${l}</button>`).join('')}</div>
       <p class="note opt-note">Auto follows your device. Red night mode still overrides this.</p>
     </section>
-    <section class="opt" id="optAlt" title="Targets, planets and comets only count while at least this high in darkness">
-      <h3 class="opt-h">Min elevation</h3>
-      <div class="alt-row">
-        <input type="range" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation in degrees">
-        <label class="alt-num"><input type="number" inputmode="numeric" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation, degrees"><span>°</span></label>
-        <button type="button" class="tbtn ghost alt-reset" data-alt="${ALT_DEF}" title="Reset to ${ALT_DEF}°">${ALT_DEF}°</button>
-      </div>
-    </section>
     <section class="opt" id="optHome">
       <h3 class="opt-h">Home sky</h3>
       <p class="note opt-note">Tap wedges for the directions you can see. <b>Home</b> then only shows targets there.</p>
       <div class="wheel-wrap"></div>
       <p class="wheel-sum">Visible: <b class="wheel-desc"></b></p>
       <div class="opt-btns"><button type="button" class="tbtn" data-act="all">All</button><button type="button" class="tbtn ghost" data-act="reset">Reset (NW → S)</button></div>
+    <div id="optAlt" title="Targets, planets and comets only count while at least this high in darkness">
+      <h3 class="opt-h">Min elevation</h3>
+      <div class="alt-row">
+        <input type="range" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation in degrees">
+        <label class="alt-num"><input type="number" inputmode="numeric" min="${ALT_LO}" max="${ALT_HI}" step="1" value="${MIN_ALT}" aria-label="Minimum elevation, degrees"><span>°</span></label>
+        <button type="button" class="tbtn ghost alt-reset" data-alt="${ALT_DEF}" title="Reset to ${ALT_DEF}°">${ALT_DEF}°</button>
+      </div>
+    </div>
     </section>`, '', false, true);
   $('#optUnits').addEventListener('click', (e) => {
     const b = e.target.closest('[data-units]');

@@ -538,7 +538,7 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 .wheel-sum { text-align: center; margin: .3em 0 .5em; color: var(--muted); }
 .wheel-sum b { color: var(--text); }
 .opt-btns { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
-#optAlt { display: flex; align-items: center; gap: 12px; margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
+#optAlt { display: flex; align-items: center; gap: 12px; margin-top: .9em; padding-top: .8em; border-top: 1px solid var(--line); }
 #optAlt .opt-h { margin: 0; flex: none; }
 .alt-row { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .alt-reset { flex: none; padding: 4px 9px; font-size: .85em; }
