@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.58';
+const VERSION = 'v3.59';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -484,6 +484,24 @@ function cometsTonight(obs, S, win) {
     out.push({
       kind: 'comet', id: c.id, name: c.name, type: 'Comet', el: c, ...tr, d: pk.d, alt: pk.alt, az: pk.az,
       ra: at.ra2000, dec: at.dec2000, mag: at.mag, r: at.r, delta: at.delta, moonSep: moonSepAt(pk),
+    });
+  }
+  return out.sort((a, b) => a.mag - b.mag);
+}
+
+/* Every comet in the list that gets above 5° once the sky is reasonably dark, however faint (the Comets list under Planets).
+   Like Planets: the best placement after dusk (Home sky applies). cometsTonight() above still picks the bright ones for the target lists. */
+function cometsAll(obs, S) {
+  const out = [];
+  for (const c of COMETS) {
+    const tr = track(S, (d) => { const p = cometPos(c, d); return altAzRaDec(p.ra, p.dec, d, obs); });
+    let best = null;
+    for (const p of tr.curve) if (p.sun <= -6 && (!state.home || inHome(p.az)) && (!best || p.alt > best.alt)) best = p;
+    if (!best || best.alt <= 5) continue;
+    const at = cometPos(c, best.d);
+    out.push({
+      kind: 'comet', id: c.id, name: c.name, type: 'Comet', el: c, ...tr, peak: best, d: best.d, alt: best.alt, az: best.az,
+      ra: at.ra2000, dec: at.dec2000, mag: at.mag, r: at.r, delta: at.delta, moonSep: moonSepAt(best),
     });
   }
   return out.sort((a, b) => a.mag - b.mag);
@@ -1002,18 +1020,50 @@ function buildHours(from, to, src, obs, illum) {
 }
 
 /* ---------- rendering ---------- */
+/* The Moon as a lit sphere: limb darkening, a soft terminator, faint maria (dark plains) that show only on the lit
+   part, a little earthshine on the unlit part, and a glow. Same phase geometry as before. Each call gets its own
+   gradient ids because several Moons can be on the page at once. */
+let moonUid = 0;
+const MOON_MARIA = [[-.26, -.38, .25, .19, -15], [.09, -.37, .14, .13, 0], [.23, -.08, .2, .15, 15], [.56, -.27, .1, .08, 0],
+  [-.56, -.02, .15, .36, 10], [-.3, .4, .18, .12, 0], [.5, .13, .09, .12, 0], [-.06, .06, .12, .1, 0]];
 function moonGlyph(cx, cy, r, angle, lat) {
-  const k = (1 - Math.cos(angle * Math.PI / 180)) / 2; // illuminated fraction
+  const id = 'mg' + (++moonUid), f = (v) => v.toFixed(2);
+  const rad = angle * Math.PI / 180, k = (1 - Math.cos(rad)) / 2; // illuminated fraction
   let litRight = angle < 180;
   if (lat < 0) litRight = !litRight;
-  const rx = r * Math.abs(Math.cos(angle * Math.PI / 180));
+  const rx = r * Math.abs(Math.cos(rad));
   const gibbous = k > 0.5;
-  const outer = litRight ? 1 : 0;
   const term = litRight ? (gibbous ? 1 : 0) : (gibbous ? 0 : 1);
+  // The lit shape reaches past the edge on the sunlit side, so blurring it softens only the terminator; the disc clip keeps the limb sharp.
+  const E = 1.4 * r, sx = litRight ? 1 : -1;
   const lit = k < 0.01 ? '' : k > 0.99
-    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--moon-lit)"/>`
-    : `<path d="M${cx} ${cy - r} A${r} ${r} 0 0 ${outer} ${cx} ${cy + r} A${rx.toFixed(2)} ${r} 0 0 ${term} ${cx} ${cy - r}Z" fill="var(--moon-lit)"/>`;
-  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--moon-dark)" stroke="var(--moon-lit)" stroke-opacity=".35" stroke-width="1"/>${lit}`;
+    ? `M${f(cx - E)} ${f(cy - E)} H${f(cx + E)} V${f(cy + E)} H${f(cx - E)}Z`
+    : `M${f(cx)} ${f(cy - E)} H${f(cx + sx * E)} V${f(cy + E)} H${f(cx)} V${f(cy + r)} A${f(rx)} ${r} 0 0 ${term} ${f(cx)} ${f(cy - r)}Z`;
+  const south = lat < 0 ? ` transform="rotate(180 ${cx} ${cy})"` : ''; // the Moon is upside down for observers in the south
+  const maria = MOON_MARIA.map(([dx, dy, a, b, t]) => `<ellipse cx="${f(cx + dx * r)}" cy="${f(cy + dy * r)}" rx="${f(a * r)}" ry="${f(b * r)}" transform="rotate(${t} ${f(cx + dx * r)} ${f(cy + dy * r)})"/>`).join('');
+  const box = `userSpaceOnUse" x="${f(cx - 2 * r)}" y="${f(cy - 2 * r)}" width="${f(4 * r)}" height="${f(4 * r)}"`;
+  const dir = litRight ? [1, 0] : [0, 1];
+  return `<defs>
+    <radialGradient id="${id}h"><stop offset=".78" style="stop-color:var(--moon-lit);stop-opacity:${f(0.05 + 0.2 * k)}"/><stop offset="1" style="stop-color:var(--moon-lit);stop-opacity:0"/></radialGradient>
+    <radialGradient id="${id}d" cx=".42" cy=".38" r=".7"><stop offset="0" style="stop-color:var(--moon-lit);stop-opacity:.16"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></radialGradient>
+    <radialGradient id="${id}s"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset=".82" stop-color="#000" stop-opacity=".16"/><stop offset="1" stop-color="#000" stop-opacity=".5"/></radialGradient>
+    <linearGradient id="${id}g" x1="${dir[0]}" y1="0" x2="${dir[1]}" y2="0"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="${f(0.3 * (1 - k))}"/></linearGradient>
+    <clipPath id="${id}c"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>
+    <filter id="${id}b" filterUnits="${box}><feGaussianBlur stdDeviation="${f(Math.max(0.35, r * 0.05))}"/></filter>
+    <filter id="${id}m" filterUnits="${box}><feGaussianBlur stdDeviation="${f(Math.max(0.25, r * 0.035))}"/></filter>
+    <mask id="${id}k" maskUnits="${box}>${lit ? `<path d="${lit}" fill="#fff" filter="url(#${id}b)"/>` : ''}</mask>
+  </defs>
+  <circle cx="${cx}" cy="${cy}" r="${f(r * 1.1)}" fill="url(#${id}h)"/>
+  <circle cx="${cx}" cy="${cy}" r="${r}" style="fill:var(--moon-dark)"/>
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}d)"/>
+  <g clip-path="url(#${id}c)">
+    <g${south} fill="#000" opacity=".16" filter="url(#${id}m)">${maria}</g>
+    ${lit ? `<path d="${lit}" style="fill:var(--moon-lit)" filter="url(#${id}b)"/>` : ''}
+    <g mask="url(#${id}k)"><g${south}><g style="fill:var(--moon-dark)" opacity=".42" filter="url(#${id}m)">${maria}</g><circle cx="${f(cx - 0.12 * r)}" cy="${f(cy + 0.7 * r)}" r="${f(Math.max(0.5, r * 0.05))}" fill="#fff" opacity=".6"/></g></g>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}g)"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}s)"/>
+  </g>
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" style="stroke:var(--moon-lit)" stroke-opacity=".28" stroke-width="1"/>`;
 }
 
 const PUFF_ICON = '<path d="M6.2 19.5h11.9a4.1 4.1 0 0 0 .9-8.1 4.3 4.3 0 0 0-5.6-3.3A5 5 0 0 0 4.6 10.6a4.5 4.5 0 0 0 1.6 8.9z" fill="currentColor"/><circle cx="9.3" cy="10.4" r="3.9" fill="currentColor"/><circle cx="14.6" cy="9.6" r="3.3" fill="currentColor"/>';
@@ -1353,6 +1403,7 @@ function showSheet(title, body, sub = '', wide = false, locked = false, copy = '
   cb.setAttribute('aria-label', copy ? `Copy ${copy}` : 'Copy');
   $('#sheetGuide').hidden = true; // only Options and the User Guide show this button (see setSheetLink)
   guideAct = null;
+  $('#sheet').classList.remove('is-guide');
   $('#sheetTitle').textContent = title;
   $('#sheetSub').textContent = sub;
   $('#sheetSub').hidden = !sub;
@@ -1511,6 +1562,14 @@ function renderPlanets(list) {
     <span class="sub2">${p.start ? `${MIN_ALT}°+ from ${esc(fmtTime(p.start))}` : `Stays below ${MIN_ALT}°${state.home ? ' in home sky' : ''}`}</span></div>
     <div class="r">${esc(fmtTime(p.d))}<span class="sub2">${Math.round(p.alt)}° ${compass(p.az)}</span></div></button>`).join('')
     : '<p class="empty">None well placed after dusk.</p>';
+}
+
+/* Comets: every comet in the list that is above the horizon after dusk, brightest first (even ones too faint for the target lists). */
+function renderComets(list) {
+  $('#comets').innerHTML = list.length ? list.map((c, i) => `<button type="button" class="row tgt${c.start ? '' : ' cm-low'}" data-c="${i}" title="${c.start ? `Above ${MIN_ALT}° from ${esc(fmtTime(c.start))}` : `Stays below ${MIN_ALT}°${state.home ? ' in home sky' : ''}`}">
+    <div class="nm"><span class="t1"><b>${esc(c.id)}</b>${esc(c.name)}</span></div>
+    <div class="r"><span class="cm-m">mag ${c.mag.toFixed(1)}</span>${esc(fmtTime(c.d))}</div></button>`).join('')
+    : '<p class="empty">None above the horizon after dusk.</p>';
 }
 
 /* Small survey image for the Top targets card, cropped to the object's size. */
@@ -2082,6 +2141,7 @@ function openObject(o) {
 }
 function showTarget(i) { const D = state.data; openObject(D && D.nights[state.night].targets[i]); }
 function showPlanet(i) { const D = state.data; openObject(D && D.nights[state.night].planets[i]); }
+function showComet(i) { const D = state.data; openObject(D && D.nights[state.night].comets[i]); }
 
 /* ---------- options ---------- */
 function homeWheel() {
@@ -2205,10 +2265,10 @@ function showOptions() {
 /* User Guide: opens in the same pop-up as Options, with a "‹ Options" button to go back. */
 function showGuide() {
   const G = window.SKY_GUIDE;
-  showSheet('User Guide', G ? G.html() : '<p class="note">The guide could not be loaded. Close the app and open it again.</p>', '', true, false);
+  showSheet('User Guide', G ? G.html(VERSION) : '<p class="note">The guide could not be loaded. Close the app and open it again.</p>', '', true, false);
   setSheetLink('‹ Options', showOptions);
-  const body = $('#sheetBody');
-  if (G) body.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => G.go(body, b.dataset.g)));
+  $('#sheet').classList.add('is-guide');
+  if (G) G.wire($('#sheetBody'));
 }
 
 function showSources() {
@@ -2238,6 +2298,7 @@ function renderAll() {
   renderMoon(N.moon, D.lat);
   renderPath(N, D.lat, effNow());
   renderPlanets(N.planets);
+  renderComets(N.comets);
   renderTargets(N.targets);
   const s = D.src, on = OM_MODELS.filter((m) => s.om[m.id]).length + ENSEMBLES.filter((e) => s.ens[e.name]).length + (s.met ? 1 : 0) + (s.t7 && !s.t7cached ? 1 : 0);
   $('#sourcesBtn').textContent = `Data sources · ${on}/${OM_MODELS.length + ENSEMBLES.length + 2} online`;
@@ -2250,6 +2311,7 @@ function findTargets() {
   if (!D) return;
   for (const N of D.nights) {
     N.planets = planetsTonight(D.obs, N.S);
+    N.comets = cometsAll(D.obs, N.S);
     N.targets = [...cometsTonight(D.obs, N.S, N.win), ...targetsTonight(D.obs, N.S)];
   }
 }
@@ -2352,7 +2414,7 @@ function buildNights(src, now, key) {
   const prev = state.data;
   state.data = { now, lat: +loc.lat, obs, src, nights, key };
   // Targets depend only on place and time, not weather: reuse them when a late source just refreshes the forecast.
-  if (prev && prev.key === key && prev.now === now && prev.nights) nights.forEach((N, i) => { N.planets = prev.nights[i].planets; N.targets = prev.nights[i].targets; });
+  if (prev && prev.key === key && prev.now === now && prev.nights) nights.forEach((N, i) => { N.planets = prev.nights[i].planets; N.comets = prev.nights[i].comets; N.targets = prev.nights[i].targets; });
   else findTargets();
   renderAll();
 }
@@ -2508,6 +2570,7 @@ function init() {
   tq.addEventListener('keydown', (e) => { if (e.key === 'Enter') tq.blur(); });
   tqx.addEventListener('click', () => { tq.value = ''; redoSearch(); tq.focus(); });
   $('#planets').addEventListener('click', (e) => { const t = e.target.closest('[data-p]'); if (t) showPlanet(+t.dataset.p); });
+  $('#comets').addEventListener('click', (e) => { const t = e.target.closest('[data-c]'); if (t) showComet(+t.dataset.c); });
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#sheet').addEventListener('close', () => document.documentElement.classList.remove('sheet-open'));
   // Stop the page behind an open sheet from scrolling or rubber-banding on iPad; only the sheet's own body may scroll.
