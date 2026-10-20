@@ -157,7 +157,7 @@ html.red .brand .sub { color: var(--accent); }
 
 /* Time Machine: look at the sky later tonight (default Now) */
 .tm {
-  flex: 1 1 190px; min-width: 150px; max-width: 300px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  flex: 0 1 190px; min-width: 150px; max-width: 200px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 11px 2px;
 }
 .tm-top { display: flex; align-items: center; gap: 8px; font-size: .64rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
@@ -165,7 +165,7 @@ html.red .brand .sub { color: var(--accent); }
 .tm output { margin-left: auto; color: var(--accent); font-size: .86rem; font-weight: 800; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
 .tm-now { padding: 0 8px; height: 18px; font: inherit; font-size: .66rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 9px; cursor: pointer; }
 .tm-now[hidden] { display: none; }
-.tm input[type=range] { width: 100%; height: 22px; margin: 0; accent-color: var(--accent); touch-action: pan-x; cursor: pointer; }
+.tm input[type=range] { width: 100%; height: 28px; margin: 0; accent-color: var(--accent); touch-action: pan-x; cursor: pointer; }
 .tm input[type=range]:disabled { opacity: .4; cursor: default; }
 .tm.off { opacity: .6; }
 
@@ -709,7 +709,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .red-btn .lbl, .home-btn .lbl { display: none; }
   .top { gap: 10px; }
   .night-seg button { padding: 0 9px; }
-  .tm { flex: 1 1 226px; min-width: 226px; }
+  .tm { flex: 0 1 170px; min-width: 170px; max-width: 180px; }
   .loc-ctl { flex: 1 1 190px; }
 }
 

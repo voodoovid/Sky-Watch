@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.42';
+const VERSION = 'v3.43';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1507,37 +1507,52 @@ const nextSeg = (o, t) => (o.segs || []).find((g) => g.e > t);                  
 /* The time everything is judged at: the Time Machine time (tonight only), otherwise now. */
 const effNow = () => (state.data ? (state.night === 0 && state.tm ? state.tm : state.data.now) : new Date());
 const tmLabel = () => (state.night === 0 && state.tm ? fmtTime(state.tm) : 'Now');
-/* Slider runs from now (or dusk, if the night hasn't started) to 30 minutes before astronomical dawn. */
+/* Slider: position 0 = Now, then one stop per 15 minutes on the quarter hour (e.g. 10:15, 10:30)
+   up to 30 minutes before astronomical dawn. Coarse steps keep it easy to land where you want. */
+const TM_STEP = 15 * 60e3;
+let tmRaf = 0, tmDrawn = null;
 function tmRange() {
   const D = state.data; if (!D) return null;
   const w = D.nights[0].win, dawn = w.darkEnd || w.rise;
   const start = Math.max(+D.now, +w.set), end = +dawn - 30 * 60e3;
-  const n = Math.floor((end - start) / STEP);
-  return n >= 1 ? { start, n } : null;
+  const first = (Math.floor(start / TM_STEP) + 1) * TM_STEP;   // first quarter hour after now / dusk
+  const n = end >= first ? Math.floor((end - first) / TM_STEP) + 1 : 0;
+  return n >= 1 ? { first, n } : null;
 }
+const tmAt = (r, v) => new Date(r.first + (v - 1) * TM_STEP);
 function syncTM() {
   const r = tmRange(), rng = $('#tmRange'), box = $('#tm');
   const on = !!r && state.night === 0;
   rng.disabled = !on; box.classList.toggle('off', !on);
+  rng.step = 1;
   if (!r) { state.tm = null; rng.max = 0; rng.value = 0; }
   else {
     rng.max = r.n;
     // keep the chosen time across a refresh while it is still ahead of us and inside tonight
-    const v = state.tm ? Math.round((+state.tm - r.start) / STEP) : 0;
-    if (!state.tm || v < 1 || v > r.n) { state.tm = null; rng.value = 0; } else { rng.value = v; state.tm = new Date(r.start + v * STEP); }
+    const v = state.tm ? Math.round((+state.tm - r.first) / TM_STEP) + 1 : 0;
+    if (!state.tm || v < 1 || v > r.n) { state.tm = null; rng.value = 0; } else { rng.value = v; state.tm = tmAt(r, v); }
   }
   $('#tmVal').textContent = tmLabel();
   $('#tmNow').hidden = !(on && state.tm);
   rng.title = on ? 'Slide to see what you can film later tonight (Home sky applies)' : 'Time Machine works on Tonight';
+  tmDrawn = state.tm ? +state.tm : 0;   // whatever the page was just redrawn at
 }
-function onTM() {
-  const r = tmRange(), v = +$('#tmRange').value;
-  state.tm = r && v >= 1 ? new Date(r.start + v * STEP) : null;
-  $('#tmVal').textContent = tmLabel(); $('#tmNow').hidden = !state.tm;
+/* Full redraw at the chosen time: Top Ten (icons, order, times), Seestar list, Moon path, open pop-up chart. */
+function applyTM() {
   const D = state.data; if (!D) return;
-  renderTargets(D.nights[state.night].targets);
-  renderPath(D.nights[state.night], D.lat, effNow());
+  const nt = D.nights[state.night];
+  renderTargets(nt.targets);
+  renderPath(nt, D.lat, effNow());
   if ($('#sheet').open && $('#objChart') && state.openObj) altChart($('#objChart'), state.openObj, effNow());
+}
+function onTM(final) {
+  const r = tmRange(), v = +$('#tmRange').value;
+  state.tm = r && v >= 1 ? tmAt(r, v) : null;
+  $('#tmVal').textContent = tmLabel(); $('#tmNow').hidden = !state.tm;
+  const key = state.tm ? +state.tm : 0;
+  if (final === true) { cancelAnimationFrame(tmRaf); tmRaf = 0; tmDrawn = key; applyTM(); return; }  // on release: always redraw
+  if (key === tmDrawn || tmRaf) return;                                                              // while dragging: once per frame, only on a new stop
+  tmRaf = requestAnimationFrame(() => { tmRaf = 0; tmDrawn = state.tm ? +state.tm : 0; applyTM(); });
 }
 const TOP_N = 3;      // ranks shown at once in the Top targets card
 const TOP_MORE = 10;  // scroll down in the card for more; all ten leave the Seestar list
@@ -2358,8 +2373,9 @@ function init() {
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   wireCopy();
-  $('#tmRange').addEventListener('input', onTM);
-  $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(); });
+  $('#tmRange').addEventListener('input', () => onTM());
+  $('#tmRange').addEventListener('change', () => onTM(true));
+  $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(true); });
   $('#sourcesBtn').addEventListener('click', showSources);
   $('#optBtn').addEventListener('click', showOptions);
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
