@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.42">
+<link rel="stylesheet" href="style.css?v=3.46">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -35,6 +35,7 @@
 </svg>
 
 <header class="top">
+  <div class="top-l">
   <div class="brand">
     <img class="logo" src="icon.svg" alt="" width="30" height="30">
     <div class="brand-txt"><h1>SkyWatch</h1><span class="sub">Go / No Go</span></div>
@@ -46,11 +47,12 @@
     <button id="gpsBtn" class="ibtn" type="button" title="Use GPS" aria-label="Use GPS"><svg><use href="#i-gps"/></svg></button>
     <button id="searchBtn" class="ibtn" type="button" title="Find a place" aria-label="Find a place" aria-expanded="false"><svg><use href="#i-search"/></svg></button>
   </div>
+  </div>
   <div class="tm" id="tm">
     <svg class="tm-dial" id="tmDial" viewBox="0 0 64 64" role="slider" tabindex="-1" aria-label="Time Machine: see what is up later tonight" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="Now"><g id="tmG"></g></svg>
     <div class="tm-info">
       <span class="tm-t">Time Machine</span>
-      <span class="tm-row"><output id="tmVal">Now</output><button id="tmNow" class="tm-now" type="button" hidden>Now</button></span>
+      <span class="tm-row"><output id="tmVal">Now</output><button id="tmNow" class="tm-now" type="button" disabled>Now</button></span>
     </div>
     <input id="tmRange" type="range" min="0" max="0" step="1" value="0" disabled hidden tabindex="-1" aria-hidden="true">
   </div>
@@ -124,6 +126,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=3.42"></script>
+<script src="app.js?v=3.46"></script>
 </body>
 </html>

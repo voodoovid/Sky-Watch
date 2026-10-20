@@ -111,6 +111,9 @@ html.red {
 html.red .logo { filter: grayscale(1) sepia(1) saturate(8) hue-rotate(-50deg) brightness(.7); }
 
 * { box-sizing: border-box; }
+/* Nothing in the app is selectable / copyable (typing fields and the pop-up Copy button still work). */
+html, body, body * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html, body { margin: 0; }
 body {
   background: radial-gradient(1200px 600px at 50% -200px, var(--bg2), var(--bg)) fixed, var(--bg);
@@ -136,6 +139,7 @@ svg { display: block; }
   position: sticky; top: 0; z-index: 10;
 }
 .ver-top { display: none; font-size: .78rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.top-l { display: contents; }
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .logo { width: 44px; height: 44px; border-radius: 11px; }
 .brand-txt { display: flex; flex-direction: column; align-items: center; text-align: center; line-height: 1.05; }
@@ -174,8 +178,10 @@ html.red .brand .sub { color: var(--accent); }
 .tm-t { font-size: .64rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 .tm-row { display: flex; align-items: center; gap: 8px; }
 .tm output { color: var(--accent); font-size: 1.1rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.tm-now { padding: 0 8px; height: 18px; font: inherit; font-size: .66rem; font-weight: 700; color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 9px; cursor: pointer; }
-.tm-now[hidden] { display: none; }
+/* The Now button is always there (dimmed while the time is already Now) so the box never changes size. */
+.tm-now { flex: none; min-width: 46px; padding: 0 8px; height: 22px; font: inherit; font-size: .72rem; font-weight: 700; color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 11px; cursor: pointer; }
+.tm-now:disabled { opacity: .35; cursor: default; }
+.tm output { min-width: 5.2em; }
 .tm.off { opacity: .6; }
 .tm.off .tm-dial { cursor: default; }
 
@@ -760,3 +766,38 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
 .chart svg[role="slider"] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .chart svg[role="slider"]:focus { outline: none; }
 .chart svg[role="slider"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* iPad 13" landscape: Time Machine centred in the header; the location box is narrowed to about the width of the Tonight column. */
+@media (min-width: 1300px) and (min-height: 560px) and (min-aspect-ratio: 5/4) {
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 12px; }
+  .top-l { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .top-l .loc-ctl { flex: 0 1 230px; min-width: 0; }
+  .tm { justify-self: center; }
+  .controls { justify-self: end; margin-left: 0; }
+}
+
+/* Phones: the title / header block is locked at the top; only the content below it scrolls. */
+@media (max-width: 759px), (orientation: landscape) and (max-height: 520px) {
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; position: fixed; inset: 0; height: auto; }
+  .top { position: relative; flex: none; z-index: 20; }
+  .dash { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .foot { flex: none; }
+}
+
+/* iPhone portrait: a bigger Now button */
+@media (max-width: 759px) {
+  .tm-now { height: 34px; min-width: 76px; padding: 0 18px; font-size: .95rem; border-radius: 17px; }
+  .tm output { font-size: 1.25rem; }
+}
+
+/* iPhone landscape: no "Time Machine" name and no 3rd night, so the time sits right beside the dial */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tm-t { display: none; }
+  .night-seg [data-n="2"] { display: none; }
+  .top { padding-top: 8px; padding-bottom: 8px; gap: 10px; }
+  .logo { width: 34px; height: 34px; }
+  .brand h1 { font-size: 1.3rem; }
+  .brand .sub { font-size: .72rem; }
+  .tm { padding-right: 12px; }
+}

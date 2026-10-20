@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.45';
+const VERSION = 'v3.46';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1539,7 +1539,7 @@ function syncTM() {
     if (!state.tm || v < 1 || v > r.n) { state.tm = null; rng.value = 0; } else { rng.value = v; state.tm = tmAt(r, v); }
   }
   $('#tmVal').textContent = tmLabel();
-  $('#tmNow').hidden = !(on && state.tm);
+  $('#tmNow').disabled = !(on && state.tm);
   rng.title = on ? 'Slide to see what you can film later tonight (Home sky applies)' : 'Time Machine works on Tonight';
   tmDrawn = state.tm ? +state.tm : 0;   // whatever the page was just redrawn at
   drawDial();
@@ -1616,7 +1616,7 @@ function applyTM() {
 function onTM(final) {
   const r = tmRange(), v = +$('#tmRange').value;
   state.tm = r && v >= 1 ? tmAt(r, v) : null;
-  $('#tmVal').textContent = tmLabel(); $('#tmNow').hidden = !state.tm; drawDial();
+  $('#tmVal').textContent = tmLabel(); $('#tmNow').disabled = !state.tm; drawDial();
   const key = state.tm ? +state.tm : 0;
   if (final === true) { cancelAnimationFrame(tmRaf); tmRaf = 0; tmDrawn = key; applyTM(); return; }  // on release: always redraw
   if (key === tmDrawn || tmRaf) return;                                                              // while dragging: once per frame, only on a new stop
