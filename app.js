@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.39';
+const VERSION = 'v3.40';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1296,7 +1296,43 @@ function skyChart(hours) {
   if (rainSvg) box.querySelectorAll('svg')[1].insertAdjacentHTML('afterbegin', rainSvg);
 }
 
-function showSheet(title, body, sub = '', wide = false, locked = false) {
+/* Copy button beside the pop-up title. The copied text is plain ASCII with no "·" separator,
+   so it pastes straight into the Seestar app's search. */
+let copyText = '';
+function seestarName(o) {
+  let s = o.kind === 'planet' ? o.name : String(o.id);
+  if (o.kind === 'dso') s = s.split('/')[0]; // e.g. "NGC 869/884" → "NGC 869"
+  return s.normalize('NFKC').replace(/[‐-―−]/g, '-').replace(/\s+/g, ' ').trim();
+}
+async function copyToClipboard(text) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (e) { /* fall back */ }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+  ($('#sheet').open ? $('#sheet') : document.body).appendChild(ta);
+  ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+let copyTimer;
+function wireCopy() {
+  const b = $('#sheetCopy');
+  b.addEventListener('click', async () => {
+    if (!copyText) return;
+    const ok = await copyToClipboard(copyText);
+    b.textContent = ok ? 'Copied' : 'Copy failed';
+    b.classList.toggle('done', ok);
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1600);
+  });
+}
+
+function showSheet(title, body, sub = '', wide = false, locked = false, copy = '') {
+  copyText = copy;
+  const cb = $('#sheetCopy');
+  cb.hidden = !copy; cb.textContent = 'Copy'; cb.classList.remove('done');
+  cb.setAttribute('aria-label', copy ? `Copy ${copy}` : 'Copy');
   $('#sheetTitle').textContent = title;
   $('#sheetSub').textContent = sub;
   $('#sheetSub').hidden = !sub;
@@ -1876,7 +1912,7 @@ function openObject(o) {
       </section>
       <dl class="facts">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       <p class="fine">${o.kind === 'comet' ? 'Orbit: JPL Horizons. Positions computed on device.' : o.kind === 'dso' ? 'Catalog sizes and magnitudes are approximate.' : 'Positions computed on device (Astronomy Engine).'}</p>
-    </div>`, sub, true);
+    </div>`, sub, true, false, seestarName(o));
   state.openObj = o;
   const draw = () => altChart($('#objChart'), o, now);
   requestAnimationFrame(draw);
@@ -2276,6 +2312,7 @@ function init() {
     if (!$('#searchPanel').hidden && !e.target.closest('#searchPanel, #searchBtn')) toggleSearch(false);
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
+  wireCopy();
   $('#sourcesBtn').addEventListener('click', showSources);
   $('#optBtn').addEventListener('click', showOptions);
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });

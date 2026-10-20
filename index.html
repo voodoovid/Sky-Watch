@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.39">
+<link rel="stylesheet" href="style.css?v=3.40">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -111,11 +111,11 @@
 </footer>
 
 <dialog id="sheet" class="sheet">
-  <form method="dialog" class="sheet-head"><div class="sh-t"><h2 id="sheetTitle"></h2><p id="sheetSub" hidden></p></div><button class="ibtn sh-x" aria-label="Close">✕</button></form>
+  <form method="dialog" class="sheet-head"><div class="sh-t"><div class="sh-line"><h2 id="sheetTitle"></h2><button type="button" id="sheetCopy" class="copybtn" hidden>Copy</button></div><p id="sheetSub" hidden></p></div><button class="ibtn sh-x" aria-label="Close">✕</button></form>
   <div id="sheetBody"></div>
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=3.39"></script>
+<script src="app.js?v=3.40"></script>
 </body>
 </html>
