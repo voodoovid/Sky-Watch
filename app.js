@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.59';
+const VERSION = 'v3.60';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -489,19 +489,21 @@ function cometsTonight(obs, S, win) {
   return out.sort((a, b) => a.mag - b.mag);
 }
 
-/* Every comet in the list that gets above 5° once the sky is reasonably dark, however faint (the Comets list under Planets).
-   Like Planets: the best placement after dusk (Home sky applies). cometsTonight() above still picks the bright ones for the target lists. */
+/* The Comets list under Planets: every comet that climbs above the set elevation (Options) during full dark hours, however faint.
+   Home sky is ignored for inclusion; a comet only the Home sky blocks stays listed but greyed out (blocked). cometsTonight() above still picks the bright ones for the target lists. */
 function cometsAll(obs, S) {
-  const out = [];
+  const out = [], home = state.home;
   for (const c of COMETS) {
-    const tr = track(S, (d) => { const p = cometPos(c, d); return altAzRaDec(p.ra, p.dec, d, obs); });
-    let best = null;
-    for (const p of tr.curve) if (p.sun <= -6 && (!state.home || inHome(p.az)) && (!best || p.alt > best.alt)) best = p;
-    if (!best || best.alt <= 5) continue;
-    const at = cometPos(c, best.d);
+    const pos = (d) => { const p = cometPos(c, d); return altAzRaDec(p.ra, p.dec, d, obs); };
+    state.home = false;
+    let tr; try { tr = track(S, pos); } finally { state.home = home; }
+    if (!tr.start) continue;
+    let use = tr, blocked = false;
+    if (home) { const th = track(S, pos); if (th.start) use = th; else blocked = true; }
+    const pk = use.peak, at = cometPos(c, pk.d);
     out.push({
-      kind: 'comet', id: c.id, name: c.name, type: 'Comet', el: c, ...tr, peak: best, d: best.d, alt: best.alt, az: best.az,
-      ra: at.ra2000, dec: at.dec2000, mag: at.mag, r: at.r, delta: at.delta, moonSep: moonSepAt(best),
+      kind: 'comet', id: c.id, name: c.name, type: 'Comet', el: c, ...use, blocked, d: pk.d, alt: pk.alt, az: pk.az,
+      ra: at.ra2000, dec: at.dec2000, mag: at.mag, r: at.r, delta: at.delta, moonSep: moonSepAt(pk),
     });
   }
   return out.sort((a, b) => a.mag - b.mag);
@@ -1566,7 +1568,7 @@ function renderPlanets(list) {
 
 /* Comets: every comet in the list that is above the horizon after dusk, brightest first (even ones too faint for the target lists). */
 function renderComets(list) {
-  $('#comets').innerHTML = list.length ? list.map((c, i) => `<button type="button" class="row tgt${c.start ? '' : ' cm-low'}" data-c="${i}" title="${c.start ? `Above ${MIN_ALT}° from ${esc(fmtTime(c.start))}` : `Stays below ${MIN_ALT}°${state.home ? ' in home sky' : ''}`}">
+  $('#comets').innerHTML = list.length ? list.map((c, i) => `<button type="button" class="row tgt${c.blocked ? ' cm-low' : ''}" data-c="${i}" title="${c.blocked ? `Above ${MIN_ALT}° only outside your Home sky` : `Above ${MIN_ALT}° from ${esc(fmtTime(c.start))}`}">
     <div class="nm"><span class="t1"><b>${esc(c.id)}</b>${esc(c.name)}</span></div>
     <div class="r"><span class="cm-m">mag ${c.mag.toFixed(1)}</span>${esc(fmtTime(c.d))}</div></button>`).join('')
     : '<p class="empty">None above the horizon after dusk.</p>';

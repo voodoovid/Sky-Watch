@@ -224,7 +224,7 @@ window.SKY_GUIDE = (() => {
     <h4>Planets</h4>
     <p>Planets that rise above 5° once the sky is reasonably dark, with their brightness, when they are best placed, and how high and in which direction. Tap one for details. Planets look small in a Seestar: a bright dot or tiny disc, not a close-up.</p>
     <h4>Comets</h4>
-    <p>The <b>Comets</b> list under Planets shows every comet SkyWatch tracks that rises above 5° once the sky is reasonably dark, however faint, brightest first. Each row gives the comet's predicted magnitude, when it is above your minimum elevation, when it is best placed, and how high and in which direction. Tap one for details. If none is up, the list says so.</p>
+    <p>The <b>Comets</b> list under Planets shows every comet SkyWatch tracks that climbs above your minimum elevation (set in Options) during full dark hours, however faint, brightest first. Each row gives the predicted magnitude and when it is best placed. Tap one for details. A comet that only your Home sky blocks stays in the list, greyed out. If none qualifies, the list says so.</p>
     <p>Comets brighter than about magnitude 11.5 also join the Top Ten and Seestar target lists, tagged <b>Comet</b>, and can rank first. Comet brightness is hard to predict, so treat it as a guide. SkyWatch tracks a built-in set of comets, so a newly discovered one will not appear until it is added.</p>`)}
 
   ${chapter('g-popup', `
