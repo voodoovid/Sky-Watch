@@ -282,6 +282,8 @@ html.red .night-seg button[aria-pressed="true"] { background: #300000; color: va
   -webkit-appearance: none; appearance: none;
 }
 .tgt-search input:focus { border-color: var(--accent); }
+.tgt-search input::placeholder { color: var(--muted); opacity: 1; -webkit-text-fill-color: var(--muted); }
+.tgt-search input { caret-color: var(--accent); }
 .tgt-search input::-webkit-search-cancel-button, .tgt-search input::-webkit-search-decoration { -webkit-appearance: none; display: none; }
 .tq-x { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border: 0; background: none; color: var(--muted); font-size: .9rem; cursor: pointer; border-radius: 14px; }
 .tq-x[hidden] { display: none; }
