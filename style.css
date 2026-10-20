@@ -247,6 +247,7 @@ html.red .night-seg button[aria-pressed="true"] { background: #300000; color: va
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "verdict" "fc" "moon" "path" "top" "obj";
 }
+.leftcol { display: contents; }   /* only a real column in the landscape layout */
 .verdict-card { grid-area: verdict; }
 .moon-card { grid-area: moon; }
 .fc-card { grid-area: fc; }
@@ -333,7 +334,7 @@ html.red .chip.bad, html.red .chip.ok { color: var(--text); }
 .vstats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
 .vstats > .vs:last-child:nth-child(odd) { grid-column: span 2; }
 .vs { background: var(--card2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.vs .lbl { font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.vs .lbl { font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vs b { font-size: 1.6rem; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vs b small { font-size: .55em; font-weight: 700; margin-left: 3px; color: var(--muted); }
 .vs.ok { border-color: color-mix(in srgb, var(--go) 45%, var(--line)); } .vs.ok b { color: var(--go); }
@@ -852,17 +853,26 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .dash {
     /* Narrow Tonight/Moon column; Dark hours and Top targets get the room the target list gave up. */
     grid-template-columns: minmax(215px, .8fr) minmax(0, 1fr) minmax(0, 1.35fr) minmax(265px, 1fr);
-    /* Tonight runs a little past Dark hours (taking it from Moon) so the rain note fits without squeezing the tiles. */
-    grid-template-rows: minmax(0, 1.45fr) minmax(0, .2fr) minmax(0, .8fr);
-    grid-template-areas: "verdict fc fc obj" "verdict path top obj" "moon path top obj";
+    grid-template-rows: minmax(0, 1.45fr) minmax(0, 1fr);
+    grid-template-areas: "left fc fc obj" "left path top obj";
   }
+  /* Left column: the Tonight card is exactly as tall as its content; the Moon card takes whatever is left and shrinks/grows with it. */
+  .leftcol { display: flex; flex-direction: column; gap: var(--gap); grid-area: left; min-height: 0; min-width: 0; }
+  .verdict-card, .moon-card { grid-area: auto; }
+  .verdict-card { flex: 0 1 auto; }
+  .moon-card { flex: 1 1 0; min-height: 112px; container-type: size; }
+  /* As the Moon card gets shorter it sheds detail (picture first, then the lower rows) instead of clipping or overlapping. */
+  @container (max-height: 232px) { .moon-info > svg { display: none; } }
+  @container (min-height: 233px) { .moon-info { justify-content: center; } }
+  @container (max-height: 157px) { .kv > :nth-child(n+11) { display: none; } }
+  @container (max-height: 138px) { .kv > :nth-child(n+9) { display: none; } }
+  @container (max-height: 119px) { .kv > :nth-child(n+7) { display: none; } }
+  @container (max-height: 100px) { .kv > :nth-child(n+5) { display: none; } }
   .verdict { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
-  /* Tiles are locked to a fixed size; any spare room goes between the text and the tiles. */
-  /* Tiles sit just under the text and spread evenly down to the bottom; they only move down when the text above grows. */
   /* Tiles are 3.4rem when there is room, but squeeze down to 2.8rem before anything gets clipped (min-height: auto = the squeezed size). */
   .verdict .vstats { grid-template-columns: 1fr 1fr; flex: 0 1 auto; min-height: auto; grid-auto-rows: minmax(2.8rem, 3.4rem); align-content: space-between; margin-top: 6px; }
   /* Text never shrinks under the tiles: extra lines push the tiles down instead, and the card scrolls if it truly runs out of room. */
-  .verdict { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+  .verdict { flex: 0 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
   .verdict::-webkit-scrollbar { display: none; }
   .v-text { flex: 0 0 auto; min-height: auto; }
   .v-note { font-size: .8rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -876,9 +886,28 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .vs b { font-size: 1.4rem; }
   .vs { padding: 3px 8px; }
   .vs b { line-height: 1.05; }
+  /* Short screens: a more compact Tonight card so the Moon card keeps its room. */
+  .kv { margin: 4px 0 0; }
+  @media (max-height: 800px) {
+    .v-badge { font-size: 1.4rem; padding: 5px 10px; }
+    .v-win { font-size: .86rem; line-height: 1.25; } .v-win b { font-size: .92rem; }
+    .v-note { font-size: .74rem; line-height: 1.2; margin-top: 2px; }
+    .verdict { gap: 4px; }
+    .vs b { font-size: 1.15rem; }
+    .vs .lbl { font-size: .6rem; }
+    .verdict .vstats { grid-auto-rows: minmax(2.3rem, 2.7rem); gap: 4px; margin-top: 4px; }
+    .stat { padding: 2px 8px; } .stat.prime { padding: 3px 8px; } .stat.prime b { font-size: .98rem; }
+  }
+  @media (max-height: 745px) {
+    .v-badge { font-size: 1.2rem; padding: 4px 10px; }
+    .verdict .vstats { grid-auto-rows: minmax(2.05rem, 2.4rem); gap: 3px; }
+    .vs b { font-size: 1.05rem; }
+    .vs .lbl { font-size: .56rem; }
+    .stat .lbl { font-size: .6rem; } .stat b { font-size: .85rem; } .stat.prime b { font-size: .92rem; }
+  }
   .stat.prime b { font-size: 1.15rem; }
   .row.tgt .r .sub2 { font-size: .7rem; }
-  .moon-info { flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; }
+  .moon-info { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 10px; }
   .moon-info > svg { width: 72px; height: 72px; align-self: center; }
 }
 

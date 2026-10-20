@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.64';
+const VERSION = 'v3.65';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1271,13 +1271,39 @@ function renderVerdict(win, moon, hours) {
     if (gust > 0) chips.push(['Max gusts', wind(gust), windU(), gust > 30 ? 'bad' : gust < 20 ? 'ok' : '']);
     const moonUp = night.some((h) => h.moonAlt > 0);
     chips.push([moonUp ? 'Moon up' : 'Moon', moonUp ? Math.round(moon.illum * 100) : 'Down', moonUp ? '%' : '', moonUp && moon.illum > 0.5 ? 'bad' : !moonUp || moon.illum < 0.25 ? 'ok' : '']);
-    chips.push([dew < 2 ? 'Dew · heater on' : 'Dew gap', dew < 99 ? tempDiff(dew) : '–', '', dew < 2 ? 'bad' : dew >= 5 ? 'ok' : '']);
+    chips.push([dew < 2 ? 'Dew · Heat' : 'Dew gap', dew < 99 ? tempDiff(dew) : '–', '', dew < 2 ? 'bad' : dew >= 5 ? 'ok' : '']);
     chips.push(bortleChip());
-    if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s), `(${s})`, s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
+    if (see.length) { const s = Math.min(...see); chips.push(['Seeing', QUAL(s).replace('Average', 'Avg'), `(${s})`, s <= 4 ? 'ok' : s >= 7 ? 'bad' : '']); }
   }
   $('#verdict').innerHTML = `<div class="v-badge ${cls}">${txt}</div>
     <div class="v-text"><div class="v-win">${line}</div>${note ? `<div class="v-note">${esc(note)}</div>` : ''}</div>
     <div class="vstats">${chips.map(([l, v, u, c, id, tip]) => `<div class="vs ${c}"${id ? ` id="${id}"` : ''}${tip ? ` title="${esc(tip)}"` : ''}><span class="lbl">${esc(l)}</span><b>${esc(v)}<small>${esc(u)}</small></b></div>`).join('')}</div>`;
+}
+
+/* Tile text always fits: if a label or value is wider than its tile, shrink it (down to a floor) instead of clipping.
+   Runs by itself whenever the tiles change or the card is resized, so new or longer text needs no manual fix. */
+function fitTiles() {
+  const fits = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width <= el.clientWidth - 1; };
+  document.querySelectorAll('#verdict .vs').forEach((vs) => {
+    vs.querySelectorAll('.lbl, b').forEach((el) => {
+      el.style.fontSize = '';
+      el.style.textOverflow = 'clip';   // measure the real text width, not the ellipsised one (even a fraction of a pixel over triggers "…")
+      let px = parseFloat(getComputedStyle(el).fontSize);
+      const floor = el.tagName === 'B' ? 13 : 8;
+      while (!fits(el) && px > floor) { px -= 0.5; el.style.fontSize = px + 'px'; }
+      el.style.textOverflow = '';
+    });
+  });
+}
+let fitQueued = false;
+function queueFit() { if (fitQueued) return; fitQueued = true; requestAnimationFrame(() => { fitQueued = false; fitTiles(); }); }
+function watchTiles() {
+  const v = $('#verdict');
+  if (!v) return;
+  if (window.ResizeObserver) new ResizeObserver(queueFit).observe(v);
+  new MutationObserver(queueFit).observe(v, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('resize', queueFit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit);
 }
 
 function renderTonight(win) {
@@ -1534,6 +1560,7 @@ function renderMoon(moon, lat) {
 /* Moon through the night: altitude against time (same time axis as the forecast), twilight shading,
    when it rises/sets, where it is in the sky, and its highest point. */
 function renderPath(N, lat, now) {
+  now = state.night === 0 && state.tm ? state.tm : new Date();   // the live clock, so the Moon moves as the night goes on
   const box = $('#moonPath'), moon = N.moon, c = N.S.s.map((p) => ({ d: p.d, sun: p.sun, alt: p.moon, az: p.moonAz }));
   if (c.length < 2) { box.innerHTML = ''; return; }
   const W = Math.max(260, Math.round(box.clientWidth || 480));
@@ -1608,20 +1635,29 @@ function renderPath(N, lat, now) {
       marks += `<circle cx="${f(X(x.d))}" cy="${f(T + ph)}" r="3.5" fill="var(--path)"/>`;
       labels += pill(X(x.d), `${x.kind === 'rise' ? 'Rises' : 'Sets'} ${fmtTime(x.d)}`, x.kind === 'set' ? 'right' : 'left');
     }
-    // Highest point: Moon glyph + label
-    const r = Math.max(8, Math.min(13, ph / 10)), gx = Math.min(Math.max(X(top.d), L + r + 1), L + pw - r - 1), gy = Y(top.alt);
-    marks += moonGlyph(gx, gy, r, moon.angle, lat);
-    const txt = `Highest ${Math.round(top.alt)}° · ${fmtTime(top.d)}`, tw = txt.length * 7;
-    const lx = Math.min(Math.max(gx, L + tw / 2 + 2), L + pw - tw / 2 - 2);
-    const ly = gy - r - 7 > T + 12 ? gy - r - 7 : gy + r + 16;
-    labels += `<text x="${f(lx)}" y="${f(ly)}" font-size="12.5" font-weight="800" text-anchor="middle" fill="var(--text)" stroke="var(--card)" stroke-width="3" paint-order="stroke">${esc(txt)}</text>`;
+    // Moon glyph. Once the night is under way (real time, or the Time Machine) it sits on the curve at that moment;
+    // before the night begins it marks the highest point, which is only useful then.
+    const r = Math.max(8, Math.min(13, ph / 10));
+    let at = null, txt = '';
+    if (+now > t0 && +now < t1) {
+      const D = state.data, pos = D && D.obs ? altAz('Moon', now, D.obs) : null;
+      if (pos && pos.alt > 0) { at = { d: now, alt: pos.alt }; txt = `${Math.round(pos.alt)}° ${compass(pos.az)}`; }
+    } else { at = top; txt = `Highest ${Math.round(top.alt)}° · ${fmtTime(top.d)}`; }
+    if (at) {
+      const gx = Math.min(Math.max(X(at.d), L + r + 1), L + pw - r - 1), gy = Y(at.alt);
+      marks += moonGlyph(gx, gy, r, moon.angle, lat);
+      const tw = txt.length * 7;
+      const lx = Math.min(Math.max(gx, L + tw / 2 + 2), L + pw - tw / 2 - 2);
+      const ly = gy - r - 7 > T + 12 ? gy - r - 7 : gy + r + 16;
+      labels += `<text x="${f(lx)}" y="${f(ly)}" font-size="12.5" font-weight="800" text-anchor="middle" fill="var(--text)" stroke="var(--card)" stroke-width="3" paint-order="stroke">${esc(txt)}</text>`;
+    }
   } else {
     labels = `<text x="${f(L + pw / 2)}" y="${f(T + ph / 2)}" text-anchor="middle" font-size="13" fill="var(--muted)">The Moon stays below the horizon all night.</text>`;
   }
   // Now
   if (now && +now > t0 && +now < t1) {
     const x = X(now);
-    marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">${state.tm && state.night === 0 ? esc(fmtTime(now)) : 'Now'}</text>`;
+    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">${state.tm && state.night === 0 ? esc(fmtTime(now)) : 'Now'}</text>`;
   }
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Moon altitude through the night">${s}${marks}${labels}</svg>`;
   // Header: what the Moon does during the dark hours
@@ -2605,10 +2641,18 @@ function checkUpdate() {
     .catch(() => { /* offline: keep running the current version */ });
 }
 
+/* Redraw the Moon path against the live clock (the Time Machine drives it itself while it is in use). */
+function refreshPath() {
+  const D = state.data;
+  if (!D || state.tm || !D.nights[state.night]) return;
+  renderPath(D.nights[state.night], D.lat, effNow());
+}
+
 function init() {
   $('#ver').textContent = VERSION; $('#verTop').textContent = VERSION;
+  watchTiles();
   checkUpdate();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkUpdate(); refreshPath(); } });
   window.addEventListener('pageshow', (e) => { if (e.persisted) checkUpdate(); });
   applyRed(); applyUnits(); applyNight(); syncHome(); applyMinAlt(); renderSpots();
   const onScheme = () => applyRed();
@@ -2695,6 +2739,7 @@ function init() {
   });
   if (state.loc) load(); else useGPS();
   setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30 * 60e3);
+  setInterval(() => { if (document.visibilityState === 'visible') refreshPath(); }, 60e3);
 }
 
 if (!A) { setStatus('Astronomy library failed to load.', true); } else init();
