@@ -547,6 +547,31 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 #optTheme .opt-note { margin: .45em 0 0 !important; }
 .theme-seg { display: flex; width: 100%; }
 .theme-seg button { flex: 1; height: 28px; }
+
+/* User Guide (opens in the same pop-up as Options) */
+.guide { line-height: 1.5; }
+.g-lead { margin: 0 0 .8em; font-size: 1.02em; }
+.g-toc { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: .2em; }
+.g-toc button { font: inherit; font-size: .85em; font-weight: 650; padding: .3em .8em; border-radius: 999px; color: var(--accent); background: var(--card2); border: 1px solid var(--line2); cursor: pointer; }
+.g-toc button:active, .g-top:active { transform: scale(.96); }
+.g-sec { margin-top: 1.3em; padding-top: 1em; border-top: 1px solid var(--line); }
+.g-sh { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: .4em; }
+.g-sh h3 { margin: 0; font-size: .85em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.g-top { flex: none; font: inherit; font-size: .75em; color: var(--muted); background: none; border: 0; padding: .2em .4em; cursor: pointer; }
+.g-sec h4 { margin: 1em 0 .15em; font-size: 1em; font-weight: 750; }
+.g-sec p { margin: .35em 0; }
+.g-sec ul, .g-sec ol { margin: .35em 0; padding-left: 1.3em; }
+.g-sec li { margin: .3em 0; }
+.gb { display: inline-block; padding: .05em .55em; border-radius: 8px; font-weight: 800; font-size: .88em; letter-spacing: .02em; color: var(--chip-ink); }
+.gb.go { background: var(--go); }
+.gb.partial { background: var(--go2); }
+.gb.fair { background: var(--fair); }
+.gb.nogo { background: var(--nogo); color: #fff; }
+html.red .gb.nogo { color: var(--text); }
+.g-dl { margin: 0; }
+.g-dl dt { margin-top: .7em; font-weight: 750; }
+.g-dl dd { margin: .1em 0 0; color: var(--muted); }
+.g-end { margin-top: 1.4em; text-align: center; }
 .alt-row input[type=range] {
   flex: 1; min-width: 0; height: 32px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; touch-action: pan-y;
 }

@@ -10,5 +10,6 @@ On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to 
 - Moon phase and a chart of the Moon's path across the sky tonight
 - Planets and well-placed Seestar targets for tonight
 - GPS or saved locations, metric/imperial, and a red night-vision mode
+- Built-in User Guide: Options → **User Guide** (beside the Options title)
 
 Data: Open-Meteo, MET Norway, 7Timer!. Astronomy: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, bundled).

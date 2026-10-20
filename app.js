@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.57';
+const VERSION = 'v3.58';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1338,11 +1338,21 @@ function wireCopy() {
   });
 }
 
+/* The pill beside the sheet title: "User Guide" in Options, "‹ Options" in the guide. */
+let guideAct = null;
+function setSheetLink(label, fn) {
+  const b = $('#sheetGuide');
+  b.textContent = label; b.setAttribute('aria-label', label.replace('‹ ', 'Back to '));
+  b.hidden = false; guideAct = fn;
+}
+
 function showSheet(title, body, sub = '', wide = false, locked = false, copy = '') {
   copyText = copy;
   const cb = $('#sheetCopy');
   cb.hidden = !copy; cb.textContent = 'Copy'; cb.classList.remove('done');
   cb.setAttribute('aria-label', copy ? `Copy ${copy}` : 'Copy');
+  $('#sheetGuide').hidden = true; // only Options and the User Guide show this button (see setSheetLink)
+  guideAct = null;
   $('#sheetTitle').textContent = title;
   $('#sheetSub').textContent = sub;
   $('#sheetSub').hidden = !sub;
@@ -2153,6 +2163,7 @@ function showOptions() {
       </div>
     </div>
     </section>`, '', false, true);
+  setSheetLink('User Guide', showGuide);
   $('#optUnits').addEventListener('click', (e) => {
     const b = e.target.closest('[data-units]');
     if (!b || b.dataset.units === state.units) return;
@@ -2189,6 +2200,15 @@ function showOptions() {
   });
   box.addEventListener('keydown', (e) => { const w = e.target.closest('[data-w]'); if (w && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(w); box.querySelector(`[data-w="${w.dataset.w}"]`).focus(); } });
   renderOptions();
+}
+
+/* User Guide: opens in the same pop-up as Options, with a "‹ Options" button to go back. */
+function showGuide() {
+  const G = window.SKY_GUIDE;
+  showSheet('User Guide', G ? G.html() : '<p class="note">The guide could not be loaded. Close the app and open it again.</p>', '', true, false);
+  setSheetLink('‹ Options', showOptions);
+  const body = $('#sheetBody');
+  if (G) body.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => G.go(body, b.dataset.g)));
 }
 
 function showSources() {
@@ -2466,6 +2486,7 @@ function init() {
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   wireCopy();
+  $('#sheetGuide').addEventListener('click', () => { if (guideAct) guideAct(); });
   wireDial();
   $('#tmRange').addEventListener('input', () => onTM());
   $('#tmRange').addEventListener('change', () => onTM(true));
