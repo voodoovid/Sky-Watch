@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.54">
+<link rel="stylesheet" href="style.css?v=3.55">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -107,9 +107,9 @@
   </section>
 
   <section class="card obj-card" id="objCard">
-    <div class="tgt-search"><input id="tgtQ" type="search" placeholder="Search targets" aria-label="Search targets" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="tgtQx" type="button" class="tq-x" aria-label="Clear search" hidden>✕</button></div>
     <div class="eyebrow ttl eb-row">Planets<span class="eb-r">Highest</span></div>
     <div id="planets" class="list"></div>
+    <div class="tgt-search"><input id="tgtQ" type="search" placeholder="Search targets" aria-label="Search targets" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button id="tgtQx" type="button" class="tq-x" aria-label="Clear search" hidden>✕</button></div>
     <div class="eyebrow ttl mt eb-row" id="tgtTitle">Seestar targets<span class="eb-r">Reaches 40°</span></div>
     <div id="targets" class="list scroll"></div>
   </section>
@@ -127,6 +127,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=3.54"></script>
+<script src="app.js?v=3.55"></script>
 </body>
 </html>

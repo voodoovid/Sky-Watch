@@ -274,7 +274,8 @@ html.red .night-seg button[aria-pressed="true"] { background: #300000; color: va
 .eyebrow.ttl.mt { margin-top: 14px; }
 
 /* Target search (above Planets). 16px text stops iOS zooming the page when it is focused. */
-.tgt-search { position: relative; flex: none; margin-bottom: 8px; }
+.tgt-search { position: relative; flex: none; margin-top: 12px; }
+.tgt-search + .eyebrow.ttl.mt { margin-top: 8px; }
 .tgt-search input {
   width: 100%; box-sizing: border-box; height: 34px; padding: 0 30px 0 10px; font: inherit; font-size: 16px;
   background: var(--card2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; outline: none;
