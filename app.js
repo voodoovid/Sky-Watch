@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.52';
+const VERSION = 'v3.53';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1719,12 +1719,12 @@ function skyCutout(raHours, dec, fovDeg, w = 900, h = 600) {
     + `&fov=${fovDeg.toFixed(3)}&projection=TAN&coordsys=icrs&ra=${(raHours * 15).toFixed(4)}&dec=${dec.toFixed(4)}&format=jpg`;
 }
 /* Survey image with the Seestar frame and a full Moon drawn to the same scale. */
-function heroSky(raHours, dec, majorArcmin, caption, marker) {
+function heroSky(raHours, dec, majorArcmin, caption, marker, local) {
   const fov = Math.max(SEESTAR.w * 1.35, ((majorArcmin || 0) / 60) * 1.5); // width of the image in degrees
   const fovH = (fov * 2) / 3;
   const fw = (SEESTAR.w / fov) * 100, fh = (SEESTAR.h / fovH) * 100, mw = (MOON_DEG / fov) * 100;
   return `<figure class="hero"><div class="hero-img">
-      <img src="${skyCutout(raHours, dec, fov)}" alt="Sky survey image of the target" decoding="async">
+      <img src="${local || skyCutout(raHours, dec, fov)}" data-r="${skyCutout(raHours, dec, fov)}" alt="Sky survey image of the target" decoding="async">
       ${marker ? '<div class="xhair"></div>' : ''}
       <div class="frame" style="left:${((100 - fw) / 2).toFixed(2)}%;top:${((100 - fh) / 2).toFixed(2)}%;width:${fw.toFixed(2)}%;height:${fh.toFixed(2)}%"><svg aria-hidden="true"><rect class="fr-shadow" x="0" y="0" width="100%" height="100%"/><rect class="fr-line" x="0" y="0" width="100%" height="100%"/></svg><span>Seestar frame</span></div>
       <div class="moonscale" style="width:${mw.toFixed(2)}%"><span>Full Moon</span></div>
@@ -1754,7 +1754,11 @@ function wireHero(root) {
   root.querySelectorAll('.hero-img img:not([data-wiki])').forEach((img) => {
     const fig = img.closest('.hero');
     img.addEventListener('load', () => fig.classList.add('loaded'));
-    img.addEventListener('error', () => heroMsg(fig, !navigator.onLine));
+    img.addEventListener('error', () => {
+      const r = img.dataset.r;
+      if (r && img.getAttribute('src') !== r) img.src = r;   // saved copy missing: use the online survey
+      else heroMsg(fig, !navigator.onLine);
+    });
   });
   root.querySelectorAll('img[data-wiki]').forEach(async (img) => {
     const fig = img.closest('.hero');
@@ -1996,7 +2000,7 @@ function openObject(o) {
     const [fit, fitSub] = frameFit(sz);
     title = `${o.id} · ${o.name}`;
     sub = `${o.type} in ${constellation(o.ra, o.dec)}`;
-    hero = heroSky(o.ra, o.dec, sz ? sz[0] : 0, 'DSS2 sky survey · dashed box = Seestar S50 frame · circle = full Moon');
+    hero = heroSky(o.ra, o.dec, sz ? sz[0] : 0, 'DSS2 sky survey · dashed box = Seestar S50 frame · circle = full Moon', false, `heroes/${String(o.id).replace(/[^A-Za-z0-9]+/g, '_')}.jpg`);
     tiles = windowTiles(o) + tile('Peak', peakTxt, o.peak ? `at ${fmtTime(o.peak.d)}` : '', 'sm') + tile('Fits Seestar frame', fit, fitSub, 'sm');
     rows = [
       ['Size', info[1] ? `${info[1]} (arcminutes)` : '–'], ['In plain terms', sizeScale(sz) || '–'],
