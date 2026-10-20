@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.44';
+const VERSION = 'v3.45';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1505,6 +1505,11 @@ function thumbUrl(o) {
 const MIN_LEFT = 60 * 60e3; // a target counts as "up" for filming only if it stays usable at least this long
 const segAt = (o, t) => (o.segs || []).find((g) => g.s <= t && t < g.e);       // usable window containing t
 const nextSeg = (o, t) => (o.segs || []).find((g) => g.e > t);                  // that window, or the next one
+/* Usable hours still to come from time t until the target is gone (not its whole night). */
+const hrsLeft = (o, t) => {
+  if (!o.segs || !o.segs.length) return Math.max(0, Math.min(o.hrs, (+o.end - Math.max(+o.start, +t)) / 3600e3));
+  return o.segs.reduce((a, g) => a + Math.max(0, +g.e - Math.max(+g.s, +t)), 0) / 3600e3;
+};
 /* The time everything is judged at: the Time Machine time (tonight only), otherwise now. */
 const effNow = () => (state.data ? (state.night === 0 && state.tm ? state.tm : state.data.now) : new Date());
 const tmLabel = () => (state.night === 0 && state.tm ? fmtTime(state.tm) : 'Now');
@@ -1537,6 +1542,68 @@ function syncTM() {
   $('#tmNow').hidden = !(on && state.tm);
   rng.title = on ? 'Slide to see what you can film later tonight (Home sky applies)' : 'Time Machine works on Tonight';
   tmDrawn = state.tm ? +state.tm : 0;   // whatever the page was just redrawn at
+  drawDial();
+}
+/* The round dial: a 270° gauge (bottom-left = Now, sweeping clockwise to 30 min before dawn) with an hour tick on each full hour. */
+const dPt = (th, r) => { const a = th * Math.PI / 180; return [32 + r * Math.sin(a), 32 - r * Math.cos(a)]; };
+function drawDial() {
+  const rng = $('#tmRange'), svg = $('#tmDial'), g = $('#tmG'); if (!rng || !svg || !g) return;
+  const n = +rng.max || 0, v = Math.min(n, Math.max(0, +rng.value || 0)), on = !rng.disabled && n > 0;
+  const th = n ? -135 + 270 * v / n : -135;
+  const P = (t, r) => dPt(t, r).map((x) => x.toFixed(2)).join(' ');
+  const arc = (t1, t2, r) => `M${P(t1, r)} A${r} ${r} 0 ${t2 - t1 > 180 ? 1 : 0} 1 ${P(t2, r)}`;
+  let s = '<circle class="face" cx="32" cy="32" r="17"/>' + `<path class="trk" d="${arc(-135, 135, 23)}"/>`;
+  if (v > 0) s += `<path class="prg" d="${arc(-135, th, 23)}"/>`;
+  const r = tmRange();
+  if (r && n) for (let k = 1; k <= n; k++) {
+    if (new Date(r.first + (k - 1) * TM_STEP).getMinutes() !== 0) continue;
+    const t = -135 + 270 * k / n, a = dPt(t, 27.5), b = dPt(t, 30.5);
+    s += `<line class="tk" x1="${a[0].toFixed(2)}" y1="${a[1].toFixed(2)}" x2="${b[0].toFixed(2)}" y2="${b[1].toFixed(2)}"/>`;
+  }
+  const nd = dPt(th, 12), kn = dPt(th, 23);
+  s += `<line class="ndl" x1="32" y1="32" x2="${nd[0].toFixed(2)}" y2="${nd[1].toFixed(2)}"/><circle class="hub" cx="32" cy="32" r="2.4"/>`
+    + `<circle class="knob" cx="${kn[0].toFixed(2)}" cy="${kn[1].toFixed(2)}" r="4.2"/>`;
+  g.innerHTML = s;
+  svg.setAttribute('aria-valuemax', n); svg.setAttribute('aria-valuenow', v); svg.setAttribute('aria-valuetext', tmLabel());
+  svg.setAttribute('tabindex', on ? '0' : '-1'); svg.setAttribute('aria-disabled', on ? 'false' : 'true');
+}
+/* Dial input: tap the ring to jump, drag round to turn it. Dragging away from the dial gives finer control. */
+function wireDial() {
+  const svg = $('#tmDial'), rng = $('#tmRange'); let drag = null;
+  const kDeg = () => 270 / Math.max(1, +rng.max);
+  const angOf = (e, c) => Math.atan2(e.clientX - c.x, c.y - e.clientY) * 180 / Math.PI;
+  const fire = (t) => rng.dispatchEvent(new Event(t, { bubbles: true }));
+  const setV = (v) => { v = Math.max(0, Math.min(+rng.max, Math.round(v))); if (v !== +rng.value) { rng.value = v; fire('input'); } };
+  svg.addEventListener('pointerdown', (e) => {
+    if (rng.disabled || !(+rng.max)) return;
+    e.preventDefault();
+    const b = svg.getBoundingClientRect(), c = { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    const dist = Math.hypot(e.clientX - c.x, e.clientY - c.y), a = angOf(e, c);
+    let vf = +rng.value;
+    if (dist > b.width * 0.18 && dist <= b.width * 0.62) vf = (Math.max(-135, Math.min(135, a)) + 135) / kDeg();
+    drag = { c, last: a, vf };
+    try { svg.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    svg.focus({ preventScroll: true });
+    setV(vf);
+  });
+  svg.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const a = angOf(e, drag.c); let d = a - drag.last;
+    if (d > 180) d -= 360; else if (d < -180) d += 360;
+    drag.last = a;
+    if (Math.hypot(e.clientX - drag.c.x, e.clientY - drag.c.y) < 6) return; // angle is unreliable right at the centre
+    drag.vf = Math.max(0, Math.min(+rng.max, drag.vf + d / kDeg()));
+    setV(drag.vf);
+  });
+  const end = () => { if (drag) { drag = null; fire('change'); } };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+  svg.addEventListener('keydown', (e) => {
+    if (rng.disabled) return;
+    const v = +rng.value, n = +rng.max;
+    const to = { ArrowRight: v + 1, ArrowUp: v + 1, ArrowLeft: v - 1, ArrowDown: v - 1, PageUp: v + 4, PageDown: v - 4, Home: 0, End: n }[e.key];
+    if (to == null) return;
+    e.preventDefault(); setV(to); fire('change');
+  });
 }
 /* Full redraw at the chosen time: Top Ten (icons, order, times), Seestar list, Moon path, open pop-up chart. */
 function applyTM() {
@@ -1549,7 +1616,7 @@ function applyTM() {
 function onTM(final) {
   const r = tmRange(), v = +$('#tmRange').value;
   state.tm = r && v >= 1 ? tmAt(r, v) : null;
-  $('#tmVal').textContent = tmLabel(); $('#tmNow').hidden = !state.tm;
+  $('#tmVal').textContent = tmLabel(); $('#tmNow').hidden = !state.tm; drawDial();
   const key = state.tm ? +state.tm : 0;
   if (final === true) { cancelAnimationFrame(tmRaf); tmRaf = 0; tmDrawn = key; applyTM(); return; }  // on release: always redraw
   if (key === tmDrawn || tmRaf) return;                                                              // while dragging: once per frame, only on a new stop
@@ -1564,7 +1631,7 @@ function renderTop(list, topIdx, now) {
     const g = nextSeg(o, now), upNow = !!(g && g.s <= now);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon <span class="n">${Math.round(o.moonSep)}°</span>`;
     const what = o.kind === 'comet' ? `Comet · mag <span class="n">≈${o.mag.toFixed(1)}</span>` : esc(o.type);
-    const when = `${upNow || !g ? '' : `${esc(fmtTime(g.s))} `}<span class="to">To</span> ${esc(fmtTime(g ? g.e : o.end))}<span class="hr">${o.hrs.toFixed(1)} h</span>`;
+    const when = `${upNow || !g ? '' : `${esc(fmtTime(g.s))} `}<span class="to">To</span> ${esc(fmtTime(g ? g.e : o.end))}<span class="hr">${hrsLeft(o, now).toFixed(1)} h</span>`;
     return `<button type="button" class="top-it" data-t="${i}">
       <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
@@ -1602,7 +1669,7 @@ function renderTargets(list) {
       ? `Comet · mag ≈${o.mag.toFixed(1)}${o.moonSep == null ? '' : ' · ' + moonTxt}`
       : `${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}`;
     const when = upNow ? `To ${esc(fmtTime(g.e))}` : esc(fmtTime(g ? g.s : o.start));
-    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `${o.hrs.toFixed(1)} h` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
+    const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `${hrsLeft(o, now).toFixed(1)} h` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${hrsLeft(o, now).toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
   }).join('') : topIdx.length ? '<p class="empty">That’s everything for tonight — see Top Ten Targets.</p>' : `<p class="empty">${state.data && state.data.nights[state.night].darkLim == null ? 'No full darkness tonight here.' : `Nothing reaches ${MIN_ALT}° in darkness${state.home ? ` in your home sky (${esc(homeDesc())})` : ''} ${state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow night' : 'that night'}.`}</p>`;
@@ -2376,6 +2443,7 @@ function init() {
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   wireCopy();
+  wireDial();
   $('#tmRange').addEventListener('input', () => onTM());
   $('#tmRange').addEventListener('change', () => onTM(true));
   $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(true); });

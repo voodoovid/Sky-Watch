@@ -155,19 +155,29 @@ html.red .brand .sub { color: var(--accent); }
 }
 .controls { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
 
-/* Time Machine: look at the sky later tonight (default Now) */
+/* Time Machine: a round dial for the sky later tonight (default Now); title kept, time to the right of the dial */
 .tm {
-  flex: 0 1 190px; min-width: 150px; max-width: 200px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 11px 2px;
+  flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 3px 14px 3px 5px;
 }
-.tm-top { display: flex; align-items: center; gap: 8px; font-size: .64rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.tm-t { overflow: hidden; text-overflow: ellipsis; }
-.tm output { margin-left: auto; color: var(--accent); font-size: .86rem; font-weight: 800; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
-.tm-now { padding: 0 8px; height: 18px; font: inherit; font-size: .66rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 9px; cursor: pointer; }
+.tm-dial { width: 50px; height: 50px; flex: none; cursor: grab; touch-action: none; outline: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.tm-dial:active { cursor: grabbing; }
+.tm-dial:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 50%; }
+.tm-dial .face { fill: var(--card2); stroke: var(--line2); stroke-width: 1; }
+.tm-dial .trk { fill: none; stroke: var(--line2); stroke-width: 4.5; stroke-linecap: round; }
+.tm-dial .prg { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; }
+.tm-dial .tk { stroke: var(--muted); stroke-width: 1.3; stroke-linecap: round; opacity: .75; }
+.tm-dial .ndl { stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; }
+.tm-dial .hub { fill: var(--accent); }
+.tm-dial .knob { fill: var(--text); stroke: var(--accent); stroke-width: 2; }
+.tm-info { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; }
+.tm-t { font-size: .64rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.tm-row { display: flex; align-items: center; gap: 8px; }
+.tm output { color: var(--accent); font-size: 1.1rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tm-now { padding: 0 8px; height: 18px; font: inherit; font-size: .66rem; font-weight: 700; color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 9px; cursor: pointer; }
 .tm-now[hidden] { display: none; }
-.tm input[type=range] { width: 100%; height: 28px; margin: 0; accent-color: var(--accent); touch-action: pan-x; cursor: pointer; }
-.tm input[type=range]:disabled { opacity: .4; cursor: default; }
 .tm.off { opacity: .6; }
+.tm.off .tm-dial { cursor: default; }
 
 .ibtn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -180,7 +190,14 @@ html.red .brand .sub { color: var(--accent); }
 .ibtn:active, .tbtn:active, .seg button:active { transform: translateY(1px); }
 .ibtn[aria-expanded="true"] { color: var(--accent); }
 .red-btn { color: #ff7070; }
-.home-btn { color: var(--muted); }
+.home-btn { color: var(--muted); position: relative; }
+@media (hover: hover) {
+  .home-btn[data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    padding: 5px 10px; background: var(--card2); color: var(--text); border: 1px solid var(--line2); border-radius: 8px;
+    font-size: .74rem; font-weight: 600; white-space: nowrap; pointer-events: none; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+}
 .home-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--go) 18%, var(--card)); border-color: var(--go); color: var(--go); }
 html.red .home-btn[aria-pressed="true"] { background: #200000; border-color: var(--accent); color: var(--accent); }
 html.red .red-btn { background: #200000; border-color: var(--accent); color: var(--accent); }
@@ -629,7 +646,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   /* Pin the page so iOS can never scroll/rubber-band it upward under the status bar. */
   body { display: flex; flex-direction: column; position: fixed; inset: 0; height: auto; }
-  .top { position: static; }
+  .top { position: relative; z-index: 20; }
   .dash { flex: 1; min-height: 0; }
   .foot { padding-top: 0; }
   .card { overflow: hidden; }
@@ -710,7 +727,6 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .red-btn .lbl, .home-btn .lbl { display: none; }
   .top { gap: 10px; }
   .night-seg button { padding: 0 9px; }
-  .tm { flex: 0 1 170px; min-width: 170px; max-width: 180px; }
   .loc-ctl { flex: 1 1 190px; }
 }
 
@@ -718,10 +734,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
 @media (max-width: 759px) {
   .top { flex-wrap: wrap; }
   .loc-ctl { order: 3; flex-basis: 100%; max-width: none; }
-  .tm { order: 4; flex-basis: 100%; max-width: none; flex-direction: row; align-items: center; gap: 10px; padding: 2px 11px; }
-  .tm-top { flex: none; }
-  .tm input[type=range] { flex: 1; }
-  .tm output { margin-left: 0; min-width: 4.6em; }
+  .tm { order: 4; flex-basis: 100%; max-width: none; }
+  .tm-info { flex-direction: row; align-items: center; gap: 12px; }
   .ver-top { display: block; margin-left: auto; align-self: flex-start; padding-top: 2px; }
   .ver-foot { display: none; }
   .controls { margin-left: auto; flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }

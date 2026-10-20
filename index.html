@@ -47,14 +47,18 @@
     <button id="searchBtn" class="ibtn" type="button" title="Find a place" aria-label="Find a place" aria-expanded="false"><svg><use href="#i-search"/></svg></button>
   </div>
   <div class="tm" id="tm">
-    <label class="tm-top" for="tmRange"><span class="tm-t">Time Machine</span><output id="tmVal" for="tmRange">Now</output><button id="tmNow" class="tm-now" type="button" hidden>Now</button></label>
-    <input id="tmRange" type="range" min="0" max="0" step="1" value="0" aria-label="Time Machine: see what is up later tonight" disabled>
+    <svg class="tm-dial" id="tmDial" viewBox="0 0 64 64" role="slider" tabindex="-1" aria-label="Time Machine: see what is up later tonight" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="Now"><g id="tmG"></g></svg>
+    <div class="tm-info">
+      <span class="tm-t">Time Machine</span>
+      <span class="tm-row"><output id="tmVal">Now</output><button id="tmNow" class="tm-now" type="button" hidden>Now</button></span>
+    </div>
+    <input id="tmRange" type="range" min="0" max="0" step="1" value="0" disabled hidden tabindex="-1" aria-hidden="true">
   </div>
   <div class="controls">
     <div class="seg night-seg" id="nightSeg" role="group" aria-label="Night">
       <button type="button" data-n="0" aria-pressed="true">Tonight</button><button type="button" data-n="1" aria-pressed="false">Tomorrow</button><button type="button" data-n="2" aria-pressed="false">Day 3</button>
     </div>
-    <button id="homeBtn" class="ibtn home-btn" type="button" aria-pressed="false" aria-label="Home sky"><svg><use href="#i-home"/></svg><span class="lbl">Home</span></button>
+    <button id="homeBtn" class="ibtn home-btn" type="button" aria-pressed="false" aria-label="Home sky" data-tip="Adjust in Settings"><svg><use href="#i-home"/></svg><span class="lbl">Home</span></button>
     <button id="refreshBtn" class="ibtn" type="button" title="Refresh" aria-label="Refresh"><svg><use href="#i-refresh"/></svg></button>
     <button id="optBtn" class="ibtn" type="button" title="Options" aria-label="Options"><svg><use href="#i-gear"/></svg></button>
     <button id="redBtn" class="ibtn red-btn" type="button" aria-pressed="false" title="Red night mode" aria-label="Red night mode"><svg><use href="#i-eye"/></svg><span class="lbl">Red</span></button>
