@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.41">
+<link rel="stylesheet" href="style.css?v=3.42">
 <script>
   // Apply red mode before first paint so the screen never flashes bright at night.
   try { if (JSON.parse(localStorage.getItem('red'))) document.documentElement.classList.add('red'); } catch (e) {}
@@ -45,6 +45,10 @@
     <select id="spotSelect" aria-label="Location"></select>
     <button id="gpsBtn" class="ibtn" type="button" title="Use GPS" aria-label="Use GPS"><svg><use href="#i-gps"/></svg></button>
     <button id="searchBtn" class="ibtn" type="button" title="Find a place" aria-label="Find a place" aria-expanded="false"><svg><use href="#i-search"/></svg></button>
+  </div>
+  <div class="tm" id="tm">
+    <label class="tm-top" for="tmRange"><span class="tm-t">Time Machine</span><output id="tmVal" for="tmRange">Now</output><button id="tmNow" class="tm-now" type="button" hidden>Now</button></label>
+    <input id="tmRange" type="range" min="0" max="0" step="1" value="0" aria-label="Time Machine: see what is up later tonight" disabled>
   </div>
   <div class="controls">
     <div class="seg night-seg" id="nightSeg" role="group" aria-label="Night">
@@ -116,6 +120,6 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="app.js?v=3.41"></script>
+<script src="app.js?v=3.42"></script>
 </body>
 </html>

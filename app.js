@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.41';
+const VERSION = 'v3.42';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -27,6 +27,7 @@ const state = {
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
   data: null,
   night: 0, // 0 = tonight, 1 = tomorrow night, 2 = the night after
+  tm: null, // Time Machine time (null = now); not saved, so the app always opens on Now
   home: store.get('home', false), // only count the part of the sky set in Options
   homeLoc: store.get('homeLoc', null), // {lat, lon} where Home sky was turned on; Home is on only near here
   homeSky: (() => {
@@ -1470,7 +1471,7 @@ function renderPath(N, lat, now) {
   // Now
   if (now && +now > t0 && +now < t1) {
     const x = X(now);
-    marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">Now</text>`;
+    marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">${state.tm && state.night === 0 ? esc(fmtTime(now)) : 'Now'}</text>`;
   }
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Moon altitude through the night">${s}${marks}${labels}</svg>`;
   // Header: what the Moon does during the dark hours
@@ -1499,16 +1500,55 @@ function thumbUrl(o) {
   const fov = Math.min(4, Math.max(0.4, ((sz ? sz[0] : 40) / 60) * 1.6));
   return skyCutout(o.ra, o.dec, fov, 240, 180);
 }
+/* ---------- Time Machine: look at the sky later tonight ---------- */
+const MIN_LEFT = 60 * 60e3; // a target counts as "up" for filming only if it stays usable at least this long
+const segAt = (o, t) => (o.segs || []).find((g) => g.s <= t && t < g.e);       // usable window containing t
+const nextSeg = (o, t) => (o.segs || []).find((g) => g.e > t);                  // that window, or the next one
+/* The time everything is judged at: the Time Machine time (tonight only), otherwise now. */
+const effNow = () => (state.data ? (state.night === 0 && state.tm ? state.tm : state.data.now) : new Date());
+const tmLabel = () => (state.night === 0 && state.tm ? fmtTime(state.tm) : 'Now');
+/* Slider runs from now (or dusk, if the night hasn't started) to 30 minutes before astronomical dawn. */
+function tmRange() {
+  const D = state.data; if (!D) return null;
+  const w = D.nights[0].win, dawn = w.darkEnd || w.rise;
+  const start = Math.max(+D.now, +w.set), end = +dawn - 30 * 60e3;
+  const n = Math.floor((end - start) / STEP);
+  return n >= 1 ? { start, n } : null;
+}
+function syncTM() {
+  const r = tmRange(), rng = $('#tmRange'), box = $('#tm');
+  const on = !!r && state.night === 0;
+  rng.disabled = !on; box.classList.toggle('off', !on);
+  if (!r) { state.tm = null; rng.max = 0; rng.value = 0; }
+  else {
+    rng.max = r.n;
+    // keep the chosen time across a refresh while it is still ahead of us and inside tonight
+    const v = state.tm ? Math.round((+state.tm - r.start) / STEP) : 0;
+    if (!state.tm || v < 1 || v > r.n) { state.tm = null; rng.value = 0; } else { rng.value = v; state.tm = new Date(r.start + v * STEP); }
+  }
+  $('#tmVal').textContent = tmLabel();
+  $('#tmNow').hidden = !(on && state.tm);
+  rng.title = on ? 'Slide to see what you can film later tonight (Home sky applies)' : 'Time Machine works on Tonight';
+}
+function onTM() {
+  const r = tmRange(), v = +$('#tmRange').value;
+  state.tm = r && v >= 1 ? new Date(r.start + v * STEP) : null;
+  $('#tmVal').textContent = tmLabel(); $('#tmNow').hidden = !state.tm;
+  const D = state.data; if (!D) return;
+  renderTargets(D.nights[state.night].targets);
+  renderPath(D.nights[state.night], D.lat, effNow());
+  if ($('#sheet').open && $('#objChart') && state.openObj) altChart($('#objChart'), state.openObj, effNow());
+}
 const TOP_N = 3;      // ranks shown at once in the Top targets card
 const TOP_MORE = 10;  // scroll down in the card for more; all ten leave the Seestar list
 function renderTop(list, topIdx, now) {
   $('#topTitle').firstChild.textContent = `Top Ten Targets ${state.night === 0 ? 'Tonight' : state.night === 1 ? 'Tomorrow' : nightName(2)}`;
   $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
     const o = list[i];
-    const upNow = o.start <= now && now < o.end;
+    const g = nextSeg(o, now), upNow = !!(g && g.s <= now);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon <span class="n">${Math.round(o.moonSep)}°</span>`;
     const what = o.kind === 'comet' ? `Comet · mag <span class="n">≈${o.mag.toFixed(1)}</span>` : esc(o.type);
-    const when = `${upNow ? '' : `${esc(fmtTime(o.start))} `}<span class="to">To</span> ${esc(fmtTime(o.end))}<span class="hr">${o.hrs.toFixed(1)} h</span>`;
+    const when = `${upNow || !g ? '' : `${esc(fmtTime(g.s))} `}<span class="to">To</span> ${esc(fmtTime(g ? g.e : o.end))}<span class="hr">${o.hrs.toFixed(1)} h</span>`;
     return `<button type="button" class="top-it" data-t="${i}">
       <span class="th"><img src="${thumbUrl(o)}" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"><i class="rk">${r + 1}</i></span>
       <span class="tx"><span class="tn"><b>${esc(o.id)}</b>${esc(o.name)}</span><span class="ts">${what} · ${moonTxt}</span><span class="tw">${when}</span></span></button>`;
@@ -1526,11 +1566,11 @@ function sizeTop() {
 }
 
 function renderTargets(list) {
-  const now = state.data ? state.data.now : new Date();
+  const now = effNow();
   // The top ten still-visible targets go to their own card; the Seestar list starts at #11.
   // Targets that are up right now (with at least half an hour left) come first, so tonight's ranking favours
   // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
-  const tier = (o) => (o.start <= now && now < o.end ? (o.end - now >= 30 * 60e3 ? 0 : 2) : o.end <= now ? 3 : 1);
+  const tier = (o) => { const g = segAt(o, now); return g ? (g.e - now >= MIN_LEFT ? 0 : 2) : o.end <= now ? 3 : 1; };
   const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || a - b);
   const topIdx = [];
   order.forEach((i) => { if (topIdx.length < TOP_MORE && list[i].end > now) topIdx.push(i); });
@@ -1539,11 +1579,11 @@ function renderTargets(list) {
   $('#targets').innerHTML = rest.length ? rest.map(([o, i]) => {
     const neb = /Emission|Supernova|Planetary|^Nebula$|Cluster \+ nebula/.test(o.type);
     const moonTxt = o.moonSep == null ? 'Moon down' : `Moon ${Math.round(o.moonSep)}°`;
-    const upNow = o.start <= now && now < o.end, past = o.end <= now;
+    const g = nextSeg(o, now), upNow = !!(g && g.s <= now), past = o.end <= now;
     const sub = o.kind === 'comet'
       ? `Comet · mag ≈${o.mag.toFixed(1)}${o.moonSep == null ? '' : ' · ' + moonTxt}`
       : `${esc(o.type)}${neb ? ' · LP filter' : ''}${o.moonSep == null ? '' : ' · ' + moonTxt}`;
-    const when = upNow ? `To ${esc(fmtTime(o.end))}` : esc(fmtTime(o.start));
+    const when = upNow ? `To ${esc(fmtTime(g.e))}` : esc(fmtTime(g ? g.s : o.start));
     const sub2 = past ? `ended ${esc(fmtTime(o.end))}` : upNow ? `${o.hrs.toFixed(1)} h` : `${o.startWhy === 'dark' ? 'at dark · ' : o.startWhy === 'dir' ? 'into view · ' : ''}${o.hrs.toFixed(1)} h`;
     return `<button type="button" class="row tgt${o.kind === 'comet' ? ' comet' : ''}${past ? ' past' : ''}" data-t="${i}"><div class="nm"><span class="t1"><b>${esc(o.id)}</b>${esc(o.name)}${o.kind === 'comet' ? '<span class="tag tag-comet">Comet</span>' : ''}</span><span class="sub2">${sub}</span></div>
       <div class="r">${when}<span class="sub2">${sub2}</span></div></button>`;
@@ -1754,7 +1794,7 @@ function altChart(el, o, now) {
     const right = xs == null || xs < x - 2 || xs > x + tw + 8;
     const tx = right ? x + 4 : x - 4;
     marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-opacity=".55" stroke-width="1" stroke-dasharray="2 3"/>`;
-    labels += `<text x="${f(tx)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" text-anchor="${right ? 'start' : 'end'}" fill="var(--text)" opacity=".75">Now</text>`;
+    labels += `<text x="${f(tx)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" text-anchor="${right ? 'start' : 'end'}" fill="var(--text)" opacity=".75">${state.tm && state.night === 0 ? esc(fmtTime(now)) : 'Now'}</text>`;
     obst.push(box(right ? tx : tx - tw, T + ph - 5 - sm, tw, sm + 2));
   }
   if (o.start) {
@@ -1852,7 +1892,7 @@ function windowTiles(o) {
 }
 function openObject(o) {
   if (!o) return;
-  const now = state.data.now;
+  const now = effNow();
   const peakTxt = o.peak ? `${Math.round(o.peak.alt)}° ${compass(o.peak.az)}` : '–'; // planets: peak = best after dusk
   let title, sub, hero, tiles, rows, tip;
   if (o.kind === 'dso') {
@@ -2059,6 +2099,7 @@ function showSources() {
 function renderAll() {
   const D = state.data;
   applyNight();
+  syncTM();
   if (!D) return;
   const N = D.nights[state.night];
   renderVerdict(N.win, N.moon, N.hours);
@@ -2067,7 +2108,7 @@ function renderAll() {
   $('#fcTitle').innerHTML = `Dark hours<span class="fc-date">${esc(fmtDay(N.win.set))}</span>`;
   $('#pathTitle').textContent = state.night ? `Moon path · ${state.night === 1 ? 'tomorrow' : nightName(2)}` : 'Moon path';
   renderMoon(N.moon, D.lat);
-  renderPath(N, D.lat, D.now);
+  renderPath(N, D.lat, effNow());
   renderPlanets(N.planets);
   renderTargets(N.targets);
   const s = D.src, on = OM_MODELS.filter((m) => s.om[m.id]).length + ENSEMBLES.filter((e) => s.ens[e.name]).length + (s.met ? 1 : 0) + (s.t7 && !s.t7cached ? 1 : 0);
@@ -2267,7 +2308,7 @@ function applyNight() {
   const n = state.night === 0 ? 'Tonight' : state.night === 1 ? 'Tomorrow night' : `${nightName(2)} night`;
   $('#verdictEyebrow').textContent = n;
   const b2 = $('#nightSeg [data-n="2"]');
-  if (b2) { b2.textContent = innerWidth < 760 ? nightName(2).slice(0, 3) : nightName(2); b2.title = `${nightName(2)} night`; }
+  if (b2) { b2.textContent = innerWidth < 1100 ? nightName(2).slice(0, 3) : nightName(2); b2.title = `${nightName(2)} night`; }
 }
 function toggleSearch(open) {
   const p = $('#searchPanel');
@@ -2317,6 +2358,8 @@ function init() {
   });
   $('#forecast').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) showHour(+c.dataset.i); });
   wireCopy();
+  $('#tmRange').addEventListener('input', onTM);
+  $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(); });
   $('#sourcesBtn').addEventListener('click', showSources);
   $('#optBtn').addEventListener('click', showOptions);
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
@@ -2334,9 +2377,9 @@ function init() {
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => {
     sizeTop();
     const D = state.data; if (!D) return;
-    renderPath(D.nights[state.night], D.lat, D.now);
+    renderPath(D.nights[state.night], D.lat, effNow());
     skyChart(D.nights[state.night].hours);
-    if ($('#sheet').open && $('#objChart') && state.openObj) altChart($('#objChart'), state.openObj, D.now);
+    if ($('#sheet').open && $('#objChart') && state.openObj) altChart($('#objChart'), state.openObj, effNow());
   }, 150); });
   $('#searchInput').addEventListener('input', onSearch);
   $('#spotSelect').addEventListener('change', (e) => {
