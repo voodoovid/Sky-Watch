@@ -12,4 +12,4 @@ On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to 
 - GPS or saved locations, metric/imperial, and a red night-vision mode
 - Built-in User Guide: Options → **User Guide** (beside the Options title)
 
-Data: Open-Meteo, MET Norway, 7Timer!. Astronomy: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, bundled).
+Data: Open-Meteo, MET Norway, 7Timer!. Astronomy: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, bundled). Moon image: NASA lunar map (public domain), projected to the near side.

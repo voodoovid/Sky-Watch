@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.60';
+const VERSION = 'v3.61';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1028,7 +1028,7 @@ function buildHours(from, to, src, obs, illum) {
 let moonUid = 0;
 const MOON_MARIA = [[-.26, -.38, .25, .19, -15], [.09, -.37, .14, .13, 0], [.23, -.08, .2, .15, 15], [.56, -.27, .1, .08, 0],
   [-.56, -.02, .15, .36, 10], [-.3, .4, .18, .12, 0], [.5, .13, .09, .12, 0], [-.06, .06, .12, .1, 0]];
-function moonGlyph(cx, cy, r, angle, lat) {
+function moonGlyphVec(cx, cy, r, angle, lat) {
   const id = 'mg' + (++moonUid), f = (v) => v.toFixed(2);
   const rad = angle * Math.PI / 180, k = (1 - Math.cos(rad)) / 2; // illuminated fraction
   let litRight = angle < 180;
@@ -1066,6 +1066,84 @@ function moonGlyph(cx, cy, r, angle, lat) {
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}s)"/>
   </g>
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" style="stroke:var(--moon-lit)" stroke-opacity=".28" stroke-width="1"/>`;
+}
+
+/* The real Moon: a NASA lunar map (moon.jpg, near side) lit per pixel as a sphere for the current phase — soft terminator
+   that follows the surface, limb darkening, a little earthshine on the dark part. The shaded disc is baked to a small
+   PNG once per phase (and per red mode) and dropped into the SVG, so it stays crisp at any size. If moon.jpg can't load,
+   moonGlyphVec() above draws the old vector Moon. */
+const MOON_TEX = { S: 384, px: null, cache: {} };
+(function () {
+  const im = new Image();
+  im.onload = () => {
+    try {
+      const c = document.createElement('canvas'), S = MOON_TEX.S;
+      c.width = c.height = S;
+      const x = c.getContext('2d');
+      x.drawImage(im, 0, 0, S, S);
+      MOON_TEX.px = x.getImageData(0, 0, S, S).data;
+      MOON_TEX.cache = {};
+      redrawMoons();
+    } catch (e) { MOON_TEX.px = null; }
+  };
+  im.src = 'moon.jpg?v=' + VERSION.slice(1);
+})();
+function moonBake(angle, south, red) {
+  if (!MOON_TEX.px) return null;
+  const key = Math.round(angle * 2) + (south ? 's' : 'n') + (red ? 'r' : '');
+  if (MOON_TEX.cache[key]) return MOON_TEX.cache[key];
+  const O = 192, h = O / 2, S = MOON_TEX.S, px = MOON_TEX.px;
+  const rad = angle * Math.PI / 180, ci = -Math.cos(rad), sxs = ((angle < 180) !== south ? 1 : -1) * Math.abs(Math.sin(rad));
+  const smooth = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = O;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(O, O), d = img.data;
+  for (let y = 0; y < O; y++) {
+    for (let x = 0; x < O; x++) {
+      const nx = (x + 0.5 - h) / h, ny = (y + 0.5 - h) / h, rr = nx * nx + ny * ny;
+      const cov = Math.min(1, Math.max(0, (1 - Math.sqrt(rr)) * h + 0.5));
+      if (cov <= 0) continue;
+      const nz = Math.sqrt(Math.max(0, 1 - rr));
+      // Surface texture (turned upside down for observers in the south), kept just inside the disc at the edge.
+      const q = rr > 0.98 ? Math.sqrt(0.98 / rr) : 1, sg = south ? -1 : 1;
+      const tx = (sg * nx * q * 0.5 + 0.5) * (S - 1), ty = (sg * ny * q * 0.5 + 0.5) * (S - 1);
+      const x0 = Math.min(S - 2, Math.max(0, Math.floor(tx))), y0 = Math.min(S - 2, Math.max(0, Math.floor(ty))), fx = tx - x0, fy = ty - y0;
+      const g = (px[(y0 * S + x0) * 4] * (1 - fx) * (1 - fy) + px[(y0 * S + x0 + 1) * 4] * fx * (1 - fy)
+        + px[((y0 + 1) * S + x0) * 4] * (1 - fx) * fy + px[((y0 + 1) * S + x0 + 1) * 4] * fx * fy) / 255;
+      // Light: cosine of the angle to the Sun, softened Lommel–Seeliger style so craters and maria read all the way in.
+      const m0 = nx * sxs + nz * ci;
+      let lit = 0;
+      if (m0 > 0) lit = Math.pow(0.5 * Math.min(1, 2 * m0 / (m0 + nz + 1e-3)) + 0.5 * m0, 0.85) * smooth(0, 0.07, m0);
+      const lm = 0.66 + 0.34 * Math.sqrt(nz);                 // limb darkening: the edge turns away from us
+      const sh = lit * lm, e = 0.1 * lm, v = g * sh, ev = g * e;
+      let R, G, B;
+      if (red) { const l = v + ev * 0.7; R = l * 0.88; G = B = l * 0.11; }
+      else { R = v * 0.98 + ev * 0.55; G = v * 0.94 + ev * 0.7; B = v * 0.86 + ev; }
+      const i = (y * O + x) * 4;
+      d[i] = Math.min(255, R * 255); d[i + 1] = Math.min(255, G * 255); d[i + 2] = Math.min(255, B * 255);
+      d[i + 3] = 255 * cov * (0.5 + 0.5 * Math.min(1, sh * 5));  // the dark side is part see-through so the themed backing shows
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return (MOON_TEX.cache[key] = cv.toDataURL('image/png'));
+}
+function moonGlyph(cx, cy, r, angle, lat) {
+  const url = moonBake(angle, lat < 0, document.documentElement.classList.contains('red'));
+  if (!url) return moonGlyphVec(cx, cy, r, angle, lat);
+  const id = 'mg' + (++moonUid), f = (v) => v.toFixed(2), k = (1 - Math.cos(angle * Math.PI / 180)) / 2;
+  return `<defs><radialGradient id="${id}h"><stop offset=".8" style="stop-color:var(--moon-lit);stop-opacity:${f(0.05 + 0.2 * k)}"/><stop offset="1" style="stop-color:var(--moon-lit);stop-opacity:0"/></radialGradient></defs>
+  <circle cx="${cx}" cy="${cy}" r="${f(r * 1.12)}" fill="url(#${id}h)"/>
+  <circle cx="${cx}" cy="${cy}" r="${r}" style="fill:var(--moon-dark)"/>
+  <image class="moon-tex" href="${url}" x="${f(cx - r)}" y="${f(cy - r)}" width="${f(2 * r)}" height="${f(2 * r)}"/>
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" style="stroke:var(--moon-lit)" stroke-opacity=".22" stroke-width="1"/>`;
+}
+/* Redraw the Moon card and Moon path (texture just loaded, or red mode switched). */
+function redrawMoons() {
+  const D = state.data;
+  if (!D || !D.nights[state.night]) return;
+  const N = D.nights[state.night];
+  renderMoon(N.moon, D.lat);
+  renderPath(N, D.lat, effNow());
 }
 
 const PUFF_ICON = '<path d="M6.2 19.5h11.9a4.1 4.1 0 0 0 .9-8.1 4.3 4.3 0 0 0-5.6-3.3A5 5 0 0 0 4.6 10.6a4.5 4.5 0 0 0 1.6 8.9z" fill="currentColor"/><circle cx="9.3" cy="10.4" r="3.9" fill="currentColor"/><circle cx="14.6" cy="9.6" r="3.3" fill="currentColor"/>';
@@ -2485,6 +2563,7 @@ function applyRed() {
   // The cloud chart is painted on a canvas with the theme's colours baked in, so repaint it for the new theme.
   const D = state.data;
   if (D && D.nights[state.night]) skyChart(D.nights[state.night].hours);
+  redrawMoons();
 }
 function applyUnits() {
   document.querySelectorAll('#unitsBtn span').forEach((s) => s.classList.toggle('on', s.dataset.u === state.units));
