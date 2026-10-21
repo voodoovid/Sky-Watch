@@ -75,11 +75,24 @@
     // Flying bats and a floating ghost, on a layer that never takes clicks.
     var d = document.createElement('div');
     d.id = 'hw-decor';
-    d.setAttribute('aria-hidden', 'true');
-    d.innerHTML =
+        d.innerHTML =
       '<i class="hw-bat b1">' + BAT + '</i><i class="hw-bat b2">' + BAT + '</i><i class="hw-bat b3">' + BAT + '</i><i class="hw-bat b4">' + BAT + '</i>' +
-      '<i class="hw-ghost">' + GHOST + '</i>';
+      '<i class="hw-ghost" role="button" tabindex="0" aria-label="Play Pancake\'s purr">' + GHOST + '</i>';
     document.body.appendChild(d);
+    // Tap the ghost and Pancake purrs (the recording from Scareisdale). Everything else on this layer stays click-through.
+    var gh = d.querySelector('.hw-ghost'), purr = null;
+    var play = function (e) {
+      if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      try {
+        if (!purr) { purr = new Audio('pancake-purr.mp3'); purr.preload = 'auto'; }
+        purr.currentTime = 0;
+        var pr = purr.play(); if (pr && pr.catch) pr.catch(function () {});
+      } catch (err) { /* no audio: stay silent */ }
+      gh.classList.remove('hw-pop'); void gh.offsetWidth; gh.classList.add('hw-pop');
+    };
+    gh.addEventListener('click', play);
+    gh.addEventListener('keydown', play);
     h.classList.add('hw-ready');
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build); else build();
