@@ -1,5 +1,5 @@
 /* SkyWatch Halloween spider (October only: index.html loads this right after halloween.js).
-   An orb-weaver sits head-down at the hub of a web in the top-right corner of the Tonight card. It is drawn in SVG
+   A black widow (glossy black, round abdomen, red hourglass) sits head-down at the hub of a web in the top-right corner of the Tonight card. It is drawn in SVG
    and, when it moves, driven frame by frame: eight jointed legs placed with two-bone IK in a tetrapod gait, the way a
    real spider walks (dashes and pauses, turns in place first). While it sits still nothing runs but two tiny SMIL
    animations (breathing, a leg twitch).
@@ -87,22 +87,25 @@
     var svg = el('svg', { viewBox: '-32 -32 64 64', width: 64, height: 64, 'class': 'hw-spider' });
     var defs = el('defs', {}, svg), i;
     var ga = el('radialGradient', { id: 'hwsA', cx: '.42', cy: '.34', r: '.78' }, defs);
-    el('stop', { offset: '0', 'stop-color': '#f2bd70' }, ga);
-    el('stop', { offset: '.5', 'stop-color': '#b8742e' }, ga);
-    el('stop', { offset: '1', 'stop-color': '#4a250c' }, ga);
+    el('stop', { offset: '0', 'stop-color': '#5b5b68' }, ga);
+    el('stop', { offset: '.35', 'stop-color': '#1b1b22' }, ga);
+    el('stop', { offset: '1', 'stop-color': '#040406' }, ga);
     var gc = el('radialGradient', { id: 'hwsC', cx: '.4', cy: '.35', r: '.8' }, defs);
-    el('stop', { offset: '0', 'stop-color': '#a56a33' }, gc);
-    el('stop', { offset: '1', 'stop-color': '#33190a' }, gc);
+    el('stop', { offset: '0', 'stop-color': '#4a4a56' }, gc);
+    el('stop', { offset: '1', 'stop-color': '#0a0a0d' }, gc);
+    var gr = el('linearGradient', { id: 'hwsR', x1: '0', y1: '0', x2: '1', y2: '0' }, defs);
+    el('stop', { offset: '0', 'stop-color': '#ff3b2a' }, gr);
+    el('stop', { offset: '1', 'stop-color': '#c00d10' }, gr);
 
     var legsG = el('g', {}, svg), legs = [];
     for (i = 0; i < 8; i++) {
       var p = i >> 1, s = (i & 1) ? -1 : 1, w = el('g', {}, legsG);
       var L = { p: p, s: s, grp: (p + (i & 1)) & 1, hx: HIP[p][0], hy: HIP[p][1] * s };
-      L.fd = el('path', { 'class': 'sp-leg', 'stroke-width': '1.7' }, w);
-      L.td = el('path', { 'class': 'sp-leg', 'stroke-width': '1.25' }, w);
-      L.fb = el('path', { 'class': 'sp-band', 'stroke-width': '.9' }, w);
-      L.tb = el('path', { 'class': 'sp-band', 'stroke-width': '.65' }, w);
-      L.kn = el('circle', { r: '1', 'class': 'sp-knee' }, w);
+      L.fd = el('path', { 'class': 'sp-leg', 'stroke-width': '1.3' }, w);
+      L.td = el('path', { 'class': 'sp-leg', 'stroke-width': '.95' }, w);
+      L.fb = el('path', { 'class': 'sp-band', 'stroke-width': '.4' }, w);
+      L.tb = el('path', { 'class': 'sp-band', 'stroke-width': '.3' }, w);
+      L.kn = el('circle', { r: '.8', 'class': 'sp-knee' }, w);
       if (!reduce && (i === 1 || i === 4 || i === 7)) {          // now and then a leg flexes, as a resting spider's do
         var hp = L.hx + ' ' + L.hy;
         el('animateTransform', { attributeName: 'transform', type: 'rotate', dur: (6 + i * 0.9).toFixed(1) + 's', repeatCount: 'indefinite',
@@ -115,22 +118,19 @@
     var ab = el('g', { transform: 'translate(-12.4 0)' }, body), abi = el('g', {}, ab);
     if (!reduce) el('animateTransform', { attributeName: 'transform', type: 'scale', values: '1 1;1.035 1.075;1 1', keyTimes: '0;.5;1',
       calcMode: 'spline', keySplines: '.4 0 .6 1;.4 0 .6 1', dur: '3.8s', repeatCount: 'indefinite' }, abi);
-    el('path', { d: 'M9 0C9 -5.2 4.5 -8 -1 -7.8C-6.5 -7.5 -10 -4 -10 0C-10 4 -6.5 7.5 -1 7.8C4.5 8 9 5.2 9 0Z', fill: 'url(#hwsA)', stroke: '#2a1408', 'stroke-width': '.5' }, abi);
-    el('path', { d: 'M6.8 -3.8Q3 -1.7 -.6 -4.8M6.8 3.8Q3 1.7 -.6 4.8M-2.6 -5.6Q-5.4 -3.4 -8 -2.4M-2.6 5.6Q-5.4 3.4 -8 2.4', fill: 'none', stroke: '#4a250c', 'stroke-width': '.8', 'stroke-linecap': 'round', opacity: '.55' }, abi);
-    [[5.6, 0, 1], [2.6, 0, 1.5], [-0.8, 0, 1.7], [-4.2, 0, 1.4], [-7, 0, .9],              // the pale cross of a garden spider
-     [2.4, -3.2, 1.15], [2.4, 3.2, 1.15], [-1.2, -4.1, 1.05], [-1.2, 4.1, 1.05], [-4.6, -3, .8], [-4.6, 3, .8]].forEach(function (c) {
-      el('circle', { cx: c[0], cy: c[1], r: c[2], fill: '#f6e3b4', opacity: '.92' }, abi);
-    });
-    el('ellipse', { cx: '2', cy: '-3.9', rx: '3.6', ry: '1.5', transform: 'rotate(-12 2 -3.9)', fill: '#fff', opacity: '.2' }, abi);
-    el('ellipse', { cx: SPIN_X + 12.4, cy: '0', rx: '1.3', ry: '1', fill: '#2a1408' }, ab);   // spinnerets
-    el('ellipse', { cx: '-4.8', cy: '0', rx: '1.7', ry: '1.5', fill: '#2c1608' }, body);        // waist
-    el('ellipse', { cx: '0', cy: '0', rx: '5.4', ry: '4.4', fill: 'url(#hwsC)', stroke: '#24120a', 'stroke-width': '.5' }, body);
-    el('ellipse', { cx: '4.7', cy: '0', rx: '3.4', ry: '2.9', fill: 'url(#hwsC)', stroke: '#24120a', 'stroke-width': '.4' }, body);
+    el('path', { d: 'M9 0C9 -6.4 4.5 -9.2 -1 -9C-6.5 -8.7 -10 -4.6 -10 0C-10 4.6 -6.5 8.7 -1 9C4.5 9.2 9 6.4 9 0Z', fill: 'url(#hwsA)', stroke: '#000', 'stroke-width': '.5' }, abi);
+    el('path', { d: 'M-7.2 -3.4L-3 0L-7.2 3.4ZM1.4 -3.4L-3 0L1.4 3.4Z', fill: 'url(#hwsR)', stroke: '#7a0608', 'stroke-width': '.3', 'stroke-linejoin': 'round' }, abi);   // the red hourglass
+    el('ellipse', { cx: '2.4', cy: '-5', rx: '4.4', ry: '1.7', transform: 'rotate(-14 2.4 -5)', fill: '#fff', opacity: '.26' }, abi);   // gloss
+    el('ellipse', { cx: '-5.5', cy: '4.6', rx: '2.2', ry: '.9', transform: 'rotate(28 -5.5 4.6)', fill: '#fff', opacity: '.1' }, abi);
+    el('ellipse', { cx: SPIN_X + 12.4, cy: '0', rx: '1.3', ry: '1', fill: '#000' }, ab);   // spinnerets
+    el('ellipse', { cx: '-4.8', cy: '0', rx: '1.7', ry: '1.5', fill: '#0a0a0c' }, body);        // waist
+    el('ellipse', { cx: '0', cy: '0', rx: '5.4', ry: '4.4', fill: 'url(#hwsC)', stroke: '#000', 'stroke-width': '.5' }, body);
+    el('ellipse', { cx: '4.7', cy: '0', rx: '3.4', ry: '2.9', fill: 'url(#hwsC)', stroke: '#000', 'stroke-width': '.4' }, body);
     el('ellipse', { cx: '.6', cy: '-1.5', rx: '3.2', ry: '1', fill: '#fff', opacity: '.13' }, body);
-    var palps = el('g', { fill: 'none', stroke: '#4a2a12', 'stroke-width': '1.1', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, body);
+    var palps = el('g', { fill: 'none', stroke: '#1c1c22', 'stroke-width': '1.1', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, body);
     el('path', { d: 'M7.4 -1.2L9.5 -2.7L10.8 -1.3M7.4 1.2L9.5 2.7L10.8 1.3' }, palps);
     [[6.7, -.8], [6.7, .8], [6, -1.9], [6, 1.9], [4.9, -1.2], [4.9, 1.2], [4.6, -2.3], [4.6, 2.3]].forEach(function (c) {
-      el('circle', { cx: c[0], cy: c[1], r: '.42', fill: '#0a0503' }, body);
+      el('circle', { cx: c[0], cy: c[1], r: '.42', fill: '#16161b' }, body);
       el('circle', { cx: c[0] - .12, cy: c[1] - .12, r: '.14', fill: '#fff', opacity: '.7' }, body);
     });
     return { svg: svg, legs: legs };

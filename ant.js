@@ -1,4 +1,4 @@
-/* SkyWatch ant: now and then a small ant walks across the screen, then leaves. Usually just one; now and then a second follows (never more than two).
+/* SkyWatch ant: now and then a small ant walks across the screen, then leaves. Usually one; sometimes a second follows (never more than two).
    Each ant lives in the browser's top layer (a manual popover), so it also crawls across pop-up screens (target details, options, guide) instead of walking behind them.
    It is drawn in SVG and driven frame by frame, so the legs move with the distance walked (a tripod gait: three legs
    on the ground, three swinging), the antennae feel ahead, and the path wanders instead of running in a line.
@@ -161,18 +161,18 @@
     requestAnimationFrame(frame);
   }
 
-  // Rare visits: an ant roughly every 1.5-4 minutes while the app is open, only when none is already walking.
-  // About one visit in seven brings a second ant a few seconds behind the first.
+  // An ant every 35-90 s while the app is open, only when none is already walking.
+  // About one visit in five brings a second ant a few seconds behind the first.
   function schedule(lo, hi) {
     setTimeout(function () {
       if (document.visibilityState === 'visible' && active === 0) {
         walk();
-        if (Math.random() < 0.15) setTimeout(function () { walk(); }, 1500 + Math.random() * 3500);
+        if (Math.random() < 0.2) setTimeout(function () { walk(); }, 1500 + Math.random() * 3500);
       }
-      schedule(90000, 240000);
+      schedule(35000, 90000);
     }, lo + Math.random() * (hi - lo));
   }
   if (/[?&]ant=now/.test(location.search)) { setTimeout(walk, 600); setTimeout(walk, 3500); }   // preview: two ants
   else if (/[?&]ant=web/.test(location.search)) { setTimeout(function () { walk(true); }, 1200); }   // preview: one ant, straight at the web
-  else schedule(40000, 90000);
+  else schedule(12000, 30000);
 })();
