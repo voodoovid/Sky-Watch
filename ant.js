@@ -1,4 +1,5 @@
-/* SkyWatch ant: every so often a small ant walks across the screen, then leaves (never more than two at a time).
+/* SkyWatch ant: now and then a small ant walks across the screen, then leaves. Usually just one; now and then a second follows (never more than two).
+   Each ant lives in the browser's top layer (a manual popover), so it also crawls across pop-up screens (target details, options, guide) instead of walking behind them.
    It is drawn in SVG and driven frame by frame, so the legs move with the distance walked (a tripod gait: three legs
    on the ground, three swinging), the antennae feel ahead, and the path wanders instead of running in a line.
    It never takes clicks and never moves the layout. Adding ?ant=now to the address sends two straight away. At most two ants are ever on screen.
@@ -9,6 +10,13 @@
   if (reduce) return;
   var NS = 'http://www.w3.org/2000/svg';
   var active = 0, MAX = 2;                     // never more than two ants on screen
+  var canPop = typeof HTMLElement !== 'undefined' && !!HTMLElement.prototype.showPopover;
+  var hosts = [];                              // ants currently walking (so they can be lifted above a pop-up that opens)
+  function lift(h) { try { h.hidePopover(); h.showPopover(); } catch (e) {} }   // re-showing puts it back on top of the top layer
+  var sheet = document.getElementById('sheet');
+  if (canPop && sheet && window.MutationObserver) {
+    new MutationObserver(function () { if (sheet.open) hosts.forEach(lift); }).observe(sheet, { attributes: true, attributeFilter: ['open'] });
+  }
 
   // leg anchors along the thorax and each leg's resting knee and foot (side +1; side -1 mirrors y)
   var LEGS = [
@@ -73,7 +81,10 @@
     var host = document.createElement('div');
     host.className = 'ant-host';
     host.appendChild(part.svg);
+    if (canPop) host.setAttribute('popover', 'manual');
     document.body.appendChild(host);
+    if (canPop) { try { host.showPopover(); } catch (e) {} }
+    hosts.push(host);
 
     // start just off one edge, aim for a point near the opposite edge
     var edge = Math.floor(Math.random() * 4), x, y, tx, ty;
@@ -132,7 +143,9 @@
         A.rot.setAttribute('transform', 'rotate(' + a.toFixed(1) + ')');
       });
       // an ant that steps onto the Halloween spider's web sticks, and the spider takes it from here
-      if (!caught && window.HW && HW.web && HW.web.catchAnt && HW.web.catchAnt(host, part, x, y, th * 180 / Math.PI, speed, finish)) { caught = true; return; }
+      if (!caught && window.HW && HW.web && HW.web.catchAnt && HW.web.catchAnt(host, part, x, y, th * 180 / Math.PI, speed, finish)) {
+        caught = true; host.removeAttribute('popover'); return;   // the web takes it from here (it is no longer a popover)
+      }
       var bob = Math.sin(phase * 2) * 0.35;
       host.style.transform = 'translate3d(' + (x - 17).toFixed(1) + 'px,' + (y - 11 + bob).toFixed(1) + 'px,0) rotate(' + (th * 180 / Math.PI).toFixed(1) + 'deg)';
       var inside = x > -M && x < W + M && y > -M && y < H + M;
@@ -140,18 +153,26 @@
       if ((entered && !inside) || t > 90) { finish(); return; }
       requestAnimationFrame(frame);
     }
-    function finish() { done = true; active--; if (host.parentNode) host.parentNode.removeChild(host); }
+    function finish() {
+      done = true; active--;
+      var i = hosts.indexOf(host); if (i >= 0) hosts.splice(i, 1);
+      if (host.parentNode) host.parentNode.removeChild(host);
+    }
     requestAnimationFrame(frame);
   }
 
-  // A new ant every 20-60 s while the app is open, so a second one sometimes joins the first (walk() caps it at two).
+  // Rare visits: an ant roughly every 1.5-4 minutes while the app is open, only when none is already walking.
+  // About one visit in seven brings a second ant a few seconds behind the first.
   function schedule(lo, hi) {
     setTimeout(function () {
-      if (document.visibilityState === 'visible') walk();
-      schedule(20000, 60000);
+      if (document.visibilityState === 'visible' && active === 0) {
+        walk();
+        if (Math.random() < 0.15) setTimeout(function () { walk(); }, 1500 + Math.random() * 3500);
+      }
+      schedule(90000, 240000);
     }, lo + Math.random() * (hi - lo));
   }
   if (/[?&]ant=now/.test(location.search)) { setTimeout(walk, 600); setTimeout(walk, 3500); }   // preview: two ants
   else if (/[?&]ant=web/.test(location.search)) { setTimeout(function () { walk(true); }, 1200); }   // preview: one ant, straight at the web
-  else schedule(10000, 30000);
+  else schedule(40000, 90000);
 })();
