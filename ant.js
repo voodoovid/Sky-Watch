@@ -1,4 +1,5 @@
-/* SkyWatch ant: now and then a small ant walks across the screen, then leaves. Usually one; sometimes a second follows (never more than two).
+/* SkyWatch ant: only while the Halloween skin is on (html.hw), now and then a small ant walks across the screen, then leaves.
+   In every other season, and with Options > Holiday skins Off, no ants walk (the Christmas skin has gingerbread.js instead). Usually one; sometimes a second follows (never more than two).
    Each ant lives in the browser's top layer (a manual popover), so it also crawls across pop-up screens (target details, options, guide) instead of walking behind them.
    It is drawn in SVG and driven frame by frame, so the legs move with the distance walked (a tripod gait: three legs
    on the ground, three swinging), the antennae feel ahead, and the path wanders instead of running in a line.
@@ -8,6 +9,7 @@
   'use strict';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce) return;
+  if (!document.documentElement.classList.contains('hw')) return;   // ants belong to the Halloween skin only
   var NS = 'http://www.w3.org/2000/svg';
   var active = 0, MAX = 2;                     // never more than two ants on screen
   var canPop = typeof HTMLElement !== 'undefined' && !!HTMLElement.prototype.showPopover;
