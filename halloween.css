@@ -1,0 +1,115 @@
+/* SkyWatch Halloween skin. Loaded only in October (see index.html); every rule is scoped to html.hw, and red night mode
+   keeps its pure-red palette so night vision is never spoiled (decorations are hidden there). */
+
+/* ----- palette: dark ----- */
+html.hw {
+  --hw-o1: #ffb347; --hw-o2: #f07a12; --hw-o3: #b94700; --hw-stem: #5f8f2a; --hw-glow: #ffe27a; --hw-shade: #12061f;
+}
+html.hw:not(.red) {
+  --bg: #0b0613; --bg2: #1d0e30; --card: #150c24; --card2: #20133a;
+  --line: #34205a; --line2: #4b2e78;
+  --text: #f4ecdb; --muted: #ad9dc9; --dim: #735f94;
+  --accent: #ff8a1f;
+  --go: #8be04a; --go2: #c0e04a; --fair: #ffb020; --nogo: #ff4a5e;
+  --day: #3d2b60; --cloud: #cfc1e8; --rain: #6aa8ff;
+  --moon-lit: #ffb347; --moon-dark: #2a1740;
+  --sky-top: #14082a; --sky-bot: #381a63; --ground: #07030d; --path: #ffb347;
+  --grid: rgba(190, 150, 230, .16);
+  --band-day: #3f2768; --band-civil: #331f58; --band-nautical: #271644; --band-astro: #1c1035; --band-dark: #10091f;
+  --chip-ink: #0d1a04;
+}
+/* ----- palette: light (day mode) ----- */
+html.hw.light:not(.red) {
+  --bg: #fff3e2; --bg2: #ffe3c2; --card: #fffaf2; --card2: #fff0dc;
+  --line: #f0d3a8; --line2: #e3b97c;
+  --text: #2b1646; --muted: #6d4f8e; --dim: #a58cc0;
+  --accent: #d9650a;
+  --go: #4aa81a; --go2: #8bb81f; --fair: #e08a00; --nogo: #d2323f;
+  --day: #f2dfc2; --cloud: #e4d6f0; --rain: #1d78e0;
+  --moon-lit: #ffb347; --moon-dark: #5a3a7a;
+  --sky-top: #cdb4ee; --sky-bot: #f6dcc0; --ground: #dfc9b4; --path: #c25a00;
+  --grid: rgba(80, 40, 120, .16);
+  --band-day: #fff4e5; --band-civil: #f3e2f5; --band-nautical: #e4cdee; --band-astro: #d4b8e6; --band-dark: #c0a0dc;
+  --hw-shade: #3a1d5c;
+}
+/* ----- red night mode: same pumpkin, all red ----- */
+html.hw.red {
+  --hw-o1: #c21c1c; --hw-o2: #8a1010; --hw-o3: #4a0707; --hw-stem: #3a0505; --hw-glow: #ff3030; --hw-shade: #000;
+}
+
+/* ----- chrome ----- */
+html.hw:not(.red) body {
+  background:
+    radial-gradient(900px 420px at 50% 125%, rgba(255, 120, 0, .16), transparent 70%),
+    radial-gradient(1200px 600px at 50% -200px, var(--bg2), var(--bg)) fixed, var(--bg);
+}
+html.hw.light:not(.red) body {
+  background:
+    radial-gradient(900px 420px at 50% 125%, rgba(255, 140, 20, .2), transparent 70%),
+    radial-gradient(1200px 600px at 50% -200px, var(--bg2), var(--bg)) fixed, var(--bg);
+}
+/* candy-corn stripe under the header */
+html.hw:not(.red) .top {
+  border-bottom: 4px solid transparent;
+  border-image: linear-gradient(90deg, #ff8a1f 0 34%, #ffd23f 34% 67%, #fff3d0 67%) 1;
+}
+html.hw:not(.red) .brand h1 {
+  font-family: "Marker Felt", "Chalkduster", cursive;
+  letter-spacing: .02em;
+  text-shadow: 0 0 12px rgba(255, 138, 31, .55);
+}
+html.hw.light:not(.red) .brand h1 { text-shadow: none; color: #b34700; }
+html.hw:not(.red) .logo { border-radius: 12px; box-shadow: 0 0 14px rgba(255, 138, 31, .45); }
+
+/* cobwebs in the top-right corner of every card; the Tonight card also has its spider */
+html.hw:not(.red) .card { position: relative; }
+html.hw:not(.red) .card::after {
+  content: ''; position: absolute; top: 0; right: 0; width: 58px; height: 58px; pointer-events: none;
+  border-top-right-radius: var(--radius); opacity: .5;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58' fill='none' stroke='%23d9c9f2' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M58 0L0 0M58 0L58 58M58 0L10 40M58 0L30 52M58 0L44 22'/%3E%3Cpath d='M44 0C45 6 52 13 58 14M30 0C32 12 46 26 58 28M16 0C19 18 40 38 58 42'/%3E%3C/svg%3E") no-repeat top right / contain;
+}
+html.hw.light:not(.red) .card::after { opacity: .4; filter: brightness(.4) saturate(1.6); }
+html.hw:not(.red) .verdict-card::after {
+  width: 74px; height: 92px; opacity: .85;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 74 92' fill='none' stroke='%23d9c9f2' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M74 0L0 0M74 0L74 58M74 0L14 40M74 0L40 56M74 0L58 26' opacity='.55'/%3E%3Cpath d='M58 0C60 8 68 16 74 18M40 0C42 14 58 30 74 34M20 0C24 22 50 46 74 52' opacity='.55'/%3E%3Cpath d='M52 0V62' stroke-width='1.2'/%3E%3Cg stroke='%23ff8a1f' stroke-width='1.4'%3E%3Cpath d='M44 70L38 64M44 74L36 74M45 79L38 85M60 70L66 64M60 74L68 74M59 79L66 85'/%3E%3C/g%3E%3Cellipse cx='52' cy='73' rx='7' ry='8' fill='%23ff8a1f' stroke='none'/%3E%3Ccircle cx='52' cy='65' r='4' fill='%23ff8a1f' stroke='none'/%3E%3Ccircle cx='50.5' cy='64.5' r='1.1' fill='%23140a22' stroke='none'/%3E%3Ccircle cx='53.5' cy='64.5' r='1.1' fill='%23140a22' stroke='none'/%3E%3C/svg%3E") no-repeat top right / contain;
+}
+html.hw.light:not(.red) .verdict-card::after { filter: brightness(.45) saturate(1.5); opacity: .7; }
+html.hw:not(.red) .verdict-card { box-shadow: 0 0 22px rgba(255, 138, 31, .12); }
+
+/* the pumpkin Moon: flickering candle glow */
+html.hw .hw-flame { animation: hw-flicker 3.4s ease-in-out infinite; }
+@keyframes hw-flicker {
+  0%, 100% { opacity: 1; } 18% { opacity: .86; } 34% { opacity: 1; } 52% { opacity: .78; } 70% { opacity: .96; } 86% { opacity: .84; }
+}
+html.hw:not(.red) .moon-info > svg { filter: drop-shadow(0 0 7px rgba(255, 138, 31, .5)); overflow: visible; }
+
+/* footer greeting */
+html.hw .hw-greet { color: var(--accent); font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+html.hw.red .hw-greet { display: none; }
+
+/* ----- decorations: bats and a ghost (never take clicks, never move the layout) ----- */
+#hw-decor { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 9; }
+html:not(.hw) #hw-decor, html.red #hw-decor { display: none; }
+#hw-decor i { position: absolute; display: block; font-style: normal; }
+.hw-bat { width: 30px; color: #120a1f; opacity: .7; left: 0; animation: hw-fly 34s linear infinite; }
+html.hw.light .hw-bat { color: #2b1646; opacity: .55; }
+.hw-bat svg { width: 100%; height: auto; animation: hw-flap .45s ease-in-out infinite alternate; transform-origin: 50% 40%; }
+.hw-bat.b1 { top: 16%; animation-duration: 38s; animation-delay: -6s; }
+.hw-bat.b2 { top: 44%; width: 24px; animation-duration: 31s; animation-delay: -19s; }
+.hw-bat.b3 { top: 68%; width: 34px; animation-duration: 44s; animation-delay: -30s; }
+.hw-bat.b4 { top: 30%; width: 20px; animation-duration: 27s; animation-delay: -11s; }
+@keyframes hw-fly {
+  0%   { transform: translate(-14vw, 0); }
+  25%  { transform: translate(21vw, -26px); }
+  50%  { transform: translate(50vw, 14px); }
+  75%  { transform: translate(79vw, -22px); }
+  100% { transform: translate(112vw, 6px); }
+}
+@keyframes hw-flap { from { transform: scaleY(1); } to { transform: scaleY(.55); } }
+.hw-ghost { right: -8px; bottom: 44px; width: 36px; opacity: .8; animation: hw-bob 4.2s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(244, 239, 255, .55)); }
+@keyframes hw-bob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-9px) rotate(3deg); } }
+@media (max-width: 759px) { #hw-decor .hw-ghost, #hw-decor .hw-bat.b4 { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .hw-bat, .hw-bat svg, .hw-ghost, html.hw .hw-flame { animation: none; }
+  .hw-bat { display: none; }
+}

@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.65';
+const VERSION = 'v3.66';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1128,6 +1128,7 @@ function moonBake(angle, south, red) {
   return (MOON_TEX.cache[key] = cv.toDataURL('image/png'));
 }
 function moonGlyph(cx, cy, r, angle, lat) {
+  if (window.HW && HW.moon) return HW.moon(cx, cy, r, angle, lat);   // Halloween skin (October): a jack-o'-lantern Moon
   const url = moonBake(angle, lat < 0, document.documentElement.classList.contains('red'));
   if (!url) return moonGlyphVec(cx, cy, r, angle, lat);
   const id = 'mg' + (++moonUid), f = (v) => v.toFixed(2), k = (1 - Math.cos(angle * Math.PI / 180)) / 2;

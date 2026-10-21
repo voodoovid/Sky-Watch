@@ -10,6 +10,7 @@ On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to 
 - Moon phase and a chart of the Moon's path across the sky tonight
 - Planets and well-placed Seestar targets for tonight
 - GPS or saved locations, metric/imperial, and a red night-vision mode
+- Halloween skin: all of October (by the device's date) the app wears a pumpkin Moon, cobwebs, bats and a ghost, then returns to the normal look on Nov 1 and again each Oct 1. Preview any time with `?season=halloween`, or `?season=normal`
 - Built-in User Guide: Options → **User Guide** (beside the Options title)
 
 Data: Open-Meteo, MET Norway, 7Timer!. Astronomy: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, bundled). Moon image: NASA lunar map (public domain), projected to the near side.
