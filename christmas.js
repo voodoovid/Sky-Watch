@@ -59,7 +59,7 @@
   var purr = null;
   function playPurr(el) {
     try {
-      if (!purr) { purr = new Audio('pancake-purr.mp3?v=3.71'); purr.preload = 'auto'; }
+      if (!purr) { purr = new Audio('pancake-purr.mp3?v=3.72'); purr.preload = 'auto'; }
       purr.currentTime = 0;
       var pr = purr.play(); if (pr && pr.catch) pr.catch(function () {});
     } catch (err) { /* no audio: stay silent */ }
