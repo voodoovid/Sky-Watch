@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.79';
+const VERSION = 'v3.80';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2342,6 +2342,9 @@ function applyMinAlt() {
   const t = $('#tgtTitle .eb-r');
   if (t && !normQ(state.q)) t.textContent = `Reaches ${MIN_ALT}°`;
 }
+/* Holiday skins setting (Options): on unless the user turned it off. Read by the start-up script in index.html too. */
+function holidaySkins() { return store.get('holiday', true) !== false; }
+
 function showOptions() {
   showSheet('Options', `<section class="opt" id="optUnits">
       <h3 class="opt-h">Units</h3>
@@ -2351,6 +2354,11 @@ function showOptions() {
       <h3 class="opt-h">Appearance</h3>
       <div class="night-seg theme-seg" role="group" aria-label="Appearance">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => `<button type="button" data-theme="${v}" aria-pressed="${state.theme === v}">${l}</button>`).join('')}</div>
       <p class="note opt-note">Auto follows your device. Red night mode still overrides this.</p>
+    </section>
+    <section class="opt" id="optHoliday">
+      <h3 class="opt-h">Holiday skins</h3>
+      <div class="night-seg theme-seg" role="group" aria-label="Holiday skins">${[[true, 'On'], [false, 'Off']].map(([v, l]) => `<button type="button" data-holiday="${v}" aria-pressed="${holidaySkins() === v}">${l}</button>`).join('')}</div>
+      <p class="note opt-note">Halloween in October and Christmas in December. Off keeps the normal look all year.</p>
     </section>
     <section class="opt" id="optHome">
       <h3 class="opt-h">Home sky</h3>
@@ -2381,6 +2389,14 @@ function showOptions() {
     state.theme = b.dataset.theme; store.set('theme', state.theme);
     $('#optTheme').querySelectorAll('[data-theme]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     applyRed(); renderAll();
+  });
+  $('#optHoliday').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-holiday]');
+    if (!b) return;
+    const on = b.dataset.holiday === 'true';
+    if (on === holidaySkins()) return;
+    store.set('holiday', on);
+    location.replace(location.pathname);   // skins load at start-up, so restart (this also drops any ?season= preview)
   });
   const ab = $('#optAlt');
   const rng = ab.querySelector('input[type=range]'), num = ab.querySelector('input[type=number]');

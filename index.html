@@ -15,14 +15,16 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.79">
+<link rel="stylesheet" href="style.css?v=3.80">
 <script>
   // Seasonal skins, automatic from the device date: Halloween all of October, Christmas Dec 1-25, New Year Dec 26-31,
-  // and the normal skin the rest of the year. ?season=halloween|christmas|newyear|normal forces one for previewing.
+  // and the normal skin the rest of the year. Options > Holiday skins can turn them all off (always the normal skin).
+  // ?season=halloween|christmas|newyear|normal forces one for previewing.
   (function () {
     function season() {
       var q = location.search.match(/[?&]season=(halloween|christmas|newyear|normal)/);
       if (q) return q[1];
+      try { if (JSON.parse(localStorage.getItem('holiday')) === false) return 'normal'; } catch (e) {}   // Options > Holiday skins: Off
       var d = new Date(), m = d.getMonth();
       if (m === 9) return 'halloween';
       if (m === 11) return d.getDate() <= 25 ? 'christmas' : 'newyear';
@@ -31,10 +33,10 @@
     var s = season(), c = document.documentElement.classList;
     if (s === 'halloween') {
       c.add('hw');
-      document.write('<link rel="stylesheet" href="halloween.css?v=3.79"><script src="halloween.js?v=3.79"><\/script><script src="spider.js?v=3.79"><\/script>');
+      document.write('<link rel="stylesheet" href="halloween.css?v=3.80"><script src="halloween.js?v=3.80"><\/script><script src="spider.js?v=3.80"><\/script>');
     } else if (s === 'christmas' || s === 'newyear') {
       c.add('xm'); if (s === 'newyear') c.add('ny');
-      document.write('<link rel="stylesheet" href="christmas.css?v=3.79"><script src="christmas.js?v=3.79"><\/script>');
+      document.write('<link rel="stylesheet" href="christmas.css?v=3.80"><script src="christmas.js?v=3.80"><\/script>');
     }
     // An app left open across a season change (Oct 1, Nov 1, Dec 1, Dec 26, Jan 1) switches skin when it is next opened.
     document.addEventListener('visibilitychange', function () {
@@ -157,8 +159,8 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="guide.js?v=3.79"></script>
-<script src="app.js?v=3.79"></script>
-<script src="ant.js?v=3.79"></script>
+<script src="guide.js?v=3.80"></script>
+<script src="app.js?v=3.80"></script>
+<script src="ant.js?v=3.80"></script>
 </body>
 </html>
