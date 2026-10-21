@@ -1,13 +1,13 @@
-/* SkyWatch ant: every so often a small ant walks across the screen, then leaves.
+/* SkyWatch ant: every so often a small ant walks across the screen, then leaves (never more than two at a time).
    It is drawn in SVG and driven frame by frame, so the legs move with the distance walked (a tripod gait: three legs
    on the ground, three swinging), the antennae feel ahead, and the path wanders instead of running in a line.
-   It never takes clicks and never moves the layout. Adding ?ant=now to the address sends one straight away. */
+   It never takes clicks and never moves the layout. Adding ?ant=now to the address sends two straight away. At most two ants are ever on screen. */
 (function () {
   'use strict';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce) return;
   var NS = 'http://www.w3.org/2000/svg';
-  var running = false;
+  var active = 0, MAX = 2;                     // never more than two ants on screen
 
   // leg anchors along the thorax and each leg's resting knee and foot (side +1; side -1 mirrors y)
   var LEGS = [
@@ -65,8 +65,8 @@
   function norm(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 
   function walk() {
-    if (running) return;
-    running = true;
+    if (active >= MAX) return;
+    active++;
     var W = window.innerWidth, H = window.innerHeight, M = 40;
     var part = build();
     var host = document.createElement('div');
@@ -123,18 +123,17 @@
       if ((entered && !inside) || t > 90) { finish(); return; }
       requestAnimationFrame(frame);
     }
-    function finish() { done = true; running = false; if (host.parentNode) host.parentNode.removeChild(host); schedule(70000, 190000); }
+    function finish() { done = true; active--; if (host.parentNode) host.parentNode.removeChild(host); }
     requestAnimationFrame(frame);
   }
 
-  var timer = 0;
+  // A new ant every 20-60 s while the app is open, so a second one sometimes joins the first (walk() caps it at two).
   function schedule(lo, hi) {
-    clearTimeout(timer);
-    timer = setTimeout(function () {
-      if (document.visibilityState !== 'visible') return schedule(20000, 40000);   // not on screen: try again later
-      walk();
+    setTimeout(function () {
+      if (document.visibilityState === 'visible') walk();
+      schedule(20000, 60000);
     }, lo + Math.random() * (hi - lo));
   }
-  if (/[?&]ant=now/.test(location.search)) setTimeout(walk, 600);
-  else schedule(25000, 70000);
+  if (/[?&]ant=now/.test(location.search)) { setTimeout(walk, 600); setTimeout(walk, 3500); }   // preview: two ants
+  else schedule(10000, 30000);
 })();

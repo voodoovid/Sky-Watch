@@ -53,7 +53,6 @@
   };
 
   /* ---------- decorations ---------- */
-  var BAT = '<svg viewBox="0 0 64 30" aria-hidden="true"><path d="M32 8c-3 0-5 2-6 5-3-4-8-6-14-5 3 2 4 4 4 7-5-2-9-1-12 2 5 0 8 2 10 5 3-3 6-3 9-1 2-2 4-3 6-3 2 0 4 1 6 3 3-2 6-2 9 1 2-3 5-5 10-5-3-3-7-4-12-2 0-3 1-5 4-7-6-1-11 1-14 5-1-3-3-5-6-5z" fill="currentColor"/><path d="M29 8l1-5 2 3 2-3 1 5z" fill="currentColor"/></svg>';
   var GHOST = '<svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20 3C11 3 5 10 5 19v24l5-4 5 5 5-5 5 5 5-5 5 4V19C35 10 29 3 20 3z" fill="#f4efff"/><ellipse cx="14.5" cy="19" rx="3.2" ry="4.4" fill="#2a1740"/><ellipse cx="25.5" cy="19" rx="3.2" ry="4.4" fill="#2a1740"/><ellipse cx="20" cy="30" rx="3.6" ry="4.6" fill="#2a1740"/></svg>';
 
   function build() {
@@ -72,11 +71,10 @@
       var up = ft.querySelector('#updated');
       ft.insertBefore(g, up || null);
     }
-    // Flying bats and a floating ghost, on a layer that never takes clicks.
+    // A floating ghost, on a layer that never takes clicks (the ghost itself does: tap it).
     var d = document.createElement('div');
     d.id = 'hw-decor';
-        d.innerHTML =
-      '<i class="hw-bat b1">' + BAT + '</i><i class="hw-bat b2">' + BAT + '</i><i class="hw-bat b3">' + BAT + '</i><i class="hw-bat b4">' + BAT + '</i>' +
+    d.innerHTML =
       '<i class="hw-ghost" role="button" tabindex="0" aria-label="Play Pancake\'s purr">' + GHOST + '</i>';
     document.body.appendChild(d);
     // Tap the ghost and Pancake purrs (the recording from Scareisdale). Everything else on this layer stays click-through.
@@ -85,7 +83,7 @@
       if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
       e.preventDefault();
       try {
-        if (!purr) { purr = new Audio('pancake-purr.mp3?v=3.72'); purr.preload = 'auto'; }
+        if (!purr) { purr = new Audio('pancake-purr.mp3?v=3.73'); purr.preload = 'auto'; }
         purr.currentTime = 0;
         var pr = purr.play(); if (pr && pr.catch) pr.catch(function () {});
       } catch (err) { /* no audio: stay silent */ }
