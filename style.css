@@ -1024,3 +1024,15 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   filter: drop-shadow(0 0 .6px rgba(255, 255, 255, .55)) drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, .45)); }
 html.light .ant { filter: drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, .35)); }
 html.red .ant { filter: sepia(1) saturate(7) hue-rotate(-50deg) brightness(.7); }
+
+/* Narrow headers (iPad portrait, iPhone landscape): drop the pin icon and tighten the type so "Current location" is never cut off. */
+@media (min-width: 760px) and (max-width: 1100px), (orientation: landscape) and (max-height: 520px) {
+  .loc-ctl { padding-left: 8px; }
+  .loc-ctl .pin { display: none; }
+  .loc-ctl select { font-size: .86rem; padding-left: 0; text-overflow: clip; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .loc-ctl { gap: 2px; padding-left: 6px; }
+  .loc-ctl select { font-size: .8rem; }
+}

@@ -97,7 +97,7 @@ window.SKY_GUIDE = (() => {
     <h4>The top bar</h4>
     <dl class="g-def">
       <dt>Location</dt><dd>The pin menu switches between <b>Current location (GPS)</b> and your saved spots. The <b>GPS</b> button re-reads your position and the <b>magnifier</b> opens place search. See chapter 10.</dd>
-      <dt>Time Machine</dt><dd>The round dial shows the sky at a later time tonight. See chapter 6.</dd>
+      <dt>Time Machine</dt><dd>The round dial shows the sky at a later time on the night you are viewing: Tonight, Tomorrow or the third day. See chapter 6.</dd>
       <dt>Night</dt><dd>Switches the whole page between tonight, tomorrow night and the night after (named by weekday, such as “Thu”). <b>Tonight</b> stays the current night until fewer than two hours of darkness remain, then moves on to the coming evening, so you never look at a night that is nearly over.</dd>
       <dt>Home</dt><dd>Counts a target only while it is in the part of the sky you can see from your yard. You choose those directions in Options. When Home is on, the button is lit.</dd>
       <dt>Refresh</dt><dd>Reloads every forecast. On GPS it also re-reads your position.</dd>
@@ -200,10 +200,10 @@ window.SKY_GUIDE = (() => {
     <p>SkyWatch normally judges everything at <b>Now</b>. The Time Machine answers “what can I film at 3:00 AM?”, which helps when a target will pass behind the house or the Moon is about to rise.</p>
     <ul>
       <li><b>Turn the dial.</b> Tap the ring to jump, or drag around it. Drag further from the dial for finer control. It moves in <b>15-minute steps</b>, from the next quarter hour to 30 minutes before dawn. The arrow keys work too.</li>
-      <li><b>Now</b> returns to the present. It is greyed out when you are already on Now.</li>
+      <li><b>Now</b> resets the time for the night you are viewing: the present tonight, and dusk (shown as “Dusk”) on Tomorrow and the third day. It is greyed out when the dial is already at its start.</li>
       <li>Moving the dial re-picks the <b>Top Ten</b>, the rest of the top 30, the Moon path's “now” line, and the altitude chart if a target pop-up is open.</li>
       <li>Your <b>Home sky</b> directions apply, so you see what you can really film.</li>
-      <li>It works on <b>Tonight</b> only, and it always starts on Now when you open the app.</li>
+      <li>It works on <b>all three nights</b>. Switching night puts it back at the start, and it always starts there when you open the app.</li>
     </ul>`)}
 
   ${chapter('g-targets', `
@@ -309,7 +309,7 @@ window.SKY_GUIDE = (() => {
     ${ts('“Could not reach any weather service”', '<p>Check your connection and tap the refresh button.</p>')}
     ${ts('Seeing and Transp show “–”', '<p>7Timer! is slow and sometimes down. The verdict still works without it. Tap Refresh to try again, and open Data sources to see its status.</p>')}
     ${ts('The Bortle tile shows “–” or “…”', '<p>“…” means it is still loading. “–” means it could not be fetched (offline) or your location is outside the atlas coverage.</p>')}
-    ${ts('The Time Machine is greyed out', '<p>It works only on Tonight, and only while there is dark time left before dawn.</p>')}
+    ${ts('The Time Machine is greyed out', '<p>It works on all three nights, but only while there is dark time left before dawn. Switching night puts it back at the start of that night.</p>')}
     ${ts('A target I expected is missing', '<p>It may be below your minimum elevation, outside your Home sky directions, already in the Top Ten (the Seestar list starts at #11), or finished for the night. Use the search box to find it directly.</p>')}
     ${ts('Home turned itself off', '<p>Home is tied to the place where you switched it on. If you are more than about 3 km away it turns off, and it returns when you are back.</p>')}
     ${ts('I cannot select or copy text', '<p>That is deliberate, so a stray touch never highlights text on screen. Use the <b>Copy</b> button in a target’s pop-up.</p>')}

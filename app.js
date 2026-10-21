@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.81';
+const VERSION = 'v3.82';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1561,7 +1561,7 @@ function renderMoon(moon, lat) {
 /* Moon through the night: altitude against time (same time axis as the forecast), twilight shading,
    when it rises/sets, where it is in the sky, and its highest point. */
 function renderPath(N, lat, now) {
-  now = state.night === 0 && state.tm ? state.tm : new Date();   // the live clock, so the Moon moves as the night goes on
+  now = state.tm || new Date();   // the live clock, so the Moon moves as the night goes on
   const box = $('#moonPath'), moon = N.moon, c = N.S.s.map((p) => ({ d: p.d, sun: p.sun, alt: p.moon, az: p.moonAz }));
   if (c.length < 2) { box.innerHTML = ''; return; }
   const W = Math.max(260, Math.round(box.clientWidth || 480));
@@ -1658,7 +1658,7 @@ function renderPath(N, lat, now) {
   // Now
   if (now && +now > t0 && +now < t1) {
     const x = X(now);
-    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">${state.tm && state.night === 0 ? esc(fmtTime(now)) : 'Now'}</text>`;
+    s += `<line x1="${f(x)}" x2="${f(x)}" y1="${T}" y2="${f(T + ph)}" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="3 3"/><text x="${f(x + 4)}" y="${f(T + 11)}" font-size="10.5" font-weight="700" fill="var(--accent)">${state.tm ? esc(fmtTime(now)) : 'Now'}</text>`;
   }
   box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Moon altitude through the night">${s}${marks}${labels}</svg>`;
   // Header: what the Moon does during the dark hours
@@ -1707,17 +1707,18 @@ const hrsLeft = (o, t) => {
   if (!o.segs || !o.segs.length) return Math.max(0, Math.min(o.hrs, (+o.end - Math.max(+o.start, +t)) / 3600e3));
   return o.segs.reduce((a, g) => a + Math.max(0, +g.e - Math.max(+g.s, +t)), 0) / 3600e3;
 };
-/* The time everything is judged at: the Time Machine time (tonight only), otherwise now. */
-const effNow = () => (state.data ? (state.night === 0 && state.tm ? state.tm : state.data.now) : new Date());
-const tmLabel = () => (state.night === 0 && state.tm ? fmtTime(state.tm) : 'Now');
-/* Slider: position 0 = Now, then one stop per 15 minutes on the quarter hour (e.g. 10:15, 10:30)
+/* The time everything is judged at: the Time Machine time (any of the three nights), otherwise now. */
+const effNow = () => (state.data ? (state.tm || state.data.now) : new Date());
+/* Position 0 is the night's own starting view: "Now" tonight, and dusk on the nights after. */
+const tmLabel = () => (state.tm ? fmtTime(state.tm) : state.night === 0 ? 'Now' : 'Dusk');
+/* Slider (all three nights): position 0 = Now tonight (dusk on the other nights), then one stop per 15 minutes on the quarter hour (e.g. 10:15, 10:30)
    up to 30 minutes before astronomical dawn. Coarse steps keep it easy to land where you want. */
 const TM_STEP = 15 * 60e3;
 let tmRaf = 0, tmDrawn = null;
 function tmRange() {
   const D = state.data; if (!D) return null;
-  const w = D.nights[0].win, dawn = w.darkEnd || w.rise;
-  const start = Math.max(+D.now, +w.set), end = +dawn - 30 * 60e3;
+  const w = D.nights[state.night].win, dawn = w.darkEnd || w.rise;
+  const start = state.night === 0 ? Math.max(+D.now, +w.set) : +w.set, end = +dawn - 30 * 60e3;
   const first = (Math.floor(start / TM_STEP) + 1) * TM_STEP;   // first quarter hour after now / dusk
   const n = end >= first ? Math.floor((end - first) / TM_STEP) + 1 : 0;
   return n >= 1 ? { first, n } : null;
@@ -1725,19 +1726,19 @@ function tmRange() {
 const tmAt = (r, v) => new Date(r.first + (v - 1) * TM_STEP);
 function syncTM() {
   const r = tmRange(), rng = $('#tmRange'), box = $('#tm');
-  const on = !!r && state.night === 0;
+  const on = !!r;
   rng.disabled = !on; box.classList.toggle('off', !on);
   rng.step = 1;
   if (!r) { state.tm = null; rng.max = 0; rng.value = 0; }
   else {
     rng.max = r.n;
-    // keep the chosen time across a refresh while it is still ahead of us and inside tonight
+    // keep the chosen time across a refresh while it is still ahead of us and inside this night (switching night clears it)
     const v = state.tm ? Math.round((+state.tm - r.first) / TM_STEP) + 1 : 0;
     if (!state.tm || v < 1 || v > r.n) { state.tm = null; rng.value = 0; } else { rng.value = v; state.tm = tmAt(r, v); }
   }
   $('#tmVal').textContent = tmLabel();
   $('#tmNow').disabled = !(on && state.tm);
-  rng.title = on ? 'Slide to see what you can film later tonight (Home sky applies)' : 'Time Machine works on Tonight';
+  rng.title = on ? 'Turn to see what you can film later that night (Home sky applies)' : 'No dark hours to look at';
   tmDrawn = state.tm ? +state.tm : 0;   // whatever the page was just redrawn at
   drawDial();
 }
@@ -2088,7 +2089,7 @@ function altChart(el, o, now) {
     const right = xs == null || xs < x - 2 || xs > x + tw + 8;
     const tx = right ? x + 4 : x - 4;
     marks += `<line x1="${f(x)}" x2="${f(x)}" y1="${f(T)}" y2="${f(T + ph)}" stroke="var(--text)" stroke-opacity=".55" stroke-width="1" stroke-dasharray="2 3"/>`;
-    labels += `<text x="${f(tx)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" text-anchor="${right ? 'start' : 'end'}" fill="var(--text)" opacity=".75">${state.tm && state.night === 0 ? esc(fmtTime(now)) : 'Now'}</text>`;
+    labels += `<text x="${f(tx)}" y="${f(T + ph - 5)}" font-size="${f(sm)}" font-weight="700" text-anchor="${right ? 'start' : 'end'}" fill="var(--text)" opacity=".75">${state.tm ? esc(fmtTime(now)) : 'Now'}</text>`;
     obst.push(box(right ? tx : tx - tw, T + ph - 5 - sm, tw, sm + 2));
   }
   if (o.start) {
@@ -2582,7 +2583,7 @@ function buildNights(src, now, key) {
 /* ---------- locations ---------- */
 function renderSpots() {
   const sel = $('#spotSelect');
-  const opts = ['<option value="gps">📍 Current location (GPS)</option>'];
+  const opts = ['<option value="gps">Current location</option>'];
   state.spots.forEach((s, i) => opts.push(`<option value="${i}">${esc(s.name)}</option>`));
   if (state.loc && !state.loc.gps && !state.spots.some((s) => s.lat === state.loc.lat && s.lon === state.loc.lon)) {
     opts.push(`<option value="cur">${esc(state.loc.name)} (not saved)</option>`);
@@ -2721,7 +2722,7 @@ function init() {
   wireDial();
   $('#tmRange').addEventListener('input', () => onTM());
   $('#tmRange').addEventListener('change', () => onTM(true));
-  $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(true); });
+  $('#tmNow').addEventListener('click', () => { $('#tmRange').value = 0; onTM(true); });   // resets to the start of the day being viewed
   // iPad 13" landscape: make the title + location block exactly as wide as the buttons block, so the gap left of Time Machine equals the gap right of it.
   (() => {
     const ctl = $('.controls'), left = $('.top-l');
