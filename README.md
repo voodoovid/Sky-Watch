@@ -12,6 +12,7 @@ On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to 
 - GPS or saved locations, metric/imperial, and a red night-vision mode
 - Halloween skin: all of October (by the device's date) the app wears a pumpkin Moon, cobwebs, bats and a ghost, then returns to the normal look on Nov 1 and again each Oct 1. Preview any time with `?season=halloween`, or `?season=normal`
 - Christmas skin: Dec 1-25 (by the device's date) the app gets a candy-cane header, a string of bubble lights, falling snow, Santa and a snowman (tap the snowman and Pancake purrs). Dec 26-31 it turns to New Year (midnight and gold, champagne-colored lights, confetti, party hats), then returns to the normal look on Jan 1 and again each Dec 1. Preview any time with `?season=christmas` or `?season=newyear`.
+- A small ant walks across the screen now and then (every minute or two), in every season. Add `?ant=now` to the address to see one right away.
 - Built-in User Guide: Options → **User Guide** (beside the Options title)
 
 Data: Open-Meteo, MET Norway, 7Timer!. Astronomy: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, bundled). Moon image: NASA lunar map (public domain), projected to the near side.

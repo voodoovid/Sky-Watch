@@ -1016,3 +1016,10 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .brand .sub { font-size: .72rem; }
   .tm { padding-right: 12px; }
 }
+
+/* ---------- the ant (ant.js): walks across the screen now and then, never takes clicks ---------- */
+.ant-host { position: fixed; left: 0; top: 0; width: 34px; height: 22px; z-index: 25; pointer-events: none; will-change: transform; }
+.ant { display: block; width: 34px; height: 22px; overflow: visible;
+  filter: drop-shadow(0 0 .6px rgba(255, 255, 255, .55)) drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, .45)); }
+html.light .ant { filter: drop-shadow(0 1.5px 1.5px rgba(0, 0, 0, .35)); }
+html.red .ant { filter: sepia(1) saturate(7) hue-rotate(-50deg) brightness(.7); }

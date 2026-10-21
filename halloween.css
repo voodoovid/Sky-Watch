@@ -91,8 +91,8 @@ html.hw.red .hw-greet { display: none; }
 #hw-decor { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 9; }
 html:not(.hw) #hw-decor, html.red #hw-decor { display: none; }
 #hw-decor i { position: absolute; display: block; font-style: normal; }
-.hw-bat { width: 30px; color: #120a1f; opacity: .7; left: 0; animation: hw-fly 34s linear infinite; }
-html.hw.light .hw-bat { color: #2b1646; opacity: .55; }
+.hw-bat { width: 30px; color: #8a76b8; opacity: .72; filter: drop-shadow(0 0 3px rgba(190, 160, 255, .4)); left: 0; animation: hw-fly 34s linear infinite; }
+html.hw.light .hw-bat { color: #2b1646; opacity: .55; filter: none; }
 .hw-bat svg { width: 100%; height: auto; animation: hw-flap .45s ease-in-out infinite alternate; transform-origin: 50% 40%; }
 .hw-bat.b1 { top: 16%; animation-duration: 38s; animation-delay: -6s; }
 .hw-bat.b2 { top: 44%; width: 24px; animation-duration: 31s; animation-delay: -19s; }
