@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.68';
+const VERSION = 'v3.69';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2174,7 +2174,20 @@ function altChart(el, o, now) {
   // Start at now (if it is night), else at the peak.
   const keep = el._scrub != null && el._scrubFor === o ? el._scrub : null;
   el._scrubFor = o;
-  setT(keep ?? (now && +now > t0 && +now < t1 ? +now : o.peak ? +o.peak.d : o.start ? +o.start : (t0 + t1) / 2));
+  setT(keep ?? popupStart(now, t0, t1, o));
+}
+/* Where the pop-up's time slider starts: the current time once it is dark, 8:38 PM while it is still light. */
+const POPUP_EVENING = 20 * 60 + 38; // 8:38 PM, local minutes of the day
+function popupStart(now, t0, t1, o) {
+  const D = state.data, w = D && D.nights[state.night] && D.nights[state.night].win;
+  const dark = w && (w.darkStart || w.set);
+  if (now && dark && +now < +dark && w.set) {
+    const p = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: 'numeric', hourCycle: 'h23', timeZone: state.tz }).formatToParts(w.set);
+    const mins = +p.find((x) => x.type === 'hour').value * 60 + +p.find((x) => x.type === 'minute').value;
+    return Math.max(t0, Math.min(t1, +w.set + (POPUP_EVENING - mins) * 60e3));
+  }
+  if (now && +now > t0 && +now < t1) return +now;
+  return o.peak ? +o.peak.d : o.start ? +o.start : (t0 + t1) / 2;
 }
 
 const tile = (lbl, val, sub = '', cls = '') => `<div class="tile ${cls}"><span class="lbl">${esc(lbl)}</span><b>${esc(val)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
