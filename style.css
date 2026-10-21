@@ -993,6 +993,10 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   body { display: flex; flex-direction: column; position: fixed; inset: 0; height: auto; }
   .top { position: relative; flex: none; z-index: 20; }
   .dash { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  /* Stacked cards size to their content; without this the fixed-height scroller squeezes the grid rows and the cards overlap. */
+  .dash { grid-template-rows: none; grid-auto-rows: max-content; align-content: start; }
+  .card { min-height: min-content; flex: none; }
+  .toplist { max-height: 296px; }
   .foot { flex: none; }
 }
 
