@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.78';
+const VERSION = 'v3.79';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -639,7 +639,7 @@ const DSO = [
   ['IC 4601', 'Nebula in Scorpius', 'Nebula', 16.338, -20.09],
   ['IC 4603', 'Nebula in Ophiuchus', 'Nebula', 16.423, -24.47],
   ['NGC 7822', 'Cederblad 214 complex', 'Emission nebula', 0.06, 67.16],
-  ['IC 342', 'Hidden Galaxy', 'Galaxy', 3.78, 68.1],
+  ['IC 342', 'Hidden Galaxy', 'Galaxy', 3.79, 68.1],
   ['NGC 247', 'Galaxy in Cetus', 'Galaxy', 0.786, -20.76],
   ['NGC 300', 'Galaxy in Sculptor', 'Galaxy', 0.915, -37.68],
   ['IC 1613', 'Galaxy in Cetus', 'Galaxy', 1.08, 2.12],

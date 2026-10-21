@@ -6,7 +6,7 @@
    If an ant (ant.js) walks onto the web, ant.js hands it over through HW.web.catchAnt(): the glue stops it, it
    thrashes, the web quivers, the spider runs out along a spoke, bites it, spins silk over it while turning it, tows the
    bundle back to the hub, hangs it there, and later eats it. The whole thing takes about 25 seconds, then the web is
-   free again. It never takes clicks and never moves the layout. Add ?ant=web to the address to send an ant straight at it. */
+   free again; the spider then drops on a silk thread down the screen, and climbs back up it a few seconds later. It never takes clicks and never moves the layout. Add ?ant=web to the address to send an ant straight at it. */
 (function () {
   'use strict';
   var HW = window.HW = window.HW || {};
@@ -347,7 +347,28 @@
     } else if (st === 'vanish') {                                 // nothing left but a husk, then not even that
       w = 1; T.lar = 1 - smooth(t / 1.2); op = 1 - smooth(t / 1.2); sc = 0.78;
       var rh = drive(S, HUB.x, HUB.y, dt, 55, 8);
-      if (t > 1.3 && rh < 2) go(T, 'home');
+      if (t > 1.3 && rh < 2) { beginDrop(T); go(T, 'fall'); }
+    } else if (st === 'fall' || st === 'away' || st === 'climb') {     // meal over: it drops from the web on a thread, down the screen
+      w = 1; T.lar = 0; op = 0; sc = 0.78;
+      var hr = M.box.getBoundingClientRect(), hx = hr.left + HUB.x, hy = hr.top + HUB.y;
+      if (st === 'fall') {                                         // legs tucked, falling faster and faster, swaying on the thread
+        T.vy = Math.min(T.vy + 760 * dt, 460);
+        S.y += T.vy * dt; S.x = hx + 3 * Math.sin(T.t * 2.6) * Math.min(1, t * 2);
+        S.h = 1.5708 + 0.12 * Math.sin(T.t * 3.1);
+        if (S.y > window.innerHeight + 90) go(T, 'away');
+      } else if (st === 'away') {                                  // out of sight below the screen for a few seconds
+        S.x = hx;
+        if (t > 3.2) { S.h = -1.5708; go(T, 'climb'); }
+      } else {                                                     // then back up the thread, hand over hand
+        var cv = 170 + Math.min(120, Math.max(0, S.y - hy) * 0.15);
+        S.h = -1.5708; S.x = hx; S.y -= cv * dt; S.phase += cv * dt / SL; S.ampT = 1;
+        if (S.y <= hy + 3) { reparent(T); S.x = HUB.x; S.y = HUB.y; S.amp = 0.6; go(T, 'home'); }
+      }
+      if (T.ov) {                                                  // the drop line, from the hub to the spider's spinnerets
+        var sp1 = toWorld(S, SPIN_X, 0);
+        T.line.setAttribute('x1', fx(hx)); T.line.setAttribute('y1', fx(hy)); T.line.setAttribute('x2', fx(sp1[0])); T.line.setAttribute('y2', fx(sp1[1]));
+        T.line.style.opacity = '0.9';
+      }
     } else if (st === 'home') {
       w = 1; T.lar = 0; op = 0; sc = 0.78;
       if (turnTo(S, REST_H, dt, 4) < 0.05 || t > 1.5) { endHunt(T); return; }
@@ -390,14 +411,35 @@
     if (T.t > 80) endHunt(T);
   }
 
+  // the spider leaves the web box for a full-screen layer above the cards, so it can drop down the screen
+  function beginDrop(T) {
+    var r = M.box.getBoundingClientRect(), S = M.S, ov = document.createElement('div'), ln = document.createElementNS(NS, 'svg');
+    ov.className = 'hw-fall';
+    ln.setAttribute('class', 'hw-threads hw-line');
+    T.line = el('line', { 'class': 'th spin', 'stroke-width': '1' }, ln);
+    ov.appendChild(ln);
+    ov.appendChild(M.sp.svg);
+    document.body.appendChild(ov);
+    T.ov = ov; T.vy = 40;
+    S.x += r.left; S.y += r.top; S.h = 1.5708; S.v = 0; S.amp = 0; S.ampT = 0;
+    if (!T.fin) { T.fin = true; T.finish(); }                     // the ant is long gone: free its slot now
+  }
+  function reparent(T) {
+    if (!T.ov) return;
+    M.box.appendChild(M.sp.svg);
+    if (T.ov.parentNode) T.ov.parentNode.removeChild(T.ov);
+    T.ov = null;
+  }
+
   function endHunt(T) {
+    reparent(T);
     M.T = null;
     M.web.classList.remove('hw-quiver');
     M.S.x = HUB.x; M.S.y = HUB.y; M.S.h = REST_H; M.S.v = 0; M.S.amp = 0; M.S.ampT = 0; M.S.phase = 0;
     drawSpider(M.sp, M.S, null);
     while (M.dyn.firstChild) M.dyn.removeChild(M.dyn.firstChild);
     M.cool = performance.now() + 20000;
-    T.finish();                                                   // ant.js removes the bundle and frees its slot
+    if (!T.fin) { T.fin = true; T.finish(); }                     // ant.js removes the bundle and frees its slot
   }
 
   function tick(now) {
