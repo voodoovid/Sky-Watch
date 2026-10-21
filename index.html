@@ -15,20 +15,30 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.67">
+<link rel="stylesheet" href="style.css?v=3.70">
 <script>
-  // Halloween skin: on automatically all of October (device date), normal skin the rest of the year.
-  // ?season=halloween or ?season=normal forces one for previewing.
+  // Seasonal skins, automatic from the device date: Halloween all of October, Christmas Dec 1-25, New Year Dec 26-31,
+  // and the normal skin the rest of the year. ?season=halloween|christmas|newyear|normal forces one for previewing.
   (function () {
-    function on() { var q = location.search.match(/[?&]season=(halloween|normal)/); return q ? q[1] === 'halloween' : new Date().getMonth() === 9; }
-    var hw = on();
-    if (hw) {
-      document.documentElement.classList.add('hw');
-      document.write('<link rel="stylesheet" href="halloween.css?v=3.67"><script src="halloween.js?v=3.67"><\/script>');
+    function season() {
+      var q = location.search.match(/[?&]season=(halloween|christmas|newyear|normal)/);
+      if (q) return q[1];
+      var d = new Date(), m = d.getMonth();
+      if (m === 9) return 'halloween';
+      if (m === 11) return d.getDate() <= 25 ? 'christmas' : 'newyear';
+      return 'normal';
     }
-    // An app left open across Oct 1 or Nov 1 switches skin when it is next opened.
+    var s = season(), c = document.documentElement.classList;
+    if (s === 'halloween') {
+      c.add('hw');
+      document.write('<link rel="stylesheet" href="halloween.css?v=3.70"><script src="halloween.js?v=3.70"><\/script>');
+    } else if (s === 'christmas' || s === 'newyear') {
+      c.add('xm'); if (s === 'newyear') c.add('ny');
+      document.write('<link rel="stylesheet" href="christmas.css?v=3.70"><script src="christmas.js?v=3.70"><\/script>');
+    }
+    // An app left open across a season change (Oct 1, Nov 1, Dec 1, Dec 26, Jan 1) switches skin when it is next opened.
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible' && on() !== hw && !/[?&]season=/.test(location.search)) location.reload();
+      if (document.visibilityState === 'visible' && season() !== s && !/[?&]season=/.test(location.search)) location.reload();
     });
   })();
 </script>
@@ -147,7 +157,7 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="guide.js?v=3.67"></script>
-<script src="app.js?v=3.67"></script>
+<script src="guide.js?v=3.70"></script>
+<script src="app.js?v=3.70"></script>
 </body>
 </html>
