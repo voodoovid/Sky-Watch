@@ -104,3 +104,38 @@ html.hw.light .hw-ghost svg path { stroke: #2b1646; stroke-width: 1.5; stroke-li
 @media (prefers-reduced-motion: reduce) {
   .hw-ghost, html.hw .hw-flame { animation: none; }
 }
+
+/* ----- the spider and its web (spider.js): a live SVG in the Tonight card's top-right corner ----- */
+html.hw.hw-web-on .verdict-card::after { display: none; }
+/* the web hangs behind the card's own text and badge, so nothing is ever hard to read */
+html.hw.hw-web-on .verdict-card { isolation: isolate; }
+.hw-web { position: absolute; top: 0; right: 0; width: 104px; height: 124px; pointer-events: none; z-index: -1; }
+html:not(.hw) .hw-web, html.red .hw-web { display: none; }
+.hw-web > svg { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
+.hw-threads { -webkit-clip-path: inset(0 round 0 13px 0 0); clip-path: inset(0 round 0 13px 0 0); }
+.hw-threads .th { fill: none; stroke: #e4d8f7; stroke-linecap: round; }
+.hw-threads .spoke { stroke-width: .85; opacity: .55; }
+.hw-threads .frame { stroke-width: 1; opacity: .5; }
+.hw-threads .spiral { stroke-width: .6; opacity: .52; }
+.hw-threads .dew { fill: #fff; opacity: .6; }
+.hw-threads .strand, .hw-threads .spin { stroke: #fff; stroke-width: .8; opacity: 0; }
+html.hw.light .hw-threads .th { stroke: #5a3f80; }
+html.hw.light .hw-threads .dew { fill: #fff; stroke: #5a3f80; stroke-width: .35; opacity: .85; }
+html.hw.light .hw-threads .strand, html.hw.light .hw-threads .spin { stroke: #6a4c93; }
+.hw-quiver { animation: hw-quiver .09s linear infinite alternate; }
+@keyframes hw-quiver { from { transform: translate(.5px, .3px); } to { transform: translate(-.5px, -.35px); } }
+
+.hw-spider { z-index: 2; width: 64px; height: 64px; will-change: transform; overflow: visible;
+  filter: drop-shadow(0 0 .8px rgba(255, 236, 205, .6)) drop-shadow(0 2px 2px rgba(0, 0, 0, .5)); }
+html.hw.light .hw-spider { filter: drop-shadow(0 1.5px 1.5px rgba(40, 20, 5, .35)); }
+.hw-spider .sp-leg { fill: none; stroke: #5a3a1c; stroke-linecap: round; stroke-linejoin: round; }
+.hw-spider .sp-band { fill: none; stroke: #d9a864; stroke-dasharray: 1.6 2.7; }
+.hw-spider .sp-knee { fill: #2f1808; }
+html.hw.light .hw-spider .sp-leg { stroke: #3a2210; }
+
+/* silk wound over a caught ant (inside the ant's own box) */
+.hw-silk { position: absolute; left: 0; top: 0; width: 34px; height: 22px; overflow: visible; pointer-events: none;
+  filter: drop-shadow(0 0 .7px rgba(70, 40, 110, .7)); }
+.hw-silk .sk-fill { fill: #ece5f8; opacity: 0; }
+.hw-silk .sk-band { fill: none; stroke: #fff; stroke-width: 1; stroke-linecap: round; opacity: .92; }
+@media (prefers-reduced-motion: reduce) { .hw-quiver { animation: none; } }

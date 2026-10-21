@@ -1,7 +1,8 @@
 /* SkyWatch ant: every so often a small ant walks across the screen, then leaves (never more than two at a time).
    It is drawn in SVG and driven frame by frame, so the legs move with the distance walked (a tripod gait: three legs
    on the ground, three swinging), the antennae feel ahead, and the path wanders instead of running in a line.
-   It never takes clicks and never moves the layout. Adding ?ant=now to the address sends two straight away. At most two ants are ever on screen. */
+   It never takes clicks and never moves the layout. Adding ?ant=now to the address sends two straight away. At most two ants are ever on screen.
+   In October (spider.js) an ant that walks onto the spider's web is handed over to it: see HW.web.catchAnt. Adding ?ant=web sends one at the web. */
 (function () {
   'use strict';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -64,7 +65,7 @@
 
   function norm(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 
-  function walk() {
+  function walk(aim) {
     if (active >= MAX) return;
     active++;
     var W = window.innerWidth, H = window.innerHeight, M = 40;
@@ -81,9 +82,18 @@
     else if (edge === 1) { x = W + M; y = rx(.15, .85) * H; tx = -M * 2; ty = rx(.1, .9) * H; }
     else if (edge === 2) { x = rx(.15, .85) * W; y = -M; tx = rx(.1, .9) * W; ty = H + M * 2; }
     else { x = rx(.15, .85) * W; y = H + M; tx = rx(.1, .9) * W; ty = -M * 2; }
+    // in October some ants head for the spider's web (HW.web.center is null in every other season)
+    var web = window.HW && HW.web && HW.web.center && HW.web.center(), aimOn = false;
+    if (web && (aim === true || Math.random() < 0.25)) {
+      var side = Math.floor(Math.random() * 3), cl = function (v, lo, hi) { return Math.max(lo, Math.min(hi, v)); };
+      if (side === 0) { x = -M; y = cl(web.y + rx(-.25, .25) * H, M, H - M); }
+      else if (side === 1) { x = rx(.2, .8) * W; y = H + M; }
+      else { x = W + M; y = cl(web.y + rx(-.25, .25) * H, M, H - M); }
+      tx = web.x; ty = web.y; aimOn = true;
+    }
     var th = Math.atan2(ty - y, tx - x);
     var speed = 0, base = 60 + Math.random() * 40, t = 0, phase = 0, last = 0, pauseT = 0, nextPause = 2 + Math.random() * 4, pauses = 0;
-    var seed = Math.random() * 100, entered = false, done = false;
+    var seed = Math.random() * 100, entered = false, done = false, caught = false;
 
     function frame(now) {
       if (done) return;
@@ -99,6 +109,11 @@
       } else {
         speed += (0 - speed) * Math.min(1, dt * 9);
         pauseT -= dt;
+      }
+      if (aimOn) {                                       // keep heading for the web; once past it, carry on out the far side
+        var wc = HW.web.center();
+        if (wc && Math.hypot(wc.x - x, wc.y - y) > 30) { tx = wc.x; ty = wc.y; }
+        else { aimOn = false; tx = x + Math.cos(th) * 900; ty = y + Math.sin(th) * 900; }
       }
       // wander: a smooth, uneven sway on top of a steady pull toward the exit
       var want2 = Math.atan2(ty - y, tx - x);
@@ -116,6 +131,8 @@
         var a = (14 * Math.sin(t * 7.5 + (A.s > 0 ? 0 : 1.7) + seed) + (pauseT > 0 ? 10 * Math.sin(t * 17) : 0)) * A.s;
         A.rot.setAttribute('transform', 'rotate(' + a.toFixed(1) + ')');
       });
+      // an ant that steps onto the Halloween spider's web sticks, and the spider takes it from here
+      if (!caught && window.HW && HW.web && HW.web.catchAnt && HW.web.catchAnt(host, part, x, y, th * 180 / Math.PI, speed, finish)) { caught = true; return; }
       var bob = Math.sin(phase * 2) * 0.35;
       host.style.transform = 'translate3d(' + (x - 17).toFixed(1) + 'px,' + (y - 11 + bob).toFixed(1) + 'px,0) rotate(' + (th * 180 / Math.PI).toFixed(1) + 'deg)';
       var inside = x > -M && x < W + M && y > -M && y < H + M;
@@ -135,5 +152,6 @@
     }, lo + Math.random() * (hi - lo));
   }
   if (/[?&]ant=now/.test(location.search)) { setTimeout(walk, 600); setTimeout(walk, 3500); }   // preview: two ants
+  else if (/[?&]ant=web/.test(location.search)) { setTimeout(function () { walk(true); }, 1200); }   // preview: one ant, straight at the web
   else schedule(10000, 30000);
 })();
