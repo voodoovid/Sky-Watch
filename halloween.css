@@ -132,12 +132,14 @@ html.hw.light .hw-threads .strand, html.hw.light .hw-threads .spin { stroke: #6a
 @keyframes hw-quiver { from { transform: translate(.5px, .3px); } to { transform: translate(-.5px, -.35px); } }
 
 .hw-spider { z-index: 2; width: 64px; height: 64px; will-change: transform; overflow: visible;
-  filter: drop-shadow(0 0 .9px rgba(190, 200, 255, .7)) drop-shadow(0 2px 2px rgba(0, 0, 0, .5)); }
+  filter: drop-shadow(0 0 .6px rgba(225, 230, 255, .9)) drop-shadow(0 0 1.6px rgba(150, 170, 255, .45)) drop-shadow(0 2px 2px rgba(0, 0, 0, .5)); }
 html.hw.light .hw-spider { filter: drop-shadow(0 1.5px 1.5px rgba(20, 20, 40, .4)); }
-.hw-spider .sp-leg { fill: none; stroke: #101015; stroke-linecap: round; stroke-linejoin: round; }
-.hw-spider .sp-band { fill: none; stroke: #8a8a9c; opacity: .55; }
-.hw-spider .sp-knee { fill: #000; }
+.hw-spider .sp-leg { fill: none; stroke: #7c7c98; stroke-linecap: round; stroke-linejoin: round; }
+.hw-spider .sp-band { fill: none; stroke: #d4d4ea; opacity: .75; }
+.hw-spider .sp-knee { fill: #55556c; }
 html.hw.light .hw-spider .sp-leg { stroke: #08080b; }
+html.hw.light .hw-spider .sp-band { stroke: #6a6a80; opacity: .5; }
+html.hw.light .hw-spider .sp-knee { fill: #000; }
 
 /* silk wound over a caught ant (inside the ant's own box) */
 .hw-silk { position: absolute; left: 0; top: 0; width: 34px; height: 22px; overflow: visible; pointer-events: none;
