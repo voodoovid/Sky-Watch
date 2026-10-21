@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.73';
+const VERSION = 'v3.74';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2197,6 +2197,20 @@ function windowTiles(o) {
       + tile('Imaging window', `${o.hrs.toFixed(1)} h`, `until ${fmtTime(o.end)}${o.endWhy === 'dark' ? ' (dawn)' : o.endWhy === 'dir' ? ' (passes S)' : ''}`, 'key')
     : tile(`Reaches ${MIN_ALT}°`, 'Not tonight', `in darkness`, o.kind === 'planet' ? 'warn' : 'warn span');
 }
+/* Seestar tip for a comet. Comet-specific advice goes in here (keyed by id, and tied to the date being viewed so it
+   never goes stale); every other comet gets a brightness-based tip from the app's own predicted magnitude. */
+function cometTip(o) {
+  const base = ' LP filter off. Brightness predictions are uncertain; comets can surprise either way.';
+  const t = o.d instanceof Date ? o.d.getTime() : Date.now();
+  const mag = o.mag.toFixed(1);
+  if (o.id === '2P') {
+    if (t < Date.UTC(2026, 11, 1)) return `Wait until December to film Encke. It is far too faint right now (predicted ≈${mag}). Even an hour or two of stacking may show only a faint smudge, if anything. It brightens steadily from December and peaks from late January to mid-February 2027, when it is a much easier target.` + base;
+    if (t < Date.UTC(2027, 2, 1)) return `Encke is brightening toward its peak (late January to mid-February 2027, perihelion Feb 10): a good time to film it. Use 15–30 minute sessions, since it drifts against the stars, and keep stacking for a stronger tail.` + base;
+    return `Encke is past its peak and fading (predicted ≈${mag}). Wait for its next return in about 3.3 years.` + base;
+  }
+  if (o.mag > 13) return `Too faint for a quick live view (predicted ≈${mag}). Plan an hour or more of stacking from a dark sky, and expect only a faint smudge.` + base;
+  return 'Comets drift against the stars, so 15–30 minute sessions keep the head sharp.' + base;
+}
 function openObject(o) {
   if (!o) return;
   const now = effNow();
@@ -2252,7 +2266,7 @@ function openObject(o) {
       ['RA / Dec (J2000)', `${raHM(o.ra)} / ${decDM(o.dec)} at peak`],
       ['Moon at peak', o.moonSep == null ? 'Below horizon' : `${Math.round(o.moonSep)}° away`],
     ];
-    tip = 'Comets drift against the stars, so 15–30 minute sessions keep the head sharp. LP filter off. Brightness predictions are uncertain — comets can surprise either way.';
+    tip = cometTip(o);
   }
   showSheet(title, `<div class="obj">
       <div class="obj-top">${hero}<div class="tiles">${tiles}<div class="tip"><b>Seestar tip</b>${esc(tip)}</div></div></div>

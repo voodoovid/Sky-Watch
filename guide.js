@@ -293,7 +293,7 @@ window.SKY_GUIDE = (() => {
         <tr><td>Galaxies</td><td>Off</td><td>Need dark skies and little or no Moon. Aim for an hour or more.</td></tr>
         <tr><td>Globular clusters</td><td>Off</td><td>Bright and compact. 15 to 30 minutes resolves the stars.</td></tr>
         <tr><td>Reflection nebulae</td><td>Off</td><td>Blue broadband light, and very sensitive to the Moon.</td></tr>
-        <tr><td>Comets</td><td>Off</td><td>Use 15 to 30 minute sessions. Comets drift against the stars.</td></tr>
+        <tr><td>Comets</td><td>Off</td><td>Use 15 to 30 minute sessions. Comets drift against the stars. Faint comets (about magnitude 13 or fainter) need an hour or more from a dark sky. Each comet's pop-up has its own tip: for example, Encke (2P) is too faint until December, and best from late January to mid-February 2027.</td></tr>
         <tr><td>Planets</td><td>Off</td><td>Tiny at the S50's focal length. Shoot when they are highest.</td></tr>
       </tbody>
     </table>
