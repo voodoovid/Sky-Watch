@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.84';
+const VERSION = 'v3.85';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2602,7 +2602,7 @@ function setLoc(loc) {
   load();
 }
 /* Place names: drop administrative areas ("Metro Vancouver Regional District", "… County") so a location reads "Vancouver, BC". */
-const ADMIN_RE = /\b(regional district|regional municipality|regional county|metropolitan|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b/i;
+const ADMIN_RE = /(^metro\b|\b(regional district|regional municipality|regional county|metropolitan|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b)/i;
 const isAdminName = (n) => !n || ADMIN_RE.test(n);
 function cleanPlace(name) {
   const parts = String(name || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -2612,9 +2612,21 @@ function cleanPlace(name) {
 }
 /* Reverse-geocode a GPS fix to { name: "Town, Prov", post } (BigDataCloud's free client endpoint). Fails quietly. */
 async function placeName(lat, lon) {
+  // 1) OpenStreetMap Nominatim: street-level data, so it knows neighbourhoods ("Kerrisdale") and full postal codes.
+  try {
+    const j = await getJSON(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1&accept-language=en`, 8000);
+    const a = j.address || {};
+    const hood = [a.neighbourhood, a.suburb, a.quarter, a.city_district, a.borough].find((n) => n && !isAdminName(n));
+    const city = [a.city, a.town, a.village, a.municipality, a.hamlet].find((n) => n && !isAdminName(n));
+    const code = String(a['ISO3166-2-lvl4'] || a['ISO3166-2-lvl6'] || '').split('-')[1];
+    const region = code && code.length <= 3 ? code : (a.state || '');
+    const name = [...new Set([hood, city].filter(Boolean)), region].filter(Boolean).join(', ');
+    if (name) return { name, post: String(a.postcode || '').trim() };
+  } catch (e) {}
+  // 2) BigDataCloud: coarser, used if the first service is unreachable. Most local named area first, never a regional district.
   const j = await getJSON(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`, 8000);
   const adm = ((j.localityInfo && j.localityInfo.administrative) || []).slice().sort((a, b) => (b.adminLevel || 0) - (a.adminLevel || 0)).map((a) => a.name);
-  const town = [j.city, j.locality, ...adm].find((n) => n && !isAdminName(n) && n !== j.principalSubdivision && n !== j.countryName) || '';
+  const town = [j.locality, j.city, ...adm].find((n) => n && !isAdminName(n) && n !== j.principalSubdivision && n !== j.countryName) || '';
   const code = String(j.principalSubdivisionCode || '').split('-')[1];
   const region = code && code.length <= 3 ? code : (j.principalSubdivision || '');
   const info = (j.localityInfo && j.localityInfo.informative) || [];
