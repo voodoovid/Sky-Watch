@@ -1047,3 +1047,6 @@ html.red .ant { filter: sepia(1) saturate(7) hue-rotate(-50deg) brightness(.7); 
   .loc-ctl { gap: 2px; padding-left: 6px; }
   .loc-ctl select { font-size: .8rem; }
 }
+/* chapter references inside the User Guide are buttons that look like links */
+.guide .g-x { padding: 0; border: 0; background: none; color: var(--accent, #4aa3ff); font: inherit; font-weight: 650; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; }
+.guide .g-x:hover { text-decoration-thickness: 2px; }

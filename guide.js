@@ -21,6 +21,8 @@ window.SKY_GUIDE = (() => {
     ['g-gloss', 'Glossary'],
   ];
 
+  /* A chapter number in the text becomes a button that jumps to that chapter (wire() handles data-g). */
+  const xr = (n) => `<button type="button" class="g-x" data-g="${CHAPTERS[n - 1][0]}">chapter ${n}</button>`;
   const chapter = (id, body) => {
     const i = CHAPTERS.findIndex((c) => c[0] === id);
     return `<section class="g-ch" id="${id}" data-title="${CHAPTERS[i][1]}" data-n="${i + 1}">
@@ -96,8 +98,8 @@ window.SKY_GUIDE = (() => {
     ${diagram()}
     <h4>The top bar</h4>
     <dl class="g-def">
-      <dt>Location</dt><dd>The pin menu switches between your current location (shown by town name, e.g. Scotch Creek, BC) and your saved spots. The <b>GPS</b> button re-reads your position and the <b>magnifier</b> opens place search. See chapter 10.</dd>
-      <dt>Time Machine</dt><dd>The round dial shows the sky at a later time on the night you are viewing: Tonight, Tomorrow or the third day. See chapter 6.</dd>
+      <dt>Location</dt><dd>The pin menu switches between your current location (shown by town name, e.g. Scotch Creek, BC) and your saved spots. The <b>GPS</b> button re-reads your position and the <b>magnifier</b> opens place search. See ${xr(10)}.</dd>
+      <dt>Time Machine</dt><dd>The round dial shows the sky at a later time on the night you are viewing: Tonight, Tomorrow or the third day. See ${xr(6)}.</dd>
       <dt>Night</dt><dd>Switches the whole page between tonight, tomorrow night and the night after (named by weekday, such as “Thu”). <b>Tonight</b> stays the current night until fewer than two hours of darkness remain, then moves on to the coming evening, so you never look at a night that is nearly over.</dd>
       <dt>Home</dt><dd>Counts a target only while it is in the part of the sky you can see from your yard. You choose those directions in Options. When Home is on, the button is lit.</dd>
       <dt>Refresh</dt><dd>Reloads every forecast. On GPS it also re-reads your position.</dd>
@@ -166,7 +168,7 @@ window.SKY_GUIDE = (() => {
       <thead><tr><th scope="col">Row</th><th scope="col">What it shows</th></tr></thead>
       <tbody>
         <tr><td>Hour</td><td>The time, with <i>day</i>, <i>twi</i> or <i>dark</i> underneath.</td></tr>
-        <tr><td>Rating</td><td>GO, FAIR or NO for the hour (the score from chapter 3).</td></tr>
+        <tr><td>Rating</td><td>GO, FAIR or NO for the hour (the score from ${xr(3)}).</td></tr>
         <tr><td>Precip</td><td>Chance of rain in that hour. Any chance shows blue, and the blue deepens as the odds rise (stronger from 15%, strongest from 30%). Dry hours stay quiet.</td></tr>
         <tr><td>Cloud</td><td>Average cloud cover from every source. On a computer, hover to see the low, mid and high split.</td></tr>
         <tr><td>Sky</td><td>A picture of the same data: clouds sized to the cloud cover, and a line for the rain chance.</td></tr>
@@ -304,7 +306,7 @@ window.SKY_GUIDE = (() => {
     </ul>`)}
 
   ${chapter('g-help', `
-    ${ts('The screen says “Location blocked”', '<p>Location must be allowed in both your computer or device settings and Safari. See the steps in chapter 10. Or search for a place and tap <b>Save spot</b>, which needs no permission.</p>')}
+    ${ts('The screen says “Location blocked”', '<p>Location must be allowed in both your computer or device settings and Safari. See the steps in ' + xr(10) + '. Or search for a place and tap <b>Save spot</b>, which needs no permission.</p>')}
     ${ts('GPS shows the wrong place', '<p>A desktop computer reports where it sits, such as your office. Search for your home town and tap <b>Save spot</b> to use it from anywhere.</p>')}
     ${ts('“Could not reach any weather service”', '<p>Check your connection and tap the refresh button.</p>')}
     ${ts('Seeing and Transp show “–”', '<p>7Timer! is slow and sometimes down. The verdict still works without it. Tap Refresh to try again, and open Data sources to see its status.</p>')}
