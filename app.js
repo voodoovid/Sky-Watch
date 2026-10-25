@@ -2602,12 +2602,13 @@ function setLoc(loc) {
   load();
 }
 /* Place names: drop administrative areas ("Metro Vancouver Regional District", "… County") so a location reads "Vancouver, BC". */
-const ADMIN_RE = /\b(regional district|regional municipality|regional county|metropolitan|metro vancouver|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b/i;
+const ADMIN_RE = /\b(regional district|regional municipality|regional county|metropolitan|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b/i;
 const isAdminName = (n) => !n || ADMIN_RE.test(n);
 function cleanPlace(name) {
   const parts = String(name || '').split(',').map((x) => x.trim()).filter(Boolean);
-  const keep = parts.filter((x) => !isAdminName(x));
-  return (keep.length ? keep : parts).join(', ');
+  if (parts.length && !isAdminName(parts[0])) return parts.filter((x) => !isAdminName(x)).join(', ');
+  // Only an administrative area to go on ("Metro Vancouver Regional District, BC"): keep its place word ("Vancouver, BC").
+  return parts.map((x) => isAdminName(x) ? x.replace(ADMIN_RE, '').replace(/\b(metro|greater|the|of)\b/ig, '').replace(/\s+/g, ' ').trim() : x).filter(Boolean).join(', ');
 }
 /* Reverse-geocode a GPS fix to { name: "Town, Prov", post } (BigDataCloud's free client endpoint). Fails quietly. */
 async function placeName(lat, lon) {
