@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.85';
+const VERSION = 'v3.86';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2605,10 +2605,18 @@ function setLoc(loc) {
 const ADMIN_RE = /(^metro\b|\b(regional district|regional municipality|regional county|metropolitan|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b)/i;
 const isAdminName = (n) => !n || ADMIN_RE.test(n);
 function cleanPlace(name) {
+  return tidyPlace(rawClean(name));
+}
+/* Abbreviate provinces/states and drop the country: "Scotch Creek, British Columbia, Canada" -> "Scotch Creek, BC". */
+function tidyPlace(name) {
+  const parts = String(name || '').split(',').map((x) => x.trim()).filter((x) => x && !/^(canada|united states( of america)?|usa)$/i.test(x)).map((x) => ABBR[x] || x);
+  return parts.join(', ');
+}
+function rawClean(name) {
   const parts = String(name || '').split(',').map((x) => x.trim()).filter(Boolean);
   if (parts.length && !isAdminName(parts[0])) return parts.filter((x) => !isAdminName(x)).join(', ');
   // Only an administrative area to go on ("Metro Vancouver Regional District, BC"): keep its place word ("Vancouver, BC").
-  return parts.map((x) => isAdminName(x) ? x.replace(ADMIN_RE, '').replace(/\b(metro|greater|the|of)\b/ig, '').replace(/\s+/g, ' ').trim() : x).filter(Boolean).join(', ');
+  return parts.map((x) => isAdminName(x) ? x.replace(/\b(regional district|regional municipality|regional county|metropolitan|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b/ig, '').replace(/\b(metro|greater|the|of)\b/ig, '').replace(/\s+/g, ' ').trim() : x).filter(Boolean).join(', ');
 }
 /* Reverse-geocode a GPS fix to { name: "Town, Prov", post } (BigDataCloud's free client endpoint). Fails quietly. */
 async function placeName(lat, lon) {
@@ -2620,7 +2628,7 @@ async function placeName(lat, lon) {
     const city = [a.city, a.town, a.village, a.municipality, a.hamlet].find((n) => n && !isAdminName(n));
     const code = String(a['ISO3166-2-lvl4'] || a['ISO3166-2-lvl6'] || '').split('-')[1];
     const region = code && code.length <= 3 ? code : (a.state || '');
-    const name = [...new Set([hood, city].filter(Boolean)), region].filter(Boolean).join(', ');
+    const name = hood ? [...new Set([hood, city].filter(Boolean))].join(', ') : [city, region].filter(Boolean).join(', ');
     if (name) return { name, post: String(a.postcode || '').trim() };
   } catch (e) {}
   // 2) BigDataCloud: coarser, used if the first service is unreachable. Most local named area first, never a regional district.
@@ -2631,7 +2639,8 @@ async function placeName(lat, lon) {
   const region = code && code.length <= 3 ? code : (j.principalSubdivision || '');
   const info = (j.localityInfo && j.localityInfo.informative) || [];
   const pc = j.postcode || (info.find((x) => /post(al)?\s*code|zip/i.test(x.description || '') || /^postal/i.test(x.name || '')) || {}).name || '';
-  return { name: [town, region].filter(Boolean).join(', ') || j.countryName || '', post: String(pc).trim() };
+  const place = [j.locality, j.city].find((n) => n && !isAdminName(n) && n !== town);
+  return { name: (town && place && j.locality && j.city && j.locality !== j.city && !isAdminName(j.city) && !isAdminName(j.locality) ? [j.locality, j.city].join(', ') : [town, region].filter(Boolean).join(', ')) || j.countryName || '', post: String(pc).trim() };
 }
 const locText = (l) => [cleanPlace(l.place || l.name), l.post].filter(Boolean).join(' · ');
 function nameGPS(loc) {
@@ -2651,9 +2660,10 @@ function useGPS() {
     { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60e3 },
   );
 }
-const ABBR = { 'British Columbia': 'BC', Alberta: 'AB', Saskatchewan: 'SK', Manitoba: 'MB', Ontario: 'ON', Quebec: 'QC', 'New Brunswick': 'NB', 'Nova Scotia': 'NS', 'Prince Edward Island': 'PE', 'Newfoundland and Labrador': 'NL', Yukon: 'YT', 'Northwest Territories': 'NT', Nunavut: 'NU',
-  Alaska: 'AK', Washington: 'WA', Oregon: 'OR', California: 'CA', Idaho: 'ID', Montana: 'MT', Nevada: 'NV', Arizona: 'AZ', Utah: 'UT', Colorado: 'CO', Texas: 'TX', Florida: 'FL', 'New York': 'NY' };
+const ABBR = { 'British Columbia': 'BC', Alberta: 'AB', Saskatchewan: 'SK', Manitoba: 'MB', Ontario: 'ON', Quebec: 'QC', 'Québec': 'QC', 'New Brunswick': 'NB', 'Nova Scotia': 'NS', 'Prince Edward Island': 'PE', 'Newfoundland and Labrador': 'NL', Yukon: 'YT', 'Northwest Territories': 'NT', Nunavut: 'NU',
+  'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY' };
 let searchTimer;
+const CA_POSTAL = /^[A-Za-z]\d[A-Za-z][ -]?(\d[A-Za-z]\d)?$/;
 function onSearch() {
   clearTimeout(searchTimer);
   const q = $('#searchInput').value.trim();
@@ -2661,20 +2671,32 @@ function onSearch() {
   if (q.length < 2) { ul.hidden = true; return; }
   searchTimer = setTimeout(async () => {
     try {
-      // The geocoder matches names only, so "Scotch Creek, BC" is searched as "Scotch Creek" and the ", BC" narrows the results.
-      const [nm, ...rest] = q.split(','), hint = rest.join(' ').trim().toLowerCase();
-      const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(nm.trim())}&count=${hint ? 20 : 6}&language=en&format=json`);
-      let res = j.results || [];
-      if (hint) {
-        const ok = (r) => [r.admin1, r.country, r.country_code, ABBR[r.admin1]].some((v) => v && v.toLowerCase().startsWith(hint));
-        res = res.filter(ok).slice(0, 6);
+      let res;
+      if (CA_POSTAL.test(q)) {
+        // Canadian postal code (the geocoder below only knows US ZIPs): look up its area via Zippopotam.us, which covers the first three characters.
+        const fsa = q.replace(/[ -]/g, '').slice(0, 3).toUpperCase();
+        const z = await getJSON(`https://api.zippopotam.us/ca/${fsa}`, 8000);
+        res = (z.places || []).slice(0, 1).map((p) => ({ name: String(p['place name']).replace(/\s*\(.*$/, ''), admin1: p['state abbreviation'] || p.state, latitude: +p.latitude, longitude: +p.longitude, postcodes: [fsa], country_code: 'CA', _post: true }));
+      } else {
+        // The geocoder matches names only, so "Scotch Creek, BC" is searched as "Scotch Creek" and the ", BC" narrows the results.
+        const [nm, ...rest] = q.split(','), hint = rest.join(' ').trim().toLowerCase();
+        const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(nm.trim())}&count=${hint ? 20 : 6}&language=en&format=json`);
+        res = j.results || [];
+        if (hint) {
+          const ok = (r) => [r.admin1, r.country, r.country_code, ABBR[r.admin1]].some((v) => v && v.toLowerCase().startsWith(hint));
+          res = res.filter(ok).slice(0, 6);
+        }
       }
-      ul.innerHTML = res.length ? res.map((r, i) => `<li data-i="${i}">${esc(r.name)}<span class="muted small">${esc([r.admin1, r.country].filter(Boolean).join(', '))}${r.postcodes && r.postcodes[0] ? ' · ' + esc(r.postcodes[0]) : ''}</span></li>`).join('') : '<li class="muted">No matches</li>';
+      const where = (r) => [ABBR[r.admin1] || r.admin1, /^(CA|US)$/.test(r.country_code || '') ? '' : (r.country_code || r.country)].filter(Boolean).join(', ');
+      ul.innerHTML = res.length ? res.map((r, i) => `<li data-i="${i}">${esc(r.name)}<span class="muted small">${esc(where(r))}${r.postcodes && r.postcodes[0] ? ' · ' + esc(r.postcodes[0]) : ''}</span></li>`).join('') : '<li class="muted">No matches</li>';
       ul.hidden = false;
-      ul.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
+      ul.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', async () => {
         const r = res[+li.dataset.i];
         ul.hidden = true; $('#searchInput').value = ''; toggleSearch(false);
-        setLoc({ name: cleanPlace([r.name, r.admin1].filter(Boolean).join(', ')), post: (r.postcodes && r.postcodes[0]) || '', lat: +r.latitude.toFixed(4), lon: +r.longitude.toFixed(4) });
+        const lat = +r.latitude.toFixed(4), lon = +r.longitude.toFixed(4);
+        let name = cleanPlace([r.name, ABBR[r.admin1] || r.admin1].filter(Boolean).join(', '));
+        if (r._post) { try { const n = await placeName(lat, lon); if (n.name) name = cleanPlace(n.name); } catch (e) {} }   // a postal code covers an area: name it by its neighbourhood
+        setLoc({ name, post: (r.postcodes && r.postcodes[0]) || '', lat, lon });
       }));
     } catch (e) { ul.innerHTML = '<li class="muted">Search unavailable</li>'; ul.hidden = false; }
   }, 350);
