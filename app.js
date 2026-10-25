@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.83';
+const VERSION = 'v3.84';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2502,7 +2502,7 @@ async function load() {
   if (!loc) { setStatus('Choose a location: tap 📍 GPS or search for a place.'); return; }
   const run = ++loading;
   const lat = (+loc.lat).toFixed(4), lon = (+loc.lon).toFixed(4);
-  $('#locLabel').textContent = `${loc.place || loc.name} · ${(+loc.lat).toFixed(3)}, ${(+loc.lon).toFixed(3)}`;
+  $('#locLabel').textContent = `${locText(loc)} · ${(+loc.lat).toFixed(3)}, ${(+loc.lon).toFixed(3)}`;
   setStatus('Loading forecasts…');
   loadBortle(loc);
   // 7Timer! is slow, so it never holds up the forecast: it's started now and filled in when it arrives.
@@ -2579,13 +2579,14 @@ function buildNights(src, now, key) {
 /* ---------- locations ---------- */
 function renderSpots() {
   const sel = $('#spotSelect');
-  const here = state.loc && state.loc.gps && state.loc.place;   // GPS fix with a looked-up place name: say where you are
+  const here = state.loc && state.loc.gps && state.loc.place && cleanPlace(state.loc.place);   // GPS fix with a looked-up place name: say where you are
   const opts = [`<option value="gps">${esc(here || 'Current location')}</option>`];
-  state.spots.forEach((s, i) => opts.push(`<option value="${i}">${esc(s.name)}</option>`));
+  state.spots.forEach((s, i) => opts.push(`<option value="${i}">${esc(cleanPlace(s.name))}</option>`));
   if (state.loc && !state.loc.gps && !state.spots.some((s) => s.lat === state.loc.lat && s.lon === state.loc.lon)) {
-    opts.push(`<option value="cur">${esc(state.loc.name)} (not saved)</option>`);
+    opts.push(`<option value="cur">${esc(cleanPlace(state.loc.name))} (not saved)</option>`);
   }
   sel.innerHTML = opts.join('');
+  sel.title = state.loc ? locText(state.loc) : '';
   if (!state.loc || state.loc.gps) sel.value = 'gps';
   else {
     const i = state.spots.findIndex((s) => s.lat === state.loc.lat && s.lon === state.loc.lon);
@@ -2600,20 +2601,32 @@ function setLoc(loc) {
   renderSpots();
   load();
 }
-/* Reverse-geocode a GPS fix to "Town, Prov" (BigDataCloud's free client endpoint). Falls back silently to "Current location". */
+/* Place names: drop administrative areas ("Metro Vancouver Regional District", "… County") so a location reads "Vancouver, BC". */
+const ADMIN_RE = /\b(regional district|regional municipality|regional county|metropolitan|metro vancouver|county|district municipality|municipal district|census (division|subdivision)|division no\.?)\b/i;
+const isAdminName = (n) => !n || ADMIN_RE.test(n);
+function cleanPlace(name) {
+  const parts = String(name || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const keep = parts.filter((x) => !isAdminName(x));
+  return (keep.length ? keep : parts).join(', ');
+}
+/* Reverse-geocode a GPS fix to { name: "Town, Prov", post } (BigDataCloud's free client endpoint). Fails quietly. */
 async function placeName(lat, lon) {
   const j = await getJSON(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`, 8000);
-  const town = j.city || j.locality || '';
+  const adm = ((j.localityInfo && j.localityInfo.administrative) || []).slice().sort((a, b) => (b.adminLevel || 0) - (a.adminLevel || 0)).map((a) => a.name);
+  const town = [j.city, j.locality, ...adm].find((n) => n && !isAdminName(n) && n !== j.principalSubdivision && n !== j.countryName) || '';
   const code = String(j.principalSubdivisionCode || '').split('-')[1];
   const region = code && code.length <= 3 ? code : (j.principalSubdivision || '');
-  return [town, region].filter(Boolean).join(', ') || j.countryName || '';
+  const info = (j.localityInfo && j.localityInfo.informative) || [];
+  const pc = j.postcode || (info.find((x) => /post(al)?\s*code|zip/i.test(x.description || '') || /^postal/i.test(x.name || '')) || {}).name || '';
+  return { name: [town, region].filter(Boolean).join(', ') || j.countryName || '', post: String(pc).trim() };
 }
+const locText = (l) => [cleanPlace(l.place || l.name), l.post].filter(Boolean).join(' · ');
 function nameGPS(loc) {
-  placeName(loc.lat, loc.lon).then((n) => {
-    if (!n || !state.loc || !state.loc.gps || state.loc.lat !== loc.lat || state.loc.lon !== loc.lon) return;
-    state.loc.place = n; store.set('lastLoc', state.loc);
+  placeName(loc.lat, loc.lon).then((r) => {
+    if (!r.name || !state.loc || !state.loc.gps || state.loc.lat !== loc.lat || state.loc.lon !== loc.lon) return;
+    state.loc.place = r.name; state.loc.post = r.post; store.set('lastLoc', state.loc);
     renderSpots();
-    $('#locLabel').textContent = `${n} · ${(+loc.lat).toFixed(3)}, ${(+loc.lon).toFixed(3)}`;
+    $('#locLabel').textContent = `${locText(state.loc)} · ${(+loc.lat).toFixed(3)}, ${(+loc.lon).toFixed(3)}`;
   }, () => {});
 }
 function useGPS() {
@@ -2643,12 +2656,12 @@ function onSearch() {
         const ok = (r) => [r.admin1, r.country, r.country_code, ABBR[r.admin1]].some((v) => v && v.toLowerCase().startsWith(hint));
         res = res.filter(ok).slice(0, 6);
       }
-      ul.innerHTML = res.length ? res.map((r, i) => `<li data-i="${i}">${esc(r.name)}<span class="muted small">${esc([r.admin1, r.country].filter(Boolean).join(', '))}</span></li>`).join('') : '<li class="muted">No matches</li>';
+      ul.innerHTML = res.length ? res.map((r, i) => `<li data-i="${i}">${esc(r.name)}<span class="muted small">${esc([r.admin1, r.country].filter(Boolean).join(', '))}${r.postcodes && r.postcodes[0] ? ' · ' + esc(r.postcodes[0]) : ''}</span></li>`).join('') : '<li class="muted">No matches</li>';
       ul.hidden = false;
       ul.querySelectorAll('li[data-i]').forEach((li) => li.addEventListener('click', () => {
         const r = res[+li.dataset.i];
         ul.hidden = true; $('#searchInput').value = ''; toggleSearch(false);
-        setLoc({ name: [r.name, r.admin1].filter(Boolean).join(', '), lat: +r.latitude.toFixed(4), lon: +r.longitude.toFixed(4) });
+        setLoc({ name: cleanPlace([r.name, r.admin1].filter(Boolean).join(', ')), post: (r.postcodes && r.postcodes[0]) || '', lat: +r.latitude.toFixed(4), lon: +r.longitude.toFixed(4) });
       }));
     } catch (e) { ul.innerHTML = '<li class="muted">Search unavailable</li>'; ul.hidden = false; }
   }, 350);
