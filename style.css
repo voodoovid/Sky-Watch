@@ -544,14 +544,25 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 .alt-row { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .alt-reset { flex: none; padding: 4px 9px; font-size: .85em; }
 .opt-note { margin: 0 0 .4em !important; }
-#optUnits, #optTheme, #optHoliday { margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
-#optTheme .opt-note, #optHoliday .opt-note { margin: .45em 0 0 !important; }
+#optUnits, #optTheme { margin-bottom: .9em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
+#optTheme .opt-note { margin: .45em 0 0 !important; }
 .theme-seg { display: flex; width: 100%; }
 .theme-seg button { flex: 1; height: 28px; }
 
 /* Pop-up header: the User Guide / Options button sits at the right end of the title line, next to the close button. */
 .sh-t { flex: 1; }
+#sheetHoliday { margin-left: auto; }
+#sheetHoliday + #sheetGuide { margin-left: 0; }
 #sheetGuide { margin-left: auto; }
+/* Holiday skin switch: small iOS-style toggle beside the User Guide button. */
+.hol-sw { display: inline-flex; align-items: center; gap: 6px; flex: none; cursor: pointer; font-size: .78em; font-weight: 700; color: var(--muted); -webkit-user-select: none; user-select: none; }
+.hol-sw[hidden] { display: none; }
+.hol-sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+.hol-tr { position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line2); transition: background .15s, border-color .15s; }
+.hol-tr::after { content: ""; position: absolute; top: 1px; left: 1px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+.hol-sw input:checked + .hol-tr { background: color-mix(in srgb, var(--accent) 35%, var(--card2)); border-color: var(--accent); }
+.hol-sw input:checked + .hol-tr::after { transform: translateX(12px); background: var(--accent); }
+.hol-sw input:focus-visible + .hol-tr { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Comets list under Planets: one compact line per comet; dimmed when it never gets above the minimum elevation. */
 /* A stronger rule above the Comets title sets it apart as its own section (clearly heavier than the hairlines between rows). */

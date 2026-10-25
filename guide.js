@@ -96,7 +96,7 @@ window.SKY_GUIDE = (() => {
     ${diagram()}
     <h4>The top bar</h4>
     <dl class="g-def">
-      <dt>Location</dt><dd>The pin menu switches between <b>Current location (GPS)</b> and your saved spots. The <b>GPS</b> button re-reads your position and the <b>magnifier</b> opens place search. See chapter 10.</dd>
+      <dt>Location</dt><dd>The pin menu switches between your current location (shown by town name, e.g. Scotch Creek, BC) and your saved spots. The <b>GPS</b> button re-reads your position and the <b>magnifier</b> opens place search. See chapter 10.</dd>
       <dt>Time Machine</dt><dd>The round dial shows the sky at a later time on the night you are viewing: Tonight, Tomorrow or the third day. See chapter 6.</dd>
       <dt>Night</dt><dd>Switches the whole page between tonight, tomorrow night and the night after (named by weekday, such as “Thu”). <b>Tonight</b> stays the current night until fewer than two hours of darkness remain, then moves on to the coming evening, so you never look at a night that is nearly over.</dd>
       <dt>Home</dt><dd>Counts a target only while it is in the part of the sky you can see from your yard. You choose those directions in Options. When Home is on, the button is lit.</dd>
@@ -253,13 +253,13 @@ window.SKY_GUIDE = (() => {
       <li>Home belongs to one place. It turns on for the spot where you switched it on, switches itself off if you move more than about 3 km away, and comes back on when you return.</li>
     </ul>
     <h4>Min elevation</h4>
-    <p>How high an object must be to count. One setting is used for targets, planets, comets, charts and labels everywhere. The default is 40°, and you can set anything from 0° to 85° with the slider or by typing a number. Lower it for many more targets, though low objects are murkier. Raise it for the cleanest sky. The button at the right resets it to 40°.</p>
+    <p>How high an object must be to count. One setting is used for targets, planets, comets, charts and labels everywhere. The default is 40°, and you can set anything from 0° to 85° with the slider or by typing a number. Lower it for many more targets, though low objects are murkier. Raise it for the cleanest sky. The <b>Reset to 40</b> button at the right puts it back.</p>
     <h4>Red night mode</h4>
     <p>Tap <b>Red</b> in the top bar and the whole app switches to dim reds on black, so checking the forecast does not ruin your dark-adapted eyes. Tap <b>Normal</b> to switch back. The choice is remembered, and the screen never flashes bright when the app opens in red mode.</p>`)}
 
   ${chapter('g-loc', `
     <dl class="g-def">
-      <dt>GPS</dt><dd>Tap the GPS button, or choose <i>Current location (GPS)</i> from the menu. Your device asks permission the first time. SkyWatch requests an approximate position, which is plenty for weather.</dd>
+      <dt>GPS</dt><dd>Tap the GPS button, or choose your current location from the menu. Your device asks permission the first time. SkyWatch requests an approximate position, which is plenty for weather.</dd>
       <dt>Search</dt><dd>Tap the magnifier, type at least two letters, and tap a result.</dd>
       <dt>Save spot</dt><dd>After picking a place, tap <b>Save spot</b> and give it a name, such as “Home” or “Cabin”. It then appears in the menu on that device.</dd>
       <dt>Remove</dt><dd>Select a saved spot and tap <b>Remove</b> to delete it.</dd>
