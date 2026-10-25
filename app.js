@@ -2583,7 +2583,7 @@ function renderSpots() {
   const opts = [`<option value="gps">${esc(here || 'Current location')}</option>`];
   state.spots.forEach((s, i) => opts.push(`<option value="${i}">${esc(cleanPlace(s.name))}</option>`));
   if (state.loc && !state.loc.gps && !state.spots.some((s) => s.lat === state.loc.lat && s.lon === state.loc.lon)) {
-    opts.push(`<option value="cur">${esc(cleanPlace(state.loc.name))} (not saved)</option>`);
+    opts.push(`<option value="cur">${esc(cleanPlace(state.loc.name))}</option>`);
   }
   sel.innerHTML = opts.join('');
   sel.title = state.loc ? locText(state.loc) : '';
