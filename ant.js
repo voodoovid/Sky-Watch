@@ -4,7 +4,9 @@
    It is drawn in SVG and driven frame by frame, so the legs move with the distance walked (a tripod gait: three legs
    on the ground, three swinging), the antennae feel ahead, and the path wanders instead of running in a line.
    It never takes clicks and never moves the layout. Adding ?ant=now to the address sends two straight away. At most two ants are ever on screen.
-   In October (spider.js) an ant that walks onto the spider's web is handed over to it: see HW.web.catchAnt. Adding ?ant=web sends one at the web. */
+   In October (spider.js) an ant that walks onto the spider's web is handed over to it: see HW.web.catchAnt. Adding ?ant=web sends one at the web.
+   The Great Pumpkin (the Moon card) eats any ant that wanders near it while the Moon is at least 80% lit (app.js puts the lit fraction
+   on #moonInfo as data-illum). The ant is drawn to the mouth, the pumpkin opens wide and chomps. Adding ?ant=pumpkin sends one at it. */
 (function () {
   'use strict';
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -73,6 +75,38 @@
     return { svg: svg, legs: legs, ants: ants };
   }
 
+  // ---- the Great Pumpkin: eats ants while at least 80% lit ----
+  var EAT_MIN = 0.8;
+  var MOUTH = 'M-58 40Q0 26 58 40Q50 86 0 90Q-50 86-58 40Z';          // open mouth, in the pumpkin's 200-unit drawing box (see halloween.js)
+  function pumpkin() {
+    var box = document.getElementById('moonInfo');
+    if (!box || !(parseFloat(box.getAttribute('data-illum')) >= EAT_MIN)) return null;
+    var svg = box.querySelector('svg');
+    if (!svg || (sheet && sheet.open)) return null;                   // hidden, or covered by a pop-up
+    var r = svg.getBoundingClientRect(), side = Math.min(r.width, r.height);
+    if (side < 24 || r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) return null;
+    var k = side / 84, cx = r.left + r.width / 2, cy = r.top + r.height / 2;   // the glyph is drawn in an 84-unit box
+    return { svg: svg, x: cx, y: cy, rad: 38 * k, mx: cx, my: cy + 25 * k };  // mouth centre, 25 units below the middle
+  }
+  function chomp(svg) {
+    if (!svg.animate) return;
+    var g = el('g', { transform: 'translate(42 45.8) scale(.342)' }, svg);   // same placement as the pumpkin itself
+    var m = el('path', { d: MOUTH, fill: '#12050a', opacity: '0' }, g);
+    var dur = 1600;
+    m.animate([{ opacity: 0 }, { opacity: 0.92, offset: 0.12 }, { opacity: 0.92, offset: 0.7 }, { opacity: 0 }], { duration: dur, easing: 'ease-in-out' });
+    var sq = function (x, y) { return 'scale(' + x + ',' + y + ')'; };
+    svg.style.transformOrigin = '50% 75%';
+    svg.animate([
+      { transform: sq(1, 1), filter: 'brightness(1)' },
+      { transform: sq(1.08, 0.9), offset: 0.15 }, { transform: sq(0.97, 1.05), offset: 0.3 },
+      { transform: sq(1.08, 0.9), offset: 0.45 }, { transform: sq(0.97, 1.05), offset: 0.6 },
+      { transform: sq(1.05, 0.94), filter: 'brightness(1.55)', offset: 0.78 },
+      { transform: sq(1, 1), filter: 'brightness(1)' }
+    ], { duration: dur, easing: 'ease-in-out' });
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, dur + 100);
+  }
+
+  function smooth(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
   function norm(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 
   function walk(aim) {
@@ -104,19 +138,27 @@
       else { x = W + M; y = cl(web.y + rx(-.25, .25) * H, M, H - M); }
       tx = web.x; ty = web.y; aimOn = true;
     }
+    if (aim === 'moon') {                                // preview: one ant, straight at the Great Pumpkin
+      var P0 = pumpkin();
+      if (P0) { x = -M; y = P0.y; tx = P0.x; ty = P0.y; }
+    }
     var th = Math.atan2(ty - y, tx - x);
     var speed = 0, base = 60 + Math.random() * 40, t = 0, phase = 0, last = 0, pauseT = 0, nextPause = 2 + Math.random() * 4, pauses = 0;
-    var seed = Math.random() * 100, entered = false, done = false, caught = false;
+    var seed = Math.random() * 100, entered = false, done = false, caught = false, eat = null;   // eat: set once the Great Pumpkin has noticed the ant
 
     function frame(now) {
       if (done) return;
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016; last = now; t += dt;
+      var P = pumpkin();
+      if (!eat && P && Math.hypot(x - P.x, y - P.y) < P.rad * 2.2) { eat = { g: -1 }; aimOn = false; pauseT = 0; }   // near the Great Pumpkin: it has noticed
+      if (eat && eat.g < 0 && !P) eat = null;                                  // it hid or was covered before the bite: carry on walking
+      if (eat && eat.g < 0) { tx = P.mx; ty = P.my; }
       var moving = pauseT <= 0;
       if (moving) {
         // ease up to cruising speed, with slow surges as a real ant has
         var want = base * (0.8 + 0.3 * Math.sin(t * 0.9 + seed));
         speed += (want - speed) * Math.min(1, dt * 4);
-        if (t > nextPause && pauses < 2 && x > 0.12 * W && x < 0.88 * W && y > 0.12 * H && y < 0.88 * H) {
+        if (!eat && t > nextPause && pauses < 2 && x > 0.12 * W && x < 0.88 * W && y > 0.12 * H && y < 0.88 * H) {
           pauseT = 0.7 + Math.random() * 1.3; pauses++; nextPause = t + 4 + Math.random() * 5;
         }
       } else {
@@ -131,8 +173,20 @@
       // wander: a smooth, uneven sway on top of a steady pull toward the exit
       var want2 = Math.atan2(ty - y, tx - x);
       var sway = 0.55 * Math.sin(t * 1.3 + seed) + 0.35 * Math.sin(t * 2.9 + seed * 2.1);
-      th += norm(want2 - th) * Math.min(1, dt * 0.9) + sway * dt * (speed > 4 ? 1 : 0.2);
-      x += Math.cos(th) * speed * dt; y += Math.sin(th) * speed * dt;
+      if (eat) {
+        if (eat.g < 0) {                                                       // drawn in: turn sharply toward the mouth and hurry
+          th += norm(want2 - th) * Math.min(1, dt * 6);
+          speed += (95 - speed) * Math.min(1, dt * 3);
+          if (P && Math.hypot(P.mx - x, P.my - y) < Math.max(7, P.rad * 0.26)) { eat.g = 0; eat.sx = x; eat.sy = y; chomp(P.svg); }
+        } else {                                                               // gulp: slide into the mouth, shrinking
+          eat.g += dt;
+          var q = Math.min(1, eat.g / 0.55), Pm = pumpkin(), ex = Pm ? Pm.mx : eat.sx, ey = Pm ? Pm.my : eat.sy;
+          x = eat.sx + (ex - eat.sx) * smooth(q); y = eat.sy + (ey - eat.sy) * smooth(q);
+          speed = 30;
+          if (eat.g >= 0.6) { finish(); return; }
+        }
+      } else th += norm(want2 - th) * Math.min(1, dt * 0.9) + sway * dt * (speed > 4 ? 1 : 0.2);
+      if (!eat || eat.g < 0) { x += Math.cos(th) * speed * dt; y += Math.sin(th) * speed * dt; }
       phase += speed * dt * 0.3;                         // one leg cycle per ~21 px walked
       part.legs.forEach(function (L) {
         var a = Math.sin(phase + (L.grp ? Math.PI : 0)) * 17 * Math.min(1, speed / 25);
@@ -149,7 +203,9 @@
         caught = true; host.removeAttribute('popover'); return;   // the web takes it from here (it is no longer a popover)
       }
       var bob = Math.sin(phase * 2) * 0.35;
-      host.style.transform = 'translate3d(' + (x - 17).toFixed(1) + 'px,' + (y - 11 + bob).toFixed(1) + 'px,0) rotate(' + (th * 180 / Math.PI).toFixed(1) + 'deg)';
+      var sc = eat && eat.g >= 0 ? Math.max(0.1, 1 - 0.9 * smooth(eat.g / 0.55)) : 1;
+      host.style.transform = 'translate3d(' + (x - 17).toFixed(1) + 'px,' + (y - 11 + bob).toFixed(1) + 'px,0) rotate(' + (th * 180 / Math.PI).toFixed(1) + 'deg)' + (sc < 1 ? ' scale(' + sc.toFixed(2) + ')' : '');
+      host.style.opacity = eat && eat.g > 0.35 ? Math.max(0, 1 - (eat.g - 0.35) / 0.25).toFixed(2) : '';
       var inside = x > -M && x < W + M && y > -M && y < H + M;
       if (inside) entered = true;
       if ((entered && !inside) || t > 90) { finish(); return; }
@@ -175,6 +231,7 @@
     }, lo + Math.random() * (hi - lo));
   }
   if (/[?&]ant=now/.test(location.search)) { setTimeout(walk, 600); setTimeout(walk, 3500); }   // preview: two ants
+  else if (/[?&]ant=pumpkin/.test(location.search)) { setTimeout(function () { walk('moon'); }, 3500); }   // preview: one ant, straight at the Great Pumpkin (needs the Moon at 80%+)
   else if (/[?&]ant=web/.test(location.search)) { setTimeout(function () { walk(true); }, 1200); }   // preview: one ant, straight at the web
   else schedule(12000, 30000);
 })();

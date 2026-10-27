@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.87';
+const VERSION = 'v3.88';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1554,6 +1554,7 @@ function renderMoon(moon, lat) {
   const shape = moon.illum < 0.03 ? 'New' : moon.illum > 0.97 ? 'Full' : moon.illum < 0.5 ? 'Crescent' : 'Gibbous';
   const rows = [['Phase', `${waxing ? 'Waxing' : 'Waning'} ${shape.toLowerCase()}`], ...ev, ['Age', moon.ageDays.toFixed(1) + ' d'],
     ...['Full', 'New'].map((n) => nextOf(n)).filter(Boolean).map((p) => [`Next ${p.n.toLowerCase()}`, fmtDay(p.d)])];
+  $('#moonInfo').setAttribute('data-illum', moon.illum.toFixed(3));   // ant.js: the Great Pumpkin eats ants while 80%+ lit
   $('#moonInfo').innerHTML = `<svg viewBox="0 0 84 84" aria-label="Moon phase">${moonGlyph(42, 42, 38, moon.angle, lat)}</svg>
     <div class="moon-txt"><div class="moon-name">${esc(moon.name)} <span>${Math.round(moon.illum * 100)}%</span></div>
     <dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`;
