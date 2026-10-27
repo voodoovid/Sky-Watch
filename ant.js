@@ -77,7 +77,6 @@
 
   // ---- the Great Pumpkin: eats ants while at least 80% lit ----
   var EAT_MIN = 0.8;
-  var MOUTH = 'M-58 40Q0 26 58 40Q50 86 0 90Q-50 86-58 40Z';          // open mouth, in the pumpkin's 200-unit drawing box (see halloween.js)
   function pumpkin() {
     var box = document.getElementById('moonInfo');
     if (!box || !(parseFloat(box.getAttribute('data-illum')) >= EAT_MIN)) return null;
@@ -88,22 +87,50 @@
     var k = side / 84, cx = r.left + r.width / 2, cy = r.top + r.height / 2;   // the glyph is drawn in an 84-unit box
     return { svg: svg, x: cx, y: cy, rad: 38 * k, mx: cx, my: cy + 25 * k };  // mouth centre, 25 units below the middle
   }
+  var chompUid = 0;
+  /* The Great Pumpkin chews: its mouth fills with a glowing cavity and two rows of teeth that close on each other four times,
+     it swallows with a flash, then winks its right eye. Drawn over the pumpkin's own face (halloween.js names the parts). */
   function chomp(svg) {
     if (!svg.animate) return;
-    var g = el('g', { transform: 'translate(42 45.8) scale(.342)' }, svg);   // same placement as the pumpkin itself
-    var m = el('path', { d: MOUTH, fill: '#12050a', opacity: '0' }, g);
-    var dur = 1600;
-    m.animate([{ opacity: 0 }, { opacity: 0.92, offset: 0.12 }, { opacity: 0.92, offset: 0.7 }, { opacity: 0 }], { duration: dur, easing: 'ease-in-out' });
-    var sq = function (x, y) { return 'scale(' + x + ',' + y + ')'; };
+    var id = 'hwc' + (++chompUid), T = 3000, FILL = { duration: T, fill: 'both', easing: 'linear' };
+    var g = el('g', { transform: 'translate(42 45.8) scale(.342)' }, svg);          // same placement as the pumpkin itself
+    var defs = el('defs', {}, g);
+    var cp = el('clipPath', { id: id }, defs);
+    var CAV = 'M-66 -2L66 -2Q50 44 0 48Q-50 44 -66 -2Z';                              // mouth cavity, y relative to the upper lip (box y 38)
+    el('path', { d: CAV }, cp);
+    var cav = el('g', { transform: 'translate(0 38)', opacity: '0' }, g);
+    var jaw = el('g', {}, cav);                                                         // scales from the upper lip, so it opens and closes
+    el('path', { d: CAV, style: 'fill:var(--hw-o3)' }, jaw);
+    el('path', { d: CAV, fill: '#000', opacity: '.42' }, jaw);
+    var low = el('g', { 'clip-path': 'url(#' + id + ')' }, jaw), i;
+    for (i = -3; i <= 3; i++) el('path', { d: 'M' + (i * 17 - 9) + ' 46L' + (i * 17) + ' 24L' + (i * 17 + 9) + ' 46Z', style: 'fill:var(--hw-glow)' }, low);
+    var up = el('g', { transform: 'translate(0 38)', opacity: '0' }, g);              // upper teeth hang from the lip and stay put
+    for (i = -3; i <= 3; i++) el('path', { d: 'M' + (i * 17 - 8) + ' -1L' + (i * 17) + ' 17L' + (i * 17 + 8) + ' -1Z', style: 'fill:var(--hw-glow)' }, up);
+    var on = [{ opacity: 0, offset: 0 }, { opacity: 1, offset: 0.06 }, { opacity: 1, offset: 0.66 }, { opacity: 0, offset: 0.72 }, { opacity: 0, offset: 1 }];
+    cav.animate(on, FILL); up.animate(on, FILL);
+    svg.querySelectorAll('.hw-mouth').forEach(function (m) {                           // the pumpkin's own mouth steps aside while it chews
+      m.animate([{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.05 }, { opacity: 0, offset: 0.7 }, { opacity: 1, offset: 0.78 }, { opacity: 1, offset: 1 }], FILL);
+    });
+    var sq = function (dx, y) { return 'translate(' + dx + 'px,0) scale(1,' + y + ')'; };
+    jaw.animate([
+      { transform: sq(0, 1), offset: 0 }, { transform: sq(0, 1), offset: 0.06 },
+      { transform: sq(3, 0.42), offset: 0.15 }, { transform: sq(-2, 0.9), offset: 0.24 },
+      { transform: sq(-3, 0.42), offset: 0.33 }, { transform: sq(2, 0.9), offset: 0.42 },
+      { transform: sq(3, 0.42), offset: 0.51 }, { transform: sq(0, 1), offset: 0.62 }, { transform: sq(0, 1), offset: 1 }
+    ], FILL);
+    // the whole pumpkin bobs with each bite, flashes as it swallows, tilts for the wink
     svg.style.transformOrigin = '50% 75%';
+    var bob = function (o, sx, sy, rot, br) { return { transform: 'rotate(' + rot + 'deg) scale(' + sx + ',' + sy + ')', filter: 'brightness(' + br + ')', offset: o }; };
     svg.animate([
-      { transform: sq(1, 1), filter: 'brightness(1)' },
-      { transform: sq(1.08, 0.9), offset: 0.15 }, { transform: sq(0.97, 1.05), offset: 0.3 },
-      { transform: sq(1.08, 0.9), offset: 0.45 }, { transform: sq(0.97, 1.05), offset: 0.6 },
-      { transform: sq(1.05, 0.94), filter: 'brightness(1.55)', offset: 0.78 },
-      { transform: sq(1, 1), filter: 'brightness(1)' }
-    ], { duration: dur, easing: 'ease-in-out' });
-    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, dur + 100);
+      bob(0, 1, 1, 0, 1), bob(0.15, 1.04, 0.96, 0, 1), bob(0.24, 1, 1, 0, 1), bob(0.33, 1.04, 0.96, 0, 1), bob(0.42, 1, 1, 0, 1),
+      bob(0.51, 1.04, 0.96, 0, 1), bob(0.66, 1, 1, 0, 1.5), bob(0.74, 1, 1, -5, 1.1), bob(0.9, 1, 1, -5, 1), bob(0.98, 1, 1, 0, 1), bob(1, 1, 1, 0, 1)
+    ], { duration: T, easing: 'ease-in-out' });
+    svg.querySelectorAll('.hw-eyeR').forEach(function (e) {                            // wink: the right eye squeezes shut, holds, opens
+      e.style.transformBox = 'fill-box'; e.style.transformOrigin = 'center';
+      e.animate([{ transform: 'scale(1,1)', offset: 0 }, { transform: 'scale(1,1)', offset: 0.74 }, { transform: 'scale(1.1,0.07)', offset: 0.78 },
+        { transform: 'scale(1.1,0.07)', offset: 0.9 }, { transform: 'scale(1,1)', offset: 0.96 }, { transform: 'scale(1,1)', offset: 1 }], FILL);
+    });
+    setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, T + 100);
   }
 
   function smooth(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }

@@ -29,7 +29,8 @@
     var ellT = BODY.map(function (e) { return '<ellipse transform="' + tf + '" cx="' + e[0] + '" cy="' + e[1] + '" rx="' + e[2] + '" ry="' + e[3] + '"/>'; }).join('');
     var box = 'userSpaceOnUse" x="' + f(cx - 2 * r) + '" y="' + f(cy - 2 * r) + '" width="' + f(4 * r) + '" height="' + f(4 * r) + '"';
     var small = r < 16;                                             // tiny Moon on the path: skip the fine detail
-    var face = '<path d="M-62 -18 L-22 -38 L-14 -6Z M62 -18 L22 -38 L14 -6Z M0 4 L-12 26 H12Z M-68 36 L-50 52 L-36 40 L-20 58 L0 42 L20 58 L36 40 L50 52 L68 36 Q50 84 0 86 Q-50 84 -68 36Z"/>';
+    // eyes, nose and mouth are separate paths so the Great Pumpkin can wink and chew (ant.js)
+    var face = '<path class="hw-eyeL" d="M-62 -18 L-22 -38 L-14 -6Z"/><path class="hw-eyeR" d="M62 -18 L22 -38 L14 -6Z"/><path d="M0 4 L-12 26 H12Z"/><path class="hw-mouth" d="M-68 36 L-50 52 L-36 40 L-20 58 L0 42 L20 58 L36 40 L50 52 L68 36 Q50 84 0 86 Q-50 84 -68 36Z"/>';
     return '<defs>' +
       '<radialGradient id="' + id + 'o" cx=".38" cy=".32" r=".8"><stop offset="0" style="stop-color:var(--hw-o1)"/><stop offset=".55" style="stop-color:var(--hw-o2)"/><stop offset="1" style="stop-color:var(--hw-o3)"/></radialGradient>' +
       '<radialGradient id="' + id + 'h"><stop offset=".55" style="stop-color:var(--hw-o1);stop-opacity:.34"/><stop offset="1" style="stop-color:var(--hw-o1);stop-opacity:0"/></radialGradient>' +
