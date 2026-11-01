@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.95';
+const VERSION = 'v3.96';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -30,6 +30,7 @@ const state = {
   q: '', // target search text (not saved)
   tm: null, // Time Machine time (null = now); not saved, so the app always opens on Now
   moonPen: store.get('moonPen2', true), // test switch: rank targets down when close to a bright Moon
+  cloudPen: store.get('cloudPen', true), // switch: rank targets down when forecast cloud covers their window
   home: store.get('home', false), // only count the part of the sky set in Options
   homeLoc: store.get('homeLoc', null), // {lat, lon} where Home sky was turned on; Home is on only near here
   homeSky: (() => {
@@ -1834,8 +1835,17 @@ function onTM(final) {
 }
 const TOP_N = 3;      // ranks shown at once in the Top targets card
 const TOP_MORE = 10;  // scroll down in the card for more; all ten leave the Seestar list
+/* The Top Ten title and its two switches always share one line: shrink the whole title row until it fits. */
+function fitTopTitle() {
+  const el = $('#topTitle'); if (!el) return;
+  el.style.fontSize = '';
+  let px = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 1 && px > 9) { px -= 0.5; el.style.fontSize = px + 'px'; }
+}
+addEventListener('resize', () => fitTopTitle());
 function renderTop(list, topIdx, now) {
   $('#topTitle').firstChild.textContent = `Top Ten Targets ${state.night === 0 ? 'Tonight' : state.night === 1 ? 'Tomorrow' : nightName(2)}`;
+  fitTopTitle();
   $('#topTargets').innerHTML = topIdx.length ? topIdx.map((i, r) => {
     const o = list[i];
     const g = nextSeg(o, now), upNow = !!(g && g.s <= now);
@@ -1896,7 +1906,7 @@ function renderTargets(list, skipTop) {
   // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
   const tier = (o) => { const g = segAt(o, now); return g ? (g.e - now >= MIN_LEFT ? 0 : 2) : o.end <= now ? 3 : 1; };
   const D = state.data, nt = D ? D.nights[state.night] : null;
-  const adj = nt ? list.map((o, i) => (o.sc != null ? o.sc : 100 - i) - cloudPenalty(o, now, nt.hours)
+  const adj = nt ? list.map((o, i) => (o.sc != null ? o.sc : 100 - i) - (state.cloudPen ? cloudPenalty(o, now, nt.hours) : 0)
     - (state.moonPen ? moonPenalty(o, now, nt.moon, D.obs) : 0)) : null;
   const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || (adj ? adj[b] - adj[a] : 0) || a - b);
   // The list holds every candidate for the night; show the best 30 for the time being looked at (Top Ten + 20 more),
@@ -2849,6 +2859,8 @@ function init() {
   $('#optBtn').addEventListener('click', showOptions);
   const mp = $('#moonPen'); mp.checked = state.moonPen; addEventListener('pageshow', () => { mp.checked = state.moonPen; });
   mp.addEventListener('change', () => { state.moonPen = mp.checked; store.set('moonPen2', state.moonPen); applyTM(); });
+  const cp = $('#cloudPen'); cp.checked = state.cloudPen; addEventListener('pageshow', () => { cp.checked = state.cloudPen; });
+  cp.addEventListener('change', () => { state.cloudPen = cp.checked; store.set('cloudPen', state.cloudPen); applyTM(); });
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   const tq = $('#tgtQ'), tqx = $('#tgtQx');

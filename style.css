@@ -557,7 +557,8 @@ html.red .wheel .wedge.on { fill: #3a0000; stroke: var(--accent); }
 /* Holiday skin switch: small iOS-style toggle beside the User Guide button. */
 .hol-sw { display: inline-flex; align-items: center; gap: 6px; flex: none; cursor: pointer; font-size: .78em; font-weight: 700; color: var(--muted); -webkit-user-select: none; user-select: none; }
 .hol-sw[hidden] { display: none; }
-.moonpen-sw { margin-left: auto; letter-spacing: .04em; text-transform: uppercase; }
+.tt-sw { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex: none; }
+.moonpen-sw { margin-left: 0; letter-spacing: .04em; text-transform: uppercase; }
 .moonpen-sw .mp-t { font-size: .74em; line-height: 1.05; letter-spacing: .06em; white-space: nowrap; }
 .hol-sw input { position: absolute; opacity: 0; width: 0; height: 0; }
 .hol-tr { position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--card2); border: 1px solid var(--line2); transition: background .15s, border-color .15s; }
