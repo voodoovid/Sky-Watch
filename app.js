@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.90';
+const VERSION = 'v3.91';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -29,7 +29,7 @@ const state = {
   night: 0, // 0 = tonight, 1 = tomorrow night, 2 = the night after
   q: '', // target search text (not saved)
   tm: null, // Time Machine time (null = now); not saved, so the app always opens on Now
-  moonPen: store.get('moonPen', false), // test switch: rank targets down when close to a bright Moon
+  moonPen: store.get('moonPen', true), // test switch: rank targets down when close to a bright Moon
   home: store.get('home', false), // only count the part of the sky set in Options
   homeLoc: store.get('homeLoc', null), // {lat, lon} where Home sky was turned on; Home is on only near here
   homeSky: (() => {
