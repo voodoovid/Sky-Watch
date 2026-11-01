@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.89';
+const VERSION = 'v3.90';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -29,6 +29,7 @@ const state = {
   night: 0, // 0 = tonight, 1 = tomorrow night, 2 = the night after
   q: '', // target search text (not saved)
   tm: null, // Time Machine time (null = now); not saved, so the app always opens on Now
+  moonPen: store.get('moonPen', false), // test switch: rank targets down when close to a bright Moon
   home: store.get('home', false), // only count the part of the sky set in Options
   homeLoc: store.get('homeLoc', null), // {lat, lon} where Home sky was turned on; Home is on only near here
   homeSky: (() => {
@@ -944,6 +945,7 @@ function targetsTonight(obs, S) {
   // Rank by how long it's up in darkness (up to 6 h counts — a full Seestar session) plus how rewarding it is.
   const score = (o) => 0.6 * Math.min(o.hrs, 6) + appeal(o.id, o.type);
   // Keep the whole ranked pool: the page picks the Top Ten + 20 more from it at the chosen Time Machine time.
+  out.forEach((o) => { o.sc = score(o); });
   return out.sort((a, b) => score(b) - score(a) || b.alt - a.alt);
 }
 
@@ -1848,6 +1850,18 @@ function sizeTop() {
   el.style.setProperty('--toph', `${Math.max(48, (el.clientHeight - 6 * (TOP_N - 1)) / TOP_N)}px`);
 }
 
+/* Moon penalty (test switch): how many score points a target loses at time d. Zero while the Moon is down; otherwise
+   grows with how lit the Moon is, how high it is, and how close it sits to the target. Galaxies and reflection nebulae
+   suffer most; emission nebulae, planetary nebulae and the LP filter cope better. */
+function moonPenalty(o, d, moon, obs) {
+  if (!moon || !(o.ra != null && o.dec != null)) return 0;
+  const m = altAz('Moon', d, obs); if (m.alt <= 0) return 0;
+  const t = altAzRaDec(o.ra, o.dec, d, obs);
+  const sep = angSep(t, m);
+  const near = Math.pow(Math.max(0, 1 - sep / 90), 1.5);
+  const sens = /Galaxy|Reflection/.test(o.type || '') ? 1.2 : /Emission|Supernova|Planetary|^Nebula$|Cluster \+ nebula/.test(o.type || '') ? 0.5 : 0.8;
+  return 4 * moon.illum * Math.min(1, m.alt / 30) * near * sens;
+}
 /* Target search: ignores case, spaces and punctuation, so "m 45", "M45" and "pleiades" all match. */
 const normQ = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 function renderTargets(list, skipTop) {
@@ -1857,7 +1871,12 @@ function renderTargets(list, skipTop) {
   // Targets that are up right now (with at least half an hour left) come first, so tonight's ranking favours
   // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
   const tier = (o) => { const g = segAt(o, now); return g ? (g.e - now >= MIN_LEFT ? 0 : 2) : o.end <= now ? 3 : 1; };
-  const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || a - b);
+  let adj = null;
+  if (state.moonPen && state.data) {
+    const D = state.data, mn = D.nights[state.night].moon;
+    adj = list.map((o, i) => (o.sc != null ? o.sc : 100 - i) - moonPenalty(o, now, mn, D.obs));
+  }
+  const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || (adj ? adj[b] - adj[a] : 0) || a - b);
   // The list holds every candidate for the night; show the best 30 for the time being looked at (Top Ten + 20 more),
   // so moving the Time Machine re-picks them rather than just reshuffling the same 30.
   const live = order.filter((i) => list[i].end > now);
@@ -2806,6 +2825,8 @@ function init() {
   })();
   $('#sourcesBtn').addEventListener('click', showSources);
   $('#optBtn').addEventListener('click', showOptions);
+  const mp = $('#moonPen'); mp.checked = state.moonPen;
+  mp.addEventListener('change', () => { state.moonPen = mp.checked; store.set('moonPen', state.moonPen); applyTM(); });
   $('#topTargets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   $('#targets').addEventListener('click', (e) => { const t = e.target.closest('[data-t]'); if (t) showTarget(+t.dataset.t); });
   const tq = $('#tgtQ'), tqx = $('#tgtQx');
