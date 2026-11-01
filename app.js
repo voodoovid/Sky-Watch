@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.93';
+const VERSION = 'v3.94';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1287,6 +1287,14 @@ function renderVerdict(win, moon, hours) {
    Runs by itself whenever the tiles change or the card is resized, so new or longer text needs no manual fix. */
 function fitTiles() {
   const fits = (el) => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width <= el.clientWidth - 1; };
+  // The lines under the verdict badge (window time and rain/conditions note) never wrap: shrink to fit one line.
+  document.querySelectorAll('#verdict .v-win, #verdict .v-note').forEach((el) => {
+    el.style.fontSize = '';
+    el.style.textOverflow = 'clip';
+    let px = parseFloat(getComputedStyle(el).fontSize);
+    while (!fits(el) && px > 9) { px -= 0.5; el.style.fontSize = px + 'px'; }
+    el.style.textOverflow = '';
+  });
   document.querySelectorAll('#verdict .vs').forEach((vs) => {
     vs.querySelectorAll('.lbl, b').forEach((el) => {
       el.style.fontSize = '';

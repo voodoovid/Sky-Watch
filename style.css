@@ -1052,3 +1052,6 @@ html.red .ant { filter: sepia(1) saturate(7) hue-rotate(-50deg) brightness(.7); 
 /* chapter references inside the User Guide are buttons that look like links */
 .guide .g-x { padding: 0; border: 0; background: none; color: var(--accent, #4aa3ff); font: inherit; font-weight: 650; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; }
 .guide .g-x:hover { text-decoration-thickness: 2px; }
+
+/* Verdict lines under the badge: always one line (app.js fitTiles shrinks the text to fit). */
+#verdict .v-win, #verdict .v-note { display: block; white-space: nowrap; overflow: hidden; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
