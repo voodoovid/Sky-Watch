@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.94';
+const VERSION = 'v3.95';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1858,6 +1858,22 @@ function sizeTop() {
   el.style.setProperty('--toph', `${Math.max(48, (el.clientHeight - 6 * (TOP_N - 1)) / TOP_N)}px`);
 }
 
+/* Cloud penalty: average forecast cloud cover over the part of the target's usable window that is still ahead of the
+   viewed time. Rain isn't scored here (any rain chance already makes the hour a no-go). Up to 5 points, none under 10%. */
+function cloudPenalty(o, now, hours) {
+  if (!hours || !hours.length) return 0;
+  let sum = 0, w = 0;
+  for (const g of (o.segs || [])) {
+    const a = Math.max(+g.s, +now), b = +g.e;
+    if (b <= a) continue;
+    for (const h of hours) {
+      if (!isNum(h.cloud)) continue;
+      const hs = h.t * 1000, he = hs + 3600e3, ov = Math.min(b, he) - Math.max(a, hs);
+      if (ov > 0) { sum += h.cloud * ov; w += ov; }
+    }
+  }
+  return w ? 5 * Math.max(0, sum / w - 10) / 90 : 0;
+}
 /* Moon penalty (test switch): how many score points a target loses at time d. Zero while the Moon is down; otherwise
    grows with how lit the Moon is, how high it is, and how close it sits to the target. Galaxies and reflection nebulae
    suffer most; emission nebulae, planetary nebulae and the LP filter cope better. */
@@ -1879,11 +1895,9 @@ function renderTargets(list, skipTop) {
   // Targets that are up right now (with at least half an hour left) come first, so tonight's ranking favours
   // what you can film now; everything else keeps its normal order. Indexes stay tied to the original list.
   const tier = (o) => { const g = segAt(o, now); return g ? (g.e - now >= MIN_LEFT ? 0 : 2) : o.end <= now ? 3 : 1; };
-  let adj = null;
-  if (state.moonPen && state.data) {
-    const D = state.data, mn = D.nights[state.night].moon;
-    adj = list.map((o, i) => (o.sc != null ? o.sc : 100 - i) - moonPenalty(o, now, mn, D.obs));
-  }
+  const D = state.data, nt = D ? D.nights[state.night] : null;
+  const adj = nt ? list.map((o, i) => (o.sc != null ? o.sc : 100 - i) - cloudPenalty(o, now, nt.hours)
+    - (state.moonPen ? moonPenalty(o, now, nt.moon, D.obs) : 0)) : null;
   const order = list.map((o, i) => i).sort((a, b) => tier(list[a]) - tier(list[b]) || (adj ? adj[b] - adj[a] : 0) || a - b);
   // The list holds every candidate for the night; show the best 30 for the time being looked at (Top Ten + 20 more),
   // so moving the Time Machine re-picks them rather than just reshuffling the same 30.
