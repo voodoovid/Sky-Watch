@@ -1,0 +1,23 @@
+name: Probe survey services
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/probe-survey.yml
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Try each source for M45 at S50-size and wide fields
+        run: |
+          t() { s=$(date +%s.%N); code=$(curl -sS -o /tmp/o.jpg -w "%{http_code} %{size_download}B" --max-time 45 "$2" 2>&1 | tail -1); echo "$1 | $code | $(echo "$(date +%s.%N)-$s" | bc | cut -c1-5)s"; }
+          q="projection=TAN&coordsys=icrs&ra=56.85&dec=24.12&format=jpg"
+          for h in alasky.cds.unistra.fr alaskybis.cds.unistra.fr; do
+            for f in 1.728 2.876 5.387; do
+              t "$h fov $f 720x480" "https://$h/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=720&height=480&fov=$f&$q"
+              t "$h fov $f 360x240" "https://$h/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=360&height=240&fov=$f&$q"
+            done
+          done
+          t "skyview DSS2 5.4deg" "https://skyview.gsfc.nasa.gov/cgi-bin/images?Survey=DSS2+Red&position=56.85,24.12&Size=5.4&Pixels=720,480&Return=JPEG&Projection=Tan"
+          t "eso dss 60arcmin" "https://archive.eso.org/dss/dss/image?ra=56.85&dec=24.12&equinox=J2000&name=&x=60&y=60&Sky-Survey=DSS2-red&mime-type=image/gif"
