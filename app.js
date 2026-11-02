@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.97';
+const VERSION = 'v3.98';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1982,8 +1982,8 @@ function skyCutout(raHours, dec, fovDeg, w = 900, h = 600) {
 function heroSky(raHours, dec, majorArcmin, caption, marker, local) {
   const want = ((majorArcmin || 0) / 60) * 1.5;
   const fov = Math.max(SEESTAR.w * 1.35, want); // width of the image in degrees
-  // The saved copies in heroes/ were cut for the S50 frame: use one only when this model's image would be the same width.
-  if (local && Math.abs(fov - Math.max(SEESTAR_MODELS.s50.w * 1.35, want)) > 0.0005) local = '';
+  // Saved copies: heroes/ holds the S50-width images; other models have their own wider ones in heroes/<model>/ (only where the S50 image is too narrow).
+  if (local && Math.abs(fov - Math.max(SEESTAR_MODELS.s50.w * 1.35, want)) > 0.001) local = local.replace('heroes/', `heroes/${SEESTAR.id}/`);
   const fovH = (fov * 2) / 3;
   const fw = (SEESTAR.w / fov) * 100, fh = (SEESTAR.h / fovH) * 100, mw = (MOON_DEG / fov) * 100;
   return `<figure class="hero"><div class="hero-img">
@@ -2016,11 +2016,13 @@ const heroMsg = (fig, offline) => fig.classList.add('failed', offline ? 'offline
 function wireHero(root) {
   root.querySelectorAll('.hero-img img:not([data-wiki])').forEach((img) => {
     const fig = img.closest('.hero');
-    img.addEventListener('load', () => fig.classList.add('loaded'));
+    let slow = 0;
+    const wait = () => { clearTimeout(slow); slow = setTimeout(() => { if (!fig.classList.contains('loaded')) heroMsg(fig, !navigator.onLine); }, 15000); };
+    img.addEventListener('load', () => { clearTimeout(slow); fig.classList.add('loaded'); fig.classList.remove('failed', 'nophoto', 'offline'); });
     img.addEventListener('error', () => {
       const r = img.dataset.r;
-      if (r && img.getAttribute('src') !== r) img.src = r;   // saved copy missing: use the online survey
-      else heroMsg(fig, !navigator.onLine);
+      if (r && img.getAttribute('src') !== r) { img.src = r; wait(); }   // saved copy missing: try the online survey, but never wait forever
+      else { clearTimeout(slow); heroMsg(fig, !navigator.onLine); }
     });
   });
   root.querySelectorAll('img[data-wiki]').forEach(async (img) => {
