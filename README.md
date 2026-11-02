@@ -1,6 +1,6 @@
 # SkyWatch - Go / No Go
 
-Go / no-go night sky forecast for imaging with a Seestar S50 — a one-screen dashboard that runs entirely in the browser on GitHub Pages.
+Go / no-go night sky forecast for imaging with a Seestar (S50, S30, S30 Pro or S50 Pro) — a one-screen dashboard that runs entirely in the browser on GitHub Pages.
 
 On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to install it with its icon (opens full-screen, no browser bars).
 
@@ -14,6 +14,7 @@ On iPad/iPhone: open the site in Safari → Share → **Add to Home Screen** to 
 - Christmas skin: Dec 1-25 (by the device's date) the app gets a candy-cane header, a string of bubble lights, falling snow, Santa and a snowman (tap the snowman and Pancake purrs). Dec 26-31 it turns to New Year (midnight and gold, champagne-colored lights, confetti, party hats), then returns to the normal look on Jan 1 and again each Dec 1. Preview any time with `?season=christmas` or `?season=newyear`.
 - A small ant walks across the screen every half minute or so (never more than two at a time), only while the Halloween skin is on. Add `?season=halloween&ant=now` to see two right away. The Great Pumpkin (the Moon card) eats any ant that wanders near it while the Moon is at least 80% lit; add `?season=halloween&ant=pumpkin` to send one straight at it.
 - In the Christmas / New Year skin a little iced gingerbread man waddles across the screen instead (same rhythm, waves now and then, gold party hat in the New Year week). Add `?season=christmas&gingerbread=now` to see two right away.
+- Seestar model: Options → **Seestar model** switches between S50 (default), S30, S30 Pro and S50 Pro. It sets the dashed frame in each target's pop-up (labelled e.g. “Seestar S50 frame”), the fit / mosaic tiles and the planet pixel sizes. The choice is remembered on the device.
 - Built-in User Guide: Options → **User Guide** (beside the Options title)
 
 Data: Open-Meteo, MET Norway, 7Timer!. Astronomy: [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT, bundled). Moon image: NASA lunar map (public domain), projected to the near side.

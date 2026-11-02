@@ -1,9 +1,9 @@
 'use strict';
-/* Sky Watch — hour-by-hour night sky forecast for a Seestar S50.
+/* Sky Watch — hour-by-hour night sky forecast for a Seestar smart telescope (S50, S30, S30 Pro or S50 Pro).
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.96';
+const VERSION = 'v3.97';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -327,7 +327,18 @@ function moonInfo(obs, now, win) {
 const ALT_DEF = 40, ALT_LO = 0, ALT_HI = 85;
 let MIN_ALT = (() => { const v = +store.get('minAlt', ALT_DEF); return isNum(v) ? Math.min(ALT_HI, Math.max(ALT_LO, Math.round(v))) : ALT_DEF; })(); // minimum elevation, set in Options
 const STEP = 5 * 60e3;       // 5-minute sampling through the night
-const SEESTAR = { w: 1.28, h: 0.72, scale: 2.39 }; // S50 field in degrees, arcsec per pixel
+/* Seestar models (Options > Seestar model). w × h = telephoto field in degrees (landscape), scale = arcsec per pixel,
+   focal = focal length in mm, res = frame size in pixels. S50 is the default. */
+const SEESTAR_MODELS = {
+  s50:    { id: 's50',    short: 'S50',     w: 1.28, h: 0.72, scale: 2.39, focal: 250, res: '1080 × 1920' },
+  s30:    { id: 's30',    short: 'S30',     w: 2.13, h: 1.20, scale: 3.99, focal: 150, res: '1080 × 1920' },
+  s30pro: { id: 's30pro', short: 'S30 Pro', w: 3.99, h: 2.24, scale: 3.74, focal: 160, res: '2160 × 3840' },
+  s50pro: { id: 's50pro', short: 'S50 Pro', w: 2.45, h: 1.38, scale: 2.30, focal: 260, res: '2160 × 3840' },
+};
+const MODEL_DEF = 's50';
+let SEESTAR = SEESTAR_MODELS[(() => { const v = store.get('model', MODEL_DEF); return SEESTAR_MODELS[v] ? v : MODEL_DEF; })()];
+const frameName = () => `Seestar ${SEESTAR.short} frame`;
+const frameArcmin = () => `${Math.round(SEESTAR.w * 60)}′ × ${Math.round(SEESTAR.h * 60)}′`;
 const MOON_DEG = 0.52;       // full Moon diameter
 
 function nightSamples(obs, win) {
@@ -1969,13 +1980,16 @@ function skyCutout(raHours, dec, fovDeg, w = 900, h = 600) {
 }
 /* Survey image with the Seestar frame and a full Moon drawn to the same scale. */
 function heroSky(raHours, dec, majorArcmin, caption, marker, local) {
-  const fov = Math.max(SEESTAR.w * 1.35, ((majorArcmin || 0) / 60) * 1.5); // width of the image in degrees
+  const want = ((majorArcmin || 0) / 60) * 1.5;
+  const fov = Math.max(SEESTAR.w * 1.35, want); // width of the image in degrees
+  // The saved copies in heroes/ were cut for the S50 frame: use one only when this model's image would be the same width.
+  if (local && Math.abs(fov - Math.max(SEESTAR_MODELS.s50.w * 1.35, want)) > 0.0005) local = '';
   const fovH = (fov * 2) / 3;
   const fw = (SEESTAR.w / fov) * 100, fh = (SEESTAR.h / fovH) * 100, mw = (MOON_DEG / fov) * 100;
   return `<figure class="hero"><div class="hero-img">
       <img src="${local || skyCutout(raHours, dec, fov)}" data-r="${skyCutout(raHours, dec, fov)}" alt="Sky survey image of the target" decoding="async">
       ${marker ? '<div class="xhair"></div>' : ''}
-      <div class="frame" style="left:${((100 - fw) / 2).toFixed(2)}%;top:${((100 - fh) / 2).toFixed(2)}%;width:${fw.toFixed(2)}%;height:${fh.toFixed(2)}%"><svg aria-hidden="true"><rect class="fr-shadow" x="0" y="0" width="100%" height="100%"/><rect class="fr-line" x="0" y="0" width="100%" height="100%"/></svg><span>Seestar frame</span></div>
+      <div class="frame" style="left:${((100 - fw) / 2).toFixed(2)}%;top:${((100 - fh) / 2).toFixed(2)}%;width:${fw.toFixed(2)}%;height:${fh.toFixed(2)}%"><svg aria-hidden="true"><rect class="fr-shadow" x="0" y="0" width="100%" height="100%"/><rect class="fr-line" x="0" y="0" width="100%" height="100%"/></svg><span>${frameName()}</span></div>
       <div class="moonscale" style="width:${mw.toFixed(2)}%"><span>Full Moon</span></div>
     </div><figcaption>${caption} · image ${nice(fov)}° wide</figcaption></figure>`;
 }
@@ -2276,11 +2290,11 @@ function openObject(o) {
     const [fit, fitSub] = frameFit(sz);
     title = `${o.id} · ${o.name}`;
     sub = `${o.type} in ${constellation(o.ra, o.dec)}`;
-    hero = heroSky(o.ra, o.dec, sz ? sz[0] : 0, 'DSS2 sky survey · dashed box = Seestar S50 frame · circle = full Moon', false, `heroes/${String(o.id).replace(/[^A-Za-z0-9]+/g, '_')}.jpg`);
-    tiles = windowTiles(o) + tile('Peak', peakTxt, o.peak ? `at ${fmtTime(o.peak.d)}` : '', 'sm') + tile('Fits Seestar frame', fit, fitSub, 'sm');
+    hero = heroSky(o.ra, o.dec, sz ? sz[0] : 0, `DSS2 sky survey · dashed box = ${frameName()} · circle = full Moon`, false, `heroes/${String(o.id).replace(/[^A-Za-z0-9]+/g, '_')}.jpg`);
+    tiles = windowTiles(o) + tile('Peak', peakTxt, o.peak ? `at ${fmtTime(o.peak.d)}` : '', 'sm') + tile(`Fits ${SEESTAR.short} frame`, fit, fitSub, 'sm');
     rows = [
       ['Size', info[1] ? `${info[1]} (arcminutes)` : '–'], ['In plain terms', sizeScale(sz) || '–'],
-      ['Seestar frame', `${SEESTAR.w}° × ${SEESTAR.h}° (77′ × 43′)`],
+      [frameName(), `${SEESTAR.w}° × ${SEESTAR.h}° (${frameArcmin()})`],
       ['Magnitude', info[0] == null ? 'Faint, diffuse nebula' : info[0].toFixed(1)], ['Distance', info[2]],
       ['RA / Dec (J2000)', `${raHM(o.ra)} / ${decDM(o.dec)}`],
       ['Moon at peak', o.moonSep == null ? 'Below horizon' : `${Math.round(o.moonSep)}° away`],
@@ -2295,16 +2309,16 @@ function openObject(o) {
     const rs = crossings(o.curve, 0);
     const rise = rs.find((x) => x.kind === 'rise'), set = rs.find((x) => x.kind === 'set');
     tiles = windowTiles(o) + tile('Highest', peakTxt, `at ${fmtTime(o.d)}`, 'sm') + tile('Magnitude', o.mag.toFixed(1), o.mag < 0 ? 'very bright' : '', 'sm')
-      + (o.start ? '' : tile('Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″`, `≈ ${Math.max(1, Math.round(px))} px in the Seestar`, 'sm'));
+      + (o.start ? '' : tile('Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″`, `≈ ${Math.max(1, Math.round(px))} px in the ${SEESTAR.short}`, 'sm'));
     rows = [
       ['Apparent size', `${o.size.toFixed(o.size < 10 ? 1 : 0)}″ (arcseconds${o.name === 'Saturn' ? ', globe' : ''})`],
-      ['In the Seestar', `≈ ${Math.max(1, Math.round(px))} px across (frame 1080 × 1920 px)`],
+      [`In the ${SEESTAR.short}`, `≈ ${Math.max(1, Math.round(px))} px across (frame ${SEESTAR.res} px)`],
       ['Lit', `${Math.round(o.phase * 100)}%`],
       ['Distance', `${o.distAU.toFixed(2)} AU · ${Math.round((o.distAU * 149.5978707) * 10) / 10} million km`],
       ['Rises / sets', `${rise ? fmtTime(rise.d) : '–'} / ${set ? fmtTime(set.d) : '–'}`],
       ['Moon at best time', o.moonSep == null ? 'Below horizon' : `${Math.round(o.moonSep)}° away`],
     ];
-    tip = `Planets are tiny at the S50's 250 mm focal length — ${o.name} will be a small bright disc (about ${Math.max(1, Math.round(px))} px), not a detailed close-up. Higher is sharper: shoot near ${fmtTime(o.d)}.`;
+    tip = `Planets are tiny at the ${SEESTAR.short}'s ${SEESTAR.focal} mm focal length — ${o.name} will be a small bright disc (about ${Math.max(1, Math.round(px))} px), not a detailed close-up. Higher is sharper: shoot near ${fmtTime(o.d)}.`;
   } else {
     const c = o.el;
     title = `${o.id} · ${o.name}`;
@@ -2407,7 +2421,12 @@ function setHolidaySwitch(show) {
 }
 
 function showOptions() {
-  showSheet('Options', `<section class="opt" id="optUnits">
+  showSheet('Options', `<section class="opt" id="optModel">
+      <h3 class="opt-h">Seestar model</h3>
+      <div class="night-seg theme-seg" role="group" aria-label="Seestar model">${Object.values(SEESTAR_MODELS).map((m) => `<button type="button" data-model="${m.id}" aria-pressed="${SEESTAR.id === m.id}">${m.short}</button>`).join('')}</div>
+      <p class="note opt-note" id="modelNote"></p>
+    </section>
+    <section class="opt" id="optUnits">
       <h3 class="opt-h">Units</h3>
       <div class="night-seg theme-seg" role="group" aria-label="Units">${[['metric', '°C · km/h · mm'], ['imperial', '°F · mph · in']].map(([v, l]) => `<button type="button" data-units="${v}" aria-pressed="${state.units === v}">${l}</button>`).join('')}</div>
     </section>
@@ -2433,6 +2452,15 @@ function showOptions() {
     </section>`, '', false, true);
   setSheetLink('User Guide', showGuide);
   setHolidaySwitch(true);
+  const modelNote = () => { $('#modelNote').textContent = `${frameName()}: ${SEESTAR.w}° × ${SEESTAR.h}° (${frameArcmin()}), ${SEESTAR.focal} mm, ${SEESTAR.scale}″ per pixel. Sets the dashed frame in each target's pop-up.`; };
+  modelNote();
+  $('#optModel').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-model]');
+    if (!b || !SEESTAR_MODELS[b.dataset.model] || b.dataset.model === SEESTAR.id) return;
+    SEESTAR = SEESTAR_MODELS[b.dataset.model]; store.set('model', SEESTAR.id);
+    $('#optModel').querySelectorAll('[data-model]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    modelNote();
+  });
   $('#optUnits').addEventListener('click', (e) => {
     const b = e.target.closest('[data-units]');
     if (!b || b.dataset.units === state.units) return;
@@ -2474,7 +2502,7 @@ function showOptions() {
 /* User Guide: opens in the same pop-up as Options, with a "‹ Options" button to go back. */
 function showGuide() {
   const G = window.SKY_GUIDE;
-  showSheet('User Guide', G ? G.html(VERSION) : '<p class="note">The guide could not be loaded. Close the app and open it again.</p>', '', true, false);
+  showSheet('User Guide', G ? G.html(VERSION, SEESTAR) : '<p class="note">The guide could not be loaded. Close the app and open it again.</p>', '', true, false);
   setSheetLink('‹ Options', showOptions);
   $('#sheet').classList.add('is-guide');
   if (G) G.wire($('#sheetBody'));

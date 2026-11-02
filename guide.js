@@ -1,7 +1,7 @@
 'use strict';
 /* SkyWatch User Guide — opened from the "User Guide" button beside the title in Options.
    Pure text and drawings (nothing is fetched). app.js calls:
-     SKY_GUIDE.html(version)  -> markup for the pop-up body
+     SKY_GUIDE.html(version, model)  -> markup for the pop-up body
      SKY_GUIDE.wire(body)     -> contents links + "where am I" tracking */
 window.SKY_GUIDE = (() => {
   const CHAPTERS = [
@@ -61,12 +61,15 @@ window.SKY_GUIDE = (() => {
     <figcaption>Layout on a large screen such as an iPad in landscape. On a phone the same areas stack in one column, and you scroll.</figcaption>
   </figure>`;
 
-  const html = (ver) => `<div class="guide">
+  const html = (ver, model) => {
+  const M = model || { short: 'S50', w: 1.28, h: 0.72, focal: 250 };
+  const arc = `${Math.round(M.w * 60)}′ × ${Math.round(M.h * 60)}′`;
+  return `<div class="guide">
   <header class="g-cover">
     <img class="g-logo" src="icon.svg" alt="" width="64" height="64">
     <div class="g-cover-t">
       <h2>SkyWatch – Go / No Go</h2>
-      <p class="g-sub">User guide for the Seestar S50</p>
+      <p class="g-sub">User guide for the Seestar ${M.short}</p>
     </div>
     <p class="g-cover-p">One look tells you whether tonight is worth setting up the telescope, when the best window is, and what to point it at.</p>
     <div class="g-badges" role="img" aria-label="The four verdicts: Go, Partial Go, Marginal, No Go">${badge('go', 'GO')}${badge('partial', 'PARTIAL GO')}${badge('fair', 'MARGINAL')}${badge('nogo', 'NO GO')}</div>
@@ -103,7 +106,7 @@ window.SKY_GUIDE = (() => {
       <dt>Night</dt><dd>Switches the whole page between tonight, tomorrow night and the night after (named by weekday, such as “Thu”). <b>Tonight</b> stays the current night until fewer than two hours of darkness remain, then moves on to the coming evening, so you never look at a night that is nearly over.</dd>
       <dt>Home</dt><dd>Counts a target only while it is in the part of the sky you can see from your yard. You choose those directions in Options. When Home is on, the button is lit.</dd>
       <dt>Refresh</dt><dd>Reloads every forecast. On GPS it also re-reads your position.</dd>
-      <dt>Options</dt><dd>Units, appearance, Home sky and minimum elevation. This guide opens from the <b>User Guide</b> button beside its title.</dd>
+      <dt>Options</dt><dd>Seestar model, units, appearance, Home sky and minimum elevation. This guide opens from the <b>User Guide</b> button beside its title.</dd>
       <dt>Red</dt><dd>Switches the whole app to dim red on black to protect your night vision. The button then reads <b>Normal</b>.</dd>
     </dl>
     <h4>The footer</h4>
@@ -235,7 +238,7 @@ window.SKY_GUIDE = (() => {
     <p>Tap any target or planet to open its details.</p>
     <dl class="g-def">
       <dt>Copy</dt><dd>Beside the name. Copies a plain name such as “M45” or “NGC 7000” that pastes straight into the Seestar app's search. The button briefly reads <i>Copied</i>.</dd>
-      <dt>Picture</dt><dd>A sky-survey image with a dashed box showing exactly what the S50 frame will capture, and a circle showing the full Moon at the same scale. Planets and some comets show a photo instead.</dd>
+      <dt>Picture</dt><dd>A sky-survey image with a dashed box showing exactly what the Seestar ${M.short} frame will capture, and a circle showing the full Moon at the same scale. Planets and some comets show a photo instead.</dd>
       <dt>Time tiles</dt><dd>When it reaches your minimum elevation, the length of the imaging window and when it ends, its peak height and time, and whether it <b>fits the Seestar frame</b> (Yes, Just fits, or Mosaic with the number of panels needed).</dd>
       <dt>Seestar tip</dt><dd>Whether to use the LP filter, and how long to stack for that type of object.</dd>
       <dt>Altitude tonight</dt><dd>A chart of the target's height through the night against the Moon, your minimum elevation line, the imaging window (green) and full dark. A dashed line marks Now or the Time Machine time.</dd>
@@ -245,6 +248,8 @@ window.SKY_GUIDE = (() => {
 
   ${chapter('g-options', `
     <p>Tap the sliders icon in the top bar. Changes apply immediately and are remembered on your device.</p>
+    <h4>Seestar model</h4>
+    <p>Choose <b>S50</b> (the default), <b>S30</b>, <b>S30 Pro</b> or <b>S50 Pro</b>. It sets the size of the dashed frame in each target's pop-up (labelled, for example, “Seestar S50 frame”), the <b>Fits frame</b> tile and mosaic panel counts, and the pixel sizes shown for planets. Each model's field of view, focal length and pixel scale are listed under the buttons.</p>
     <h4>Units</h4>
     <p>Metric (°C · km/h · mm) or imperial (°F · mph · in). This changes temperature, wind and rain amounts everywhere.</p>
     <h4>Appearance</h4>
@@ -298,13 +303,13 @@ window.SKY_GUIDE = (() => {
         <tr><td>Globular clusters</td><td>Off</td><td>Bright and compact. 15 to 30 minutes resolves the stars.</td></tr>
         <tr><td>Reflection nebulae</td><td>Off</td><td>Blue broadband light, and very sensitive to the Moon.</td></tr>
         <tr><td>Comets</td><td>Off</td><td>Use 15 to 30 minute sessions. Comets drift against the stars. Faint comets (about magnitude 13 or fainter) need an hour or more from a dark sky. Each comet's pop-up has its own tip: for example, Encke (2P) is too faint until December, and best from late January to mid-February 2027.</td></tr>
-        <tr><td>Planets</td><td>Off</td><td>Tiny at the S50's focal length. Shoot when they are highest.</td></tr>
+        <tr><td>Planets</td><td>Off</td><td>Tiny at the ${M.short}'s ${M.focal} mm focal length. Shoot when they are highest.</td></tr>
       </tbody>
     </table>
     <ul>
       <li><b>Dew.</b> When the Dew gap tile turns red, run the dew heater.</li>
       <li><b>Wind.</b> Strong gusts shake the mount. The app flags gusts above 30 km/h (19 mph).</li>
-      <li><b>Frame.</b> The S50 sees 1.28° × 0.72° (77′ × 43′). Larger targets need a mosaic, and the pop-up tells you how many panels.</li>
+      <li><b>Frame.</b> The ${M.short} sees ${M.w}° × ${M.h}° (${arc}). Larger targets need a mosaic, and the pop-up tells you how many panels.</li>
     </ul>`)}
 
   ${chapter('g-help', `
@@ -341,6 +346,7 @@ window.SKY_GUIDE = (() => {
     </div>
   </div>
   </div>`;
+  };
 
   /* Scroll the pop-up body to a chapter (or to the contents). */
   const go = (body, id) => {

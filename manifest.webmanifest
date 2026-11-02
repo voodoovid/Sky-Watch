@@ -1,7 +1,7 @@
 {
   "name": "SkyWatch - Go / No Go",
   "short_name": "SkyWatch",
-  "description": "Go / no-go night sky forecast for a Seestar S50.",
+  "description": "Go / no-go night sky forecast for a Seestar smart telescope.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
