@@ -1,12 +1,18 @@
 name: Download target thumbnails
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 */3 * * *'   # retries while the survey service is down; does nothing once every image is saved
   push:
     paths:
       - tools/hero-models.txt
       - tools/get-heroes-models.sh
+      - .github/workflows/get-thumbs.yml
 permissions:
   contents: write
+concurrency:
+  group: hero-images
+  cancel-in-progress: false
 jobs:
   models:
     runs-on: ubuntu-latest
@@ -18,7 +24,12 @@ jobs:
         model: [s30, s50pro, s30pro]
     steps:
       - uses: actions/checkout@v4
+      - name: Check the survey service is answering
+        id: up
+        run: |
+          if curl -fsS -o /dev/null --max-time 30 "https://alasky.cds.unistra.fr/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=120&height=80&fov=1.728&projection=TAN&coordsys=icrs&ra=56.85&dec=24.12&format=jpg"; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "Survey service is down; will retry on the next scheduled run"; echo "ok=false" >> "$GITHUB_OUTPUT"; fi
       - name: Download ${{ matrix.model }} images in batches and save each batch
+        if: steps.up.outputs.ok == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
