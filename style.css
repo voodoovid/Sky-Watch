@@ -1173,3 +1173,37 @@ html.red .cg-th img, html.red .cg-th svg { filter: grayscale(1) sepia(1) saturat
   .tm { gap: 7px; padding-right: 10px; }
   .tmc, .tmc .tm { flex: none; }
 }
+
+/* ---------- Caught: Cloud sync (footer of the Caught pop-up + its own floating pop-up) ---------- */
+.cg-sync { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; font: inherit; font-size: .84rem; color: var(--muted); text-align: left;
+  background: var(--card2); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cg-sync svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.cg-sync .cs-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.cg-sync .cs-go { flex: none; color: var(--accent); font-weight: 700; white-space: nowrap; }
+.cg-sync[data-k="ok"] svg { color: var(--go); }
+.cg-sync[data-k="busy"] svg { color: var(--accent); animation: csPulse 1s ease-in-out infinite alternate; }
+.cg-sync[data-k="err"] svg, .cg-sync[data-k="err"] .cs-t { color: var(--nogo); }
+@media (hover: hover) { .cg-sync:hover { border-color: var(--line2); } }
+@keyframes csPulse { from { opacity: 1; } to { opacity: .35; } }
+.cs-state { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin-bottom: .8em; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; }
+.cs-dot { flex: none; width: 10px; height: 10px; margin-top: .38em; border-radius: 50%; background: var(--dim); }
+.cs-state[data-k="ok"] .cs-dot { background: var(--go); box-shadow: 0 0 8px color-mix(in srgb, var(--go) 60%, transparent); }
+.cs-state[data-k="busy"] .cs-dot { background: var(--accent); animation: csPulse 1s ease-in-out infinite alternate; }
+.cs-state[data-k="err"] .cs-dot { background: var(--nogo); }
+.cs-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-state .cs-t { font-weight: 700; }
+.cs-state .cs-d { color: var(--muted); font-size: .84em; word-break: break-word; }
+.cs-state[data-k="err"] .cs-d { color: var(--nogo); }
+.sy-note { margin: 0 0 .9em !important; }
+.sy-note:last-child { margin: .9em 0 0 !important; }
+.sy-repo { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 2px .8em; }
+.sy-repo b { font-weight: 700; word-break: break-all; text-align: right; }
+.sy-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.sy-acts .tbtn { flex: 1 1 auto; }
+.sy-rm { color: var(--nogo); border-color: color-mix(in srgb, var(--nogo) 45%, var(--line)); }
+.sy-in { width: 100%; height: 42px; padding: 0 12px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text);
+  background: var(--card2); border: 1px solid var(--line2); border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.sy-in:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.log-acts .log-save:disabled { opacity: .6; cursor: default; }
+html.red .cg-sync[data-k="ok"] svg { color: var(--accent); }
+html.red .cs-state[data-k="ok"] .cs-dot { background: var(--accent); box-shadow: none; }

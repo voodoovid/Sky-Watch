@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v4.00';
+const VERSION = 'v4.01';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2366,10 +2366,16 @@ const logKey = (o) => o.kind === 'planet' ? `planet:${o.name}` : `${o.kind}:${o.
 const logAll = () => { const v = store.get('photoLog', {}); return v && typeof v === 'object' ? v : {}; };
 const logDates = (o) => (logAll()[logKey(o)] || []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();
 function logSave(o, dates) {
-  const all = logAll(), k = logKey(o);
+  const all = logAll(), k = logKey(o), before = new Set(all[k] || []), after = new Set(dates);
+  const m = logMeta(), now = Date.now();
+  m[k] = m[k] || {};
+  after.forEach((d) => { if (!before.has(d)) m[k][d] = [now, 0]; });   // added
+  before.forEach((d) => { if (!after.has(d)) m[k][d] = [now, 1]; });   // removed (kept as a marker so other devices remove it too)
+  store.set('photoLogMeta', m);
   if (dates.length) all[k] = [...new Set(dates)].sort(); else delete all[k];
   store.set('photoLog', all);
   setCaughtCount();
+  syncSoon();
 }
 const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isoDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -2446,6 +2452,178 @@ function openLogHistory() {
   });
 }
 
+/* ---------- Caught sync: the photo log kept in the user's own private GitHub repo ----------
+   Every device keeps its own copy and merges with caught-log.json in the repo. Each date carries [time changed, removed?],
+   so the newest change wins per date (a removal beats an add made at the same moment) and removals reach every device.
+   The token is a fine-grained one limited to that one repo, stored on this device only. */
+const SYNC_FILE = 'caught-log.json';
+const SYNC_DEF_REPO = 'voodoovid/SkyWatch-Log';
+const logMeta = () => { const v = store.get('photoLogMeta', {}); return v && typeof v === 'object' ? v : {}; };
+const syncCfg = () => { const c = store.get('caughtSync', null); return c && c.token && c.repo ? c : null; };
+const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+/* Dates logged before sync existed get an "old" stamp, so any real change made on another device wins. */
+function logMetaInit() {
+  const all = logAll(), m = logMeta(); let ch = false;
+  for (const k in all) for (const d of all[k] || []) { m[k] = m[k] || {}; if (!m[k][d]) { m[k][d] = [1, 0]; ch = true; } }
+  if (ch) store.set('photoLogMeta', m);
+}
+function metaToLog(m) {
+  const out = {};
+  for (const k in m) { const ds = Object.keys(m[k] || {}).filter((d) => isoRe.test(d) && !m[k][d][1]).sort(); if (ds.length) out[k] = ds; }
+  return out;
+}
+function metaMerge(a, b) {
+  const out = {};
+  for (const src of [a, b]) for (const k in src) {
+    if (!src[k] || typeof src[k] !== 'object' || !/^(dso|comet|planet):./.test(k)) continue;
+    for (const d in src[k]) {
+      const x = src[k][d];
+      if (!isoRe.test(d) || !Array.isArray(x) || !isNum(+x[0])) continue;
+      const y = out[k] && out[k][d], v = [+x[0], x[1] ? 1 : 0];
+      if (!y || v[0] > y[0] || (v[0] === y[0] && v[1] > y[1])) (out[k] = out[k] || {})[d] = v;
+    }
+  }
+  return out;
+}
+const stable = (v) => Array.isArray(v) ? `[${v.map(stable).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(',')}}` : JSON.stringify(v);
+const b64enc = (s) => { const u = new TextEncoder().encode(s); let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(b); };
+const b64dec = (s) => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+async function ghApi(c, path, opts = {}) {
+  const r = await fetch(`https://api.github.com/repos/${c.repo}${path}`, { cache: 'no-store', ...opts,
+    headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${c.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  let j = null; try { j = await r.json(); } catch (e) { /* no body */ }
+  return { ok: r.ok, status: r.status, j };
+}
+const syncErr = (r) => r.status === 401 ? 'The token was refused (expired or deleted). Remove it and connect a new one.'
+  : r.status === 403 ? 'The token can’t write to the repo. It needs Contents: Read and write.'
+  : r.status === 404 ? 'Repo not found, or the token doesn’t have access to it.'
+  : `GitHub error ${r.status}${r.j && r.j.message ? `: ${r.j.message}` : ''}`;
+const sync = { busy: null, again: false, timer: 0, err: '', at: +store.get('caughtSyncAt', 0) || 0 };
+function syncSoon(ms = 1500) { if (!syncCfg()) return; clearTimeout(sync.timer); sync.timer = setTimeout(() => syncCaught(), ms); }
+function syncCaught() {
+  const c = syncCfg();
+  if (!c) return Promise.resolve(false);
+  if (sync.busy) { sync.again = true; return sync.busy; }
+  sync.busy = (async () => {
+    setSyncUI();
+    const was = stable(logAll());
+    try {
+      for (let tries = 0; ; tries++) {
+        const g = await ghApi(c, `/contents/${SYNC_FILE}`);
+        let remote = {}, sha;
+        if (g.ok) { sha = g.j.sha; try { const d = JSON.parse(b64dec(g.j.content)); remote = (d && d.entries) || {}; } catch (e) { remote = {}; } }
+        else if (g.status !== 404) throw new Error(syncErr(g));
+        const merged = metaMerge(logMeta(), remote);
+        store.set('photoLogMeta', merged);
+        store.set('photoLog', metaToLog(merged));
+        if (sha && stable(merged) === stable(metaMerge(remote, {}))) break;   // the repo already has everything
+        const body = { app: 'SkyWatch - Go / No Go', format: 1, updated: new Date().toISOString(), entries: merged };
+        const p = await ghApi(c, `/contents/${SYNC_FILE}`, { method: 'PUT', body: JSON.stringify({ message: 'Update Caught log', content: b64enc(JSON.stringify(body, null, 1)), ...(sha ? { sha } : {}) }) });
+        if (p.ok) break;
+        if ((p.status === 409 || p.status === 422) && tries < 3) continue;   // another device wrote first: read again and merge
+        throw new Error(syncErr(p));
+      }
+      sync.err = ''; sync.at = Date.now(); store.set('caughtSyncAt', sync.at);
+    } catch (e) {
+      sync.err = navigator.onLine === false ? 'Offline. Your catches are saved here and will sync when you’re back online.' : (e && e.message) || 'Sync failed.';
+    }
+    sync.busy = null;
+    if (stable(logAll()) !== was) refreshCaughtViews();
+    setSyncUI();
+    if (sync.again) { sync.again = false; syncSoon(300); }
+    return !sync.err;
+  })();
+  return sync.busy;
+}
+/* After a sync brings in changes: update the count, an open target's "Last caught", and the Caught list if it's showing. */
+function refreshCaughtViews() {
+  setCaughtCount();
+  if ($('#sheet').open && state.openObj && !$('#sheetLog').hidden) setLogHead(state.openObj);
+  if ($('#sheet').open && $('#sheetBody .caught') && !$('#pop2').open) showCaught();
+}
+const syncWhen = (t) => {
+  const d = new Date(t), today = isoToday() === `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return (today ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ') + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+function syncLine() {
+  const c = syncCfg();
+  if (!c) return { k: 'off', t: 'Saved on this device only', tip: 'Set up Cloud sync to keep your Caught log in your private GitHub repo and share it between devices' };
+  if (sync.busy) return { k: 'busy', t: 'Syncing…', tip: `Syncing with ${c.repo}` };
+  if (sync.err) return { k: 'err', t: 'Sync problem', tip: sync.err };
+  return { k: 'ok', t: sync.at ? `Synced ${syncWhen(sync.at)}` : 'Connected', tip: `Kept in your private repo ${c.repo}` };
+}
+/* The footer of the Caught pop-up and the Cloud sync pop-up both show the live status. */
+function setSyncUI() {
+  const L = syncLine();
+  document.querySelectorAll('.cg-sync').forEach((el) => {
+    el.dataset.k = L.k;
+    el.querySelector('.cs-t').textContent = L.t;
+    el.title = L.tip;
+  });
+  const st = $('#syncState');
+  if (st) { st.dataset.k = L.k; st.querySelector('.cs-t').textContent = L.t; st.querySelector('.cs-d').textContent = L.k === 'err' ? sync.err : L.tip; }
+}
+const CLOUD_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18.5h10.2a4.3 4.3 0 0 0 .5-8.57A6 6 0 0 0 6.2 9.1 4.7 4.7 0 0 0 7 18.5z"/></svg>';
+function showSyncSetup() {
+  const c = syncCfg();
+  const state0 = `<div class="cs-state" id="syncState"><span class="cs-dot" aria-hidden="true"></span><span class="cs-tx"><span class="cs-t"></span><span class="cs-d"></span></span></div>`;
+  const body = c
+    ? `${state0}
+       <div class="sy-repo"><span class="log-lbl">Repo</span><b>${esc(c.repo)}</b></div>
+       <div class="sy-acts">
+         <button type="button" class="tbtn log-save" id="syNow" title="Sync the Caught log with your repo now">Sync now</button>
+         <button type="button" class="tbtn" id="syCopy" title="Copy the GitHub token to the clipboard">Copy token</button>
+         <button type="button" class="tbtn ghost sy-rm" id="syRm" title="Remove the token from this device (asks first)">Remove token</button>
+       </div>
+       <p class="note sy-note">Syncs when SkyWatch opens, when you come back to it, and right after every change. Removing the token stops syncing on this device; your log stays here and in the repo.</p>`
+    : `${state0}
+       <p class="note sy-note">Keep your Caught log in your own <b>private</b> GitHub repo, so every device shows the same catches. Use a fine-grained token limited to that one repo, with <b>Contents: Read and write</b>.</p>
+       <div class="log-form">
+         <label class="log-lbl" for="syRepo">Private repo</label>
+         <input type="text" id="syRepo" class="sy-in" value="${esc(SYNC_DEF_REPO)}" autocomplete="off" autocapitalize="off" spellcheck="false" title="owner/repo of your private log repo">
+         <label class="log-lbl" for="syTok">Fine-grained token</label>
+         <input type="password" id="syTok" class="sy-in" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false" title="Paste the token limited to the log repo">
+         <p class="log-msg" id="syMsg" hidden></p>
+         <div class="log-acts"><button type="button" class="tbtn log-save" id="syGo" title="Check the repo and token, then sync">Connect</button></div>
+       </div>`;
+  showPop2('Cloud sync', 'Caught log', body);
+  setSyncUI();
+  if (c) {
+    $('#syNow').addEventListener('click', () => syncCaught());
+    $('#syCopy').addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      try { await navigator.clipboard.writeText(c.token); b.textContent = 'Copied'; } catch (err) { b.textContent = 'Copy failed'; }
+      setTimeout(() => { b.textContent = 'Copy token'; }, 1600);
+    });
+    $('#syRm').addEventListener('click', () => {
+      if (!window.confirm(`Remove the GitHub token from this device?\n\nSyncing with ${c.repo} stops here. Your Caught log stays on this device and in the repo.`)) return;
+      store.set('caughtSync', null); sync.err = ''; sync.at = 0; store.set('caughtSyncAt', 0);
+      showSyncSetup(); setSyncUI();
+    });
+    return;
+  }
+  const msg = $('#syMsg'), say = (t) => { msg.textContent = t; msg.hidden = !t; };
+  $('#syGo').addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    const repo = $('#syRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$|\/+$/g, ''), token = $('#syTok').value.trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return say('Enter the repo as owner/name, e.g. voodoovid/SkyWatch-Log.');
+    if (!token.startsWith('github_pat_')) return say('Paste a fine-grained token (it starts with github_pat_).');
+    b.disabled = true; b.textContent = 'Checking…'; say('');
+    try {
+      const r = await ghApi({ repo, token }, '');
+      if (!r.ok) throw new Error(syncErr(r));
+      if (!r.j.private) throw new Error('That repo is public. Make it private first, so nobody else can see your log.');
+      store.set('caughtSync', { repo, token });
+      sync.err = '';
+      showSyncSetup();
+      await syncCaught();
+    } catch (err) {
+      say(navigator.onLine === false ? 'You’re offline. Connect to the internet and try again.' : err.message || 'Could not connect.');
+      b.disabled = false; b.textContent = 'Connect';
+    }
+  });
+}
+
 /* ---------- Caught: every object in the photo log, newest catch first ----------
    Opened by the Caught button beside the Time Machine. Each row shows the object's thumbnail, name, the date last caught
    and how many times; tapping a row opens that object's own pop-up (as it stands on the night being viewed). */
@@ -2514,7 +2692,10 @@ function showCaught() {
        <div class="cg-head"><span>Object</span><span>Last caught</span></div>
        <ul class="cg-list">${rows}</ul>`
     : `<div class="cg-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg><p><b>Nothing caught yet.</b></p><p class="muted">Open any target, planet or comet and tap <b>Log photo</b> after you've photographed it. It will show up here.</p></div>`;
-  showSheet('Caught', `<div class="caught">${body}</div>`, list.length ? 'Everything you’ve photographed, newest first' : '');
+  const foot = `<button type="button" class="cg-sync" id="cgSync" aria-label="Cloud sync settings">${CLOUD_SVG}<span class="cs-t"></span><span class="cs-go">Cloud sync ›</span></button>`;
+  showSheet('Caught', `<div class="caught">${body}${foot}</div>`, list.length ? 'Everything you’ve photographed, newest first' : '');
+  setSyncUI();
+  $('#cgSync').addEventListener('click', showSyncSetup);
   const ul = $('#sheetBody').querySelector('.cg-list');
   if (ul) ul.addEventListener('click', (e) => {
     const b = e.target.closest('[data-i]'); if (!b) return;
@@ -3071,7 +3252,11 @@ function init() {
   $('#logBtn').addEventListener('click', openLogPhoto);
   $('#logLast').addEventListener('click', openLogHistory);
   $('#caughtBtn').addEventListener('click', showCaught);
+  logMetaInit();
   setCaughtCount();
+  syncCaught();   // pre-load: bring in catches logged on other devices right away
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - sync.at > 20e3) syncSoon(0); });
+  addEventListener('online', () => syncSoon(0));
   $('#pop2').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#sheet').addEventListener('close', () => { if ($('#pop2').open) $('#pop2').close(); });
   // Stop the page behind an open sheet from scrolling or rubber-banding on iPad; only the sheet's own body may scroll.
