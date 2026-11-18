@@ -238,6 +238,8 @@ window.SKY_GUIDE = (() => {
     <p>Tap any target or planet to open its details.</p>
     <dl class="g-def">
       <dt>Copy</dt><dd>Beside the name. Copies a plain name such as “M45” or “NGC 7000” that pastes straight into the Seestar app's search. The button briefly reads <i>Copied</i>.</dd>
+      <dt>Log photo</dt><dd>Left of the ✕. Records that you photographed the target. A small pop-up opens with today's date filled in; change it if you shot on another night, then tap <b>Save</b>. Each date can be logged once.</dd>
+      <dt>Last caught</dt><dd>Once a target has been logged, the date you last photographed it appears left of <b>Log photo</b>. Tap it to see every date you have photographed that target, newest first, with how long ago it was. Tap ✕ beside a date to remove it (you are asked to confirm). The log is saved on this device only.</dd>
       <dt>Picture</dt><dd>A sky-survey image with a dashed box showing exactly what the Seestar ${M.short} frame will capture, and a circle showing the full Moon at the same scale. Planets and some comets show a photo instead.</dd>
       <dt>Time tiles</dt><dd>When it reaches your minimum elevation, the length of the imaging window and when it ends, its peak height and time, and whether it <b>fits the Seestar frame</b> (Yes, Just fits, or Mosaic with the number of panels needed).</dd>
       <dt>Seestar tip</dt><dd>Whether to use the LP filter, and how long to stack for that type of object.</dd>

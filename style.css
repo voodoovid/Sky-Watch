@@ -1056,3 +1056,39 @@ html.red .ant { filter: sepia(1) saturate(7) hue-rotate(-50deg) brightness(.7); 
 
 /* Verdict lines under the badge: always one line (app.js fitTiles shrinks the text to fit). */
 #verdict .v-win, #verdict .v-note { display: block; white-space: nowrap; overflow: hidden; -webkit-line-clamp: unset; -webkit-box-orient: initial; }
+
+/* ---------- photo log (v3.99): "Last caught" + "Log photo" left of the pop-up ✕, and its floating pop-ups ---------- */
+.sh-log { display: flex; align-items: center; gap: 6px; flex: none; }
+.sh-log[hidden] { display: none; }
+.log-btn { display: inline-flex; align-items: center; gap: 5px; }
+.log-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linejoin: round; }
+.log-last { color: var(--text); font-weight: 700; white-space: nowrap; }
+.log-last .ll-k { color: var(--muted); font-weight: 600; }
+@media (max-width: 600px) {
+  .log-btn .lb-t, .log-last .ll-k { display: none; }
+  .log-btn { padding: .3em .6em; }
+}
+.sheet.mini { width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - var(--sh-top) - 20px)); }
+#pop2Body { padding: 1em 1.1em 1.2em; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.p2-sub { margin: .2em 0 0; color: var(--muted); font-size: .86em; font-weight: 600; }
+.p2-sub[hidden] { display: none; }
+.log-form { display: flex; flex-direction: column; gap: .55em; }
+.log-lbl { font-size: .8em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+#logDate {
+  width: 100%; height: 42px; padding: 0 12px; font: inherit; font-size: 16px; font-weight: 600;
+  color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 10px;
+}
+#logDate:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.log-msg { margin: 0; color: var(--nogo); font-size: .88em; font-weight: 600; }
+.log-msg[hidden] { display: none; }
+.log-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: .4em; }
+.log-save { background: var(--accent); color: #04101f; border-color: var(--accent); font-weight: 750; min-width: 84px; }
+html.red .log-save { background: #300000; color: var(--accent); }
+.log-sum { margin: 0 0 .7em; color: var(--muted); }
+.log-sum b { color: var(--text); }
+.log-list { list-style: none; margin: 0; padding: 0; }
+.log-list li { display: flex; align-items: center; gap: 10px; padding: .5em 0; border-bottom: 1px solid var(--line); }
+.log-list li:last-child { border-bottom: 0; }
+.ll-d { font-weight: 700; flex: 1; min-width: 0; }
+.ll-a { color: var(--muted); font-size: .86em; white-space: nowrap; }
+.ll-x { flex: none; min-width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); font-size: .8em; }

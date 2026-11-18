@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.98';
+const VERSION = 'v3.99';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -1532,6 +1532,7 @@ function showSheet(title, body, sub = '', wide = false, locked = false, copy = '
   cb.setAttribute('aria-label', copy ? `Copy ${copy}` : 'Copy');
   $('#sheetHoliday').hidden = true; // only Options shows the holiday skin switch (see setHolidaySwitch)
   $('#sheetGuide').hidden = true; // only Options and the User Guide show this button (see setSheetLink)
+  $('#sheetLog').hidden = true; // only target, planet and comet pop-ups show the photo log (see setLogHead)
   guideAct = null;
   $('#sheet').classList.remove('is-guide');
   $('#sheetTitle').textContent = title;
@@ -2349,6 +2350,7 @@ function openObject(o) {
       <p class="fine">${o.kind === 'comet' ? 'Orbit: JPL Horizons. Positions computed on device.' : o.kind === 'dso' ? 'Catalog sizes and magnitudes are approximate.' : 'Positions computed on device (Astronomy Engine).'}</p>
     </div>`, sub, true, false, seestarName(o));
   state.openObj = o;
+  setLogHead(o);
   const draw = () => altChart($('#objChart'), o, now);
   requestAnimationFrame(draw);
   wireHero($('#sheetBody'));
@@ -2356,6 +2358,92 @@ function openObject(o) {
 function showTarget(i) { const D = state.data; openObject(D && D.nights[state.night].targets[i]); }
 function showPlanet(i) { const D = state.data; openObject(D && D.nights[state.night].planets[i]); }
 function showComet(i) { const D = state.data; openObject(D && D.nights[state.night].comets[i]); }
+
+/* ---------- photo log ----------
+   Dates the user photographed each target, saved on this device: { "dso:M45": ["2026-11-17", …], "planet:Saturn": […] }.
+   The pop-up header shows "Log photo" beside ✕ and, once logged, the date last caught; tapping that lists every date. */
+const logKey = (o) => o.kind === 'planet' ? `planet:${o.name}` : `${o.kind}:${o.id}`;
+const logAll = () => { const v = store.get('photoLog', {}); return v && typeof v === 'object' ? v : {}; };
+const logDates = (o) => (logAll()[logKey(o)] || []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();
+function logSave(o, dates) {
+  const all = logAll(), k = logKey(o);
+  if (dates.length) all[k] = [...new Set(dates)].sort(); else delete all[k];
+  store.set('photoLog', all);
+}
+const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const isoDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+function logFmt(iso, long = false) {
+  const d = isoDate(iso), thisYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString('en-US', long ? { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric', ...(thisYear ? {} : { year: 'numeric' }) });
+}
+function logAgo(iso) {
+  const n = Math.round((isoDate(isoToday()) - isoDate(iso)) / 864e5);
+  if (n <= 0) return 'Today';
+  if (n === 1) return 'Yesterday';
+  if (n < 60) return `${n} days ago`;
+  const mo = Math.round(n / 30.44);
+  return mo < 24 ? `${mo} months ago` : `${Math.round(n / 365.25)} years ago`;
+}
+const logName = (o) => o.kind === 'planet' ? o.name : `${o.id} · ${o.name}`;
+function setLogHead(o) {
+  const w = $('#sheetLog'), last = $('#logLast');
+  w.hidden = !o;
+  if (!o) return;
+  const dates = logDates(o);
+  last.hidden = !dates.length;
+  if (dates.length) {
+    last.innerHTML = `<span class="ll-k">Last caught</span> ${esc(logFmt(dates[0]))}`;
+    const tip = `Last photographed ${logFmt(dates[0], true)} · ${dates.length === 1 ? 'logged once' : `logged ${dates.length} times`}. Tap to see every date.`;
+    last.title = tip; last.setAttribute('aria-label', tip);
+  }
+}
+/* Second-level floating pop-up, shown over the target pop-up. */
+function showPop2(title, sub, body) {
+  $('#pop2Title').textContent = title;
+  $('#pop2Sub').textContent = sub; $('#pop2Sub').hidden = !sub;
+  $('#pop2Body').innerHTML = body;
+  const d = $('#pop2');
+  if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
+}
+function openLogPhoto() {
+  const o = state.openObj; if (!o) return;
+  const today = isoToday();
+  showPop2('Log a photo', logName(o), `<div class="log-form">
+      <label class="log-lbl" for="logDate">Date photographed</label>
+      <input type="date" id="logDate" value="${today}" max="${today}" required>
+      <p class="log-msg" id="logMsg" hidden></p>
+      <div class="log-acts"><button type="button" class="tbtn ghost" id="logCancel" title="Close without saving">Cancel</button><button type="button" class="tbtn log-save" id="logSave" title="Save this date to the photo log">Save</button></div>
+    </div>`);
+  const inp = $('#logDate'), msg = $('#logMsg');
+  const say = (t) => { msg.textContent = t; msg.hidden = !t; };
+  inp.addEventListener('input', () => say(''));
+  $('#logCancel').addEventListener('click', () => $('#pop2').close());
+  $('#logSave').addEventListener('click', () => {
+    const v = inp.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { say('Pick a date first.'); return; }
+    if (v > today) { say('That date is in the future.'); return; }
+    const dates = logDates(o);
+    if (dates.includes(v)) { say(`Already logged for ${logFmt(v, true)}.`); return; }
+    logSave(o, [...dates, v]);
+    setLogHead(o);
+    $('#pop2').close();
+  });
+}
+function openLogHistory() {
+  const o = state.openObj; if (!o) return;
+  const dates = logDates(o);
+  if (!dates.length) { $('#pop2').open && $('#pop2').close(); setLogHead(o); return; }
+  const first = dates[dates.length - 1];
+  showPop2('Photo log', logName(o), `<p class="log-sum">Photographed <b>${dates.length === 1 ? 'once' : `${dates.length} times`}</b>${dates.length > 1 ? ` since ${esc(logFmt(first, true))}` : ''}.</p>
+    <ul class="log-list">${dates.map((d) => `<li><span class="ll-d">${esc(logFmt(d, true))}</span><span class="ll-a">${esc(logAgo(d))}</span><button type="button" class="ibtn ll-x" data-d="${d}" title="Remove ${esc(logFmt(d, true))} from the log" aria-label="Remove ${esc(logFmt(d, true))}">✕</button></li>`).join('')}</ul>`);
+  $('#pop2Body').querySelector('.log-list').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-d]'); if (!b) return;
+    if (!window.confirm(`Remove ${logFmt(b.dataset.d, true)} from the photo log for ${logName(o)}?`)) return;
+    logSave(o, logDates(o).filter((x) => x !== b.dataset.d));
+    setLogHead(o);
+    openLogHistory();
+  });
+}
 
 /* ---------- options ---------- */
 function homeWheel() {
@@ -2902,6 +2990,10 @@ function init() {
   $('#comets').addEventListener('click', (e) => { const t = e.target.closest('[data-c]'); if (t) showComet(+t.dataset.c); });
   $('#sheet').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#sheet').addEventListener('close', () => document.documentElement.classList.remove('sheet-open'));
+  $('#logBtn').addEventListener('click', openLogPhoto);
+  $('#logLast').addEventListener('click', openLogHistory);
+  $('#pop2').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+  $('#sheet').addEventListener('close', () => { if ($('#pop2').open) $('#pop2').close(); });
   // Stop the page behind an open sheet from scrolling or rubber-banding on iPad; only the sheet's own body may scroll.
   $('#sheet').addEventListener('touchmove', (e) => {
     if (e.target.closest('input, textarea, select')) return; // keep sliders and fields draggable
