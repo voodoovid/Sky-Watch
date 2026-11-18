@@ -3,7 +3,7 @@
    Weather: Open-Meteo (GFS, ECMWF, GEM, ICON + ensembles), MET Norway, 7Timer!.
    Astronomy: Astronomy Engine (bundled, MIT) — all sky math runs in the browser. */
 
-const VERSION = 'v3.99';
+const VERSION = 'v4.00';
 const LIGHT = window.matchMedia('(prefers-color-scheme: light)');
 const A = window.Astronomy;
 const $ = (s) => document.querySelector(s);
@@ -2369,6 +2369,7 @@ function logSave(o, dates) {
   const all = logAll(), k = logKey(o);
   if (dates.length) all[k] = [...new Set(dates)].sort(); else delete all[k];
   store.set('photoLog', all);
+  setCaughtCount();
 }
 const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const isoDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -2442,6 +2443,83 @@ function openLogHistory() {
     logSave(o, logDates(o).filter((x) => x !== b.dataset.d));
     setLogHead(o);
     openLogHistory();
+  });
+}
+
+/* ---------- Caught: every object in the photo log, newest catch first ----------
+   Opened by the Caught button beside the Time Machine. Each row shows the object's thumbnail, name, the date last caught
+   and how many times; tapping a row opens that object's own pop-up (as it stands on the night being viewed). */
+const PLANET_TINT = { Mercury: ['#c9c3bb', '#6f6a64'], Venus: ['#f4e3b5', '#b8925a'], Mars: ['#f0a070', '#9c3d1c'], Jupiter: ['#f1d9b8', '#a8774e'],
+  Saturn: ['#f3e2b0', '#b39457'], Uranus: ['#c8f1f2', '#5fa9b5'], Neptune: ['#9fbcff', '#2f4fb3'] };
+function caughtGlyph(kind, name) {
+  if (kind === 'planet') {
+    const [a, b] = PLANET_TINT[name] || ['#ddd', '#888'], g = `pg_${name}`;
+    const ring = name === 'Saturn' ? `<ellipse cx="32" cy="24" rx="27" ry="7" fill="none" stroke="${a}" stroke-width="2.4" opacity=".85" transform="rotate(-14 32 24)"/>` : '';
+    return `<svg viewBox="0 0 64 48" aria-hidden="true"><defs><radialGradient id="${g}" cx="38%" cy="34%" r="70%"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></radialGradient></defs><rect width="64" height="48" fill="#05070d"/>${ring}<circle cx="32" cy="24" r="${name === 'Saturn' ? 11 : 14}" fill="url(#${g})"/>${name === 'Saturn' ? `<path d="M6 30.5 Q32 26 58 17.5" fill="none" stroke="${a}" stroke-width="2.4" opacity=".85"/>` : ''}</svg>`;
+  }
+  return `<svg viewBox="0 0 64 48" aria-hidden="true"><defs><linearGradient id="ctail" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe6ff" stop-opacity=".9"/><stop offset="1" stop-color="#bfe6ff" stop-opacity="0"/></linearGradient></defs><rect width="64" height="48" fill="#05070d"/><path d="M44 14 L8 42 L14 44 Z" fill="url(#ctail)"/><circle cx="45" cy="13" r="5" fill="#e9f7ff"/><circle cx="45" cy="13" r="9" fill="#bfe6ff" opacity=".25"/></svg>`;
+}
+/* The object behind a photo-log key, on the night being viewed (null for a planet or comet that isn't up). */
+function caughtObj(key) {
+  const D = state.data; if (!D) return null;
+  const N = D.nights[state.night], i = key.indexOf(':'), kind = key.slice(0, i), id = key.slice(i + 1);
+  if (kind === 'planet') return (N.planets || []).find((p) => p.name === id) || null;
+  if (kind === 'comet') return (N.comets || []).find((c) => c.id === id) || (N.targets || []).find((c) => c.kind === 'comet' && c.id === id) || null;
+  const hit = (N.targets || []).find((t) => t.kind === 'dso' && t.id === id);
+  if (hit) return hit;
+  const row = DSO.find((r) => r[0] === id); if (!row) return null;
+  const [, name, type, ra, dec] = row;
+  const tr = track(N.S, (d) => altAzRaDec(ra, dec, d, D.obs));
+  const pk = tr.peak || tr.curve.reduce((a, c) => (!a || c.alt > a.alt ? c : a), null);
+  return { kind: 'dso', id, name, type, ra, dec, ...tr, peak: tr.peak, d: pk && pk.d, alt: pk ? pk.alt : 0, az: pk ? pk.az : 0, moonSep: tr.peak ? moonSepAt(tr.peak) : null };
+}
+/* Name and type straight from the catalogues, so a row shows even when the object isn't up tonight. */
+function caughtInfo(key) {
+  const i = key.indexOf(':'), kind = key.slice(0, i), id = key.slice(i + 1);
+  if (kind === 'planet') return { kind, id, title: id, type: 'Planet' };
+  if (kind === 'comet') { const c = COMETS.find((x) => x.id === id); return { kind, id, title: c ? `${id} · ${c.name}` : id, type: 'Comet' }; }
+  const r = DSO.find((x) => x[0] === id);
+  return { kind: 'dso', id, title: r ? `${id} · ${r[1]}` : id, type: r ? r[2] : 'Deep-sky object' };
+}
+function caughtList() {
+  const all = logAll();
+  return Object.keys(all).map((k) => {
+    const dates = (all[k] || []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();
+    return dates.length ? { key: k, dates, ...caughtInfo(k) } : null;
+  }).filter(Boolean).sort((a, b) => (a.dates[0] < b.dates[0] ? 1 : a.dates[0] > b.dates[0] ? -1 : a.title.localeCompare(b.title)));
+}
+function setCaughtCount() {
+  const n = caughtList().length, b = $('#caughtBtn');
+  $('#caughtN').textContent = n;
+  const t = n ? `Caught: ${n === 1 ? '1 object' : `${n} objects`} photographed. Tap to see them all.` : 'Caught: nothing logged yet. Use Log photo in any target pop-up.';
+  b.title = t; b.setAttribute('aria-label', t);
+}
+function showCaught() {
+  const list = caughtList(), shots = list.reduce((a, x) => a + x.dates.length, 0);
+  const nightName = state.night === 0 ? 'tonight' : state.night === 1 ? 'tomorrow' : `on ${$('#nightSeg [data-n="2"]').textContent.trim()}`;
+  const thumb = (x) => x.kind === 'dso'
+    ? `<img src="thumbs/${String(x.id).replace(/[^A-Za-z0-9]+/g, '_')}.jpg" alt="" loading="lazy" decoding="async" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">`
+    : caughtGlyph(x.kind, x.id);
+  const rows = list.map((x, i) => {
+    const up = !!caughtObj(x.key);
+    const tip = up ? `Open ${x.title}` : `${x.title} isn't above the horizon after dusk ${nightName}`;
+    return `<li><button type="button" class="cg-row${up ? '' : ' off'}" data-i="${i}" title="${esc(tip)}" aria-label="${esc(tip)}"${up ? '' : ' aria-disabled="true"'}>
+      <span class="cg-th${x.kind === 'dso' ? '' : ' ok'}">${thumb(x)}</span>
+      <span class="cg-tx"><span class="cg-n">${esc(x.title)}</span><span class="cg-s">${esc(x.type)}${up ? '' : ` · not up ${esc(nightName)}`}</span></span>
+      <span class="cg-d"><span class="cg-dd"><span class="dl">${esc(logFmt(x.dates[0], true))}</span><span class="ds">${esc(logFmt(x.dates[0]))}</span></span><span class="cg-c">${x.dates.length === 1 ? esc(logAgo(x.dates[0])) : `${x.dates.length} times · ${esc(logAgo(x.dates[0]))}`}</span></span>
+      <span class="cg-go" aria-hidden="true">›</span></button></li>`;
+  }).join('');
+  const body = list.length
+    ? `<div class="cg-stats"><div><b>${list.length}</b><span>${list.length === 1 ? 'Object' : 'Objects'}</span></div><div><b>${shots}</b><span>${shots === 1 ? 'Session' : 'Sessions'}</span></div><div><b>${esc(logFmt(list[0].dates[0]))}</b><span>Latest catch</span></div></div>
+       <div class="cg-head"><span>Object</span><span>Last caught</span></div>
+       <ul class="cg-list">${rows}</ul>`
+    : `<div class="cg-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg><p><b>Nothing caught yet.</b></p><p class="muted">Open any target, planet or comet and tap <b>Log photo</b> after you've photographed it. It will show up here.</p></div>`;
+  showSheet('Caught', `<div class="caught">${body}</div>`, list.length ? 'Everything you’ve photographed, newest first' : '');
+  const ul = $('#sheetBody').querySelector('.cg-list');
+  if (ul) ul.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-i]'); if (!b) return;
+    const o = caughtObj(list[+b.dataset.i].key);
+    if (o) openObject(o);
   });
 }
 
@@ -2992,6 +3070,8 @@ function init() {
   $('#sheet').addEventListener('close', () => document.documentElement.classList.remove('sheet-open'));
   $('#logBtn').addEventListener('click', openLogPhoto);
   $('#logLast').addEventListener('click', openLogHistory);
+  $('#caughtBtn').addEventListener('click', showCaught);
+  setCaughtCount();
   $('#pop2').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#sheet').addEventListener('close', () => { if ($('#pop2').open) $('#pop2').close(); });
   // Stop the page behind an open sheet from scrolling or rubber-banding on iPad; only the sheet's own body may scroll.

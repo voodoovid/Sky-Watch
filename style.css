@@ -182,6 +182,20 @@ html.red .brand .sub { color: var(--accent); }
 .tm-now { flex: none; min-width: 46px; padding: 0 8px; height: 22px; font: inherit; font-size: .72rem; font-weight: 700; color: var(--text); background: var(--card2); border: 1px solid var(--line2); border-radius: 11px; cursor: pointer; }
 .tm-now:disabled { opacity: .35; cursor: default; }
 .tm output { min-width: 5.2em; }
+/* Time Machine + Caught travel together: the dial on the left, the Caught log button to its right. */
+.tmc { flex: 0 1 auto; min-width: 0; display: flex; align-items: stretch; gap: 8px; }
+.tmc .tm { flex: 0 1 auto; }
+.caught-btn {
+  flex: none; display: flex; align-items: center; gap: 9px; padding: 0 14px 0 12px; min-height: 58px;
+  font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.caught-btn:active { transform: translateY(1px); }
+.caught-btn svg { width: 26px; height: 26px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linejoin: round; }
+.cb-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; line-height: 1.1; }
+.cb-t { font-size: .64rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.cb-n { font-size: 1.1rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+@media (hover: hover) { .caught-btn:hover { border-color: var(--line2); background: var(--card2); } }
 .tm.off { opacity: .6; }
 .tm.off .tm-dial { cursor: default; }
 
@@ -964,7 +978,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
 @media (max-width: 759px) {
   .top { flex-wrap: wrap; }
   .loc-ctl { order: 3; flex-basis: 100%; max-width: none; }
-  .tm { order: 4; flex-basis: 100%; max-width: none; }
+  .tmc { order: 4; flex-basis: 100%; max-width: none; }
+  .tmc .tm { flex: 1 1 auto; }
   .tm-info { flex-direction: row; align-items: center; gap: 12px; }
   .ver-top { display: block; margin-left: auto; align-self: flex-start; padding-top: 2px; }
   .ver-foot { display: none; }
@@ -997,7 +1012,7 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .top-l { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .top-l .loc-ctl { flex: 1 1 auto; min-width: 0; max-width: none; }
   .top-l { justify-self: start; }
-  .tm { justify-self: center; }
+  .tmc { justify-self: center; }
   .controls { justify-self: end; margin-left: 0; }
 }
 
@@ -1029,6 +1044,8 @@ html.red .tile.key .lbl, html.red .tile.key b, html.red .tile.warn b { color: va
   .brand h1 { font-size: 1.3rem; }
   .brand .sub { font-size: .72rem; }
   .tm { padding-right: 12px; }
+  .caught-btn { min-height: 0; padding: 0 12px 0 10px; }
+  .cb-t { display: none; }
 }
 
 /* ---------- the ant (ant.js): walks across the screen now and then, never takes clicks ---------- */
@@ -1092,3 +1109,67 @@ html.red .log-save { background: #300000; color: var(--accent); }
 .ll-d { font-weight: 700; flex: 1; min-width: 0; }
 .ll-a { color: var(--muted); font-size: .86em; white-space: nowrap; }
 .ll-x { flex: none; min-width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); font-size: .8em; }
+
+/* ---------- Caught pop-up: everything in the photo log ---------- */
+.caught { display: flex; flex-direction: column; gap: 14px; }
+.cg-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cg-stats > div { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 8px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; }
+.cg-stats b { font-size: 1.35rem; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cg-stats span { font-size: .66rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.cg-head { display: flex; justify-content: space-between; padding: 0 40px 0 98px; font-size: .66rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.cg-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.cg-list li + li { border-top: 1px solid var(--line); }
+.cg-row { width: 100%; display: flex; align-items: center; gap: 14px; padding: 10px 12px; font: inherit; color: var(--text); text-align: left; background: transparent; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cg-row:active { background: var(--card2); }
+@media (hover: hover) { .cg-row:hover { background: var(--card2); } }
+.cg-row.off { cursor: default; }
+.cg-row.off .cg-go { visibility: hidden; }
+.cg-row.off .cg-th { opacity: .55; }
+.cg-th { flex: none; width: 72px; height: 54px; border-radius: 8px; overflow: hidden; background: #05070d; border: 1px solid var(--line2); }
+.cg-th img, .cg-th svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cg-th img { opacity: 0; transition: opacity .3s; }
+.cg-th.ok img { opacity: 1; }
+html.red .cg-th img, html.red .cg-th svg { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-50deg) brightness(.5); }
+.cg-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cg-n { font-size: 1rem; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-s { font-size: .8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-d { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+.cg-dd { font-size: .92rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cg-c { font-size: .76rem; color: var(--muted); white-space: nowrap; }
+.cg-dd .ds { display: none; }
+.cg-go { flex: none; width: 14px; font-size: 1.4rem; line-height: 1; color: var(--muted); }
+.cg-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 28px 12px; }
+.cg-empty svg { width: 46px; height: 46px; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; margin-bottom: 6px; }
+.cg-empty p { margin: 0; max-width: 34ch; }
+@media (max-width: 520px) {
+  .cg-head { display: none; }
+  .cg-row { gap: 10px; padding: 9px 10px; }
+  .cg-th { width: 60px; height: 45px; }
+  .cg-n { font-size: .92rem; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .cg-dd .dl { display: none; }
+  .cg-dd .ds { display: inline; }
+  .cg-dd { font-size: .82rem; }
+  .cg-stats b { font-size: 1.1rem; }
+}
+
+/* Phones: a compact Caught button (label on top, camera + count below); on iPhone portrait the Time Machine stacks its title over the time so both boxes fit one row. */
+@media (max-width: 759px), (orientation: landscape) and (max-height: 520px) {
+  .caught-btn { display: grid; grid-template-columns: auto auto; grid-template-areas: "t t" "i n"; align-content: center; justify-content: center; column-gap: 6px; row-gap: 3px; padding: 0 12px; }
+  .cb-txt { display: contents; }
+  .cb-t { grid-area: t; text-align: center; }
+  .caught-btn svg { grid-area: i; width: 22px; height: 22px; }
+  .cb-n { grid-area: n; align-self: center; }
+}
+@media (max-width: 759px) {
+  .tm-info { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .tm-row { gap: 10px; }
+  .tm-now { height: 30px; min-width: 64px; padding: 0 14px; font-size: .9rem; border-radius: 15px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .top { gap: 8px; }
+  .tmc { gap: 6px; }
+  .caught-btn { grid-template-areas: "i n"; padding: 0 10px; }
+  .tm output { min-width: 4.5em; }
+  .tm { gap: 7px; padding-right: 10px; }
+  .tmc, .tmc .tm { flex: none; }
+}

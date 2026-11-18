@@ -15,7 +15,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
-<link rel="stylesheet" href="style.css?v=3.99">
+<link rel="stylesheet" href="style.css?v=4.00">
 <script>
   // Seasonal skins, automatic from the device date: Halloween all of October, Christmas Dec 1-25, New Year Dec 26-31,
   // and the normal skin the rest of the year. Options > Holiday skins can turn them all off (always the normal skin).
@@ -33,10 +33,10 @@
     var s = season(), c = document.documentElement.classList;
     if (s === 'halloween') {
       c.add('hw');
-      document.write('<link rel="stylesheet" href="halloween.css?v=3.99"><script src="halloween.js?v=3.99"><\/script><script src="spider.js?v=3.99"><\/script>');
+      document.write('<link rel="stylesheet" href="halloween.css?v=4.00"><script src="halloween.js?v=4.00"><\/script><script src="spider.js?v=4.00"><\/script>');
     } else if (s === 'christmas' || s === 'newyear') {
       c.add('xm'); if (s === 'newyear') c.add('ny');
-      document.write('<link rel="stylesheet" href="christmas.css?v=3.99"><script src="christmas.js?v=3.99"><\/script><script src="gingerbread.js?v=3.99"><\/script>');
+      document.write('<link rel="stylesheet" href="christmas.css?v=4.00"><script src="christmas.js?v=4.00"><\/script><script src="gingerbread.js?v=4.00"><\/script>');
     }
     // An app left open across a season change (Oct 1, Nov 1, Dec 1, Dec 26, Jan 1) switches skin when it is next opened.
     document.addEventListener('visibilitychange', function () {
@@ -76,6 +76,7 @@
     <button id="searchBtn" class="ibtn" type="button" title="Find a place" aria-label="Find a place" aria-expanded="false"><svg><use href="#i-search"/></svg></button>
   </div>
   </div>
+  <div class="tmc">
   <div class="tm" id="tm">
     <svg class="tm-dial" id="tmDial" viewBox="0 0 64 64" role="slider" tabindex="-1" aria-label="Time Machine: see what is up later in the night" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="Now"><g id="tmG"></g></svg>
     <div class="tm-info">
@@ -83,6 +84,8 @@
       <span class="tm-row"><output id="tmVal">Now</output><button id="tmNow" class="tm-now" type="button" disabled>Now</button></span>
     </div>
     <input id="tmRange" type="range" min="0" max="0" step="1" value="0" disabled hidden tabindex="-1" aria-hidden="true">
+  </div>
+  <button id="caughtBtn" class="caught-btn" type="button" title="Caught: everything you have photographed" aria-label="Caught: everything you have photographed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg><span class="cb-txt"><span class="cb-t">Caught</span><span class="cb-n" id="caughtN">0</span></span></button>
   </div>
   <div class="controls">
     <div class="seg night-seg" id="nightSeg" role="group" aria-label="Night">
@@ -164,8 +167,8 @@
 </dialog>
 
 <script src="astronomy.browser.min.js"></script>
-<script src="guide.js?v=3.99"></script>
-<script src="app.js?v=3.99"></script>
-<script src="ant.js?v=3.99"></script>
+<script src="guide.js?v=4.00"></script>
+<script src="app.js?v=4.00"></script>
+<script src="ant.js?v=4.00"></script>
 </body>
 </html>
