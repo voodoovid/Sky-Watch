@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>SkyWatch · Caught Sync Test</title>
+<meta name="theme-color" content="#070b16">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: dark; --bg:#070b16; --card:#0f1729; --card2:#152037; --line:#1f2b45; --text:#e8eef9; --muted:#8392b0;
+          --accent:#79a8ff; --go:#2fcf86; --nogo:#ef5d68; --wait:#5b6a89; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input { -webkit-user-select: text; user-select: text; }
+  body { min-height: 100vh; padding: calc(env(safe-area-inset-top) + 20px) calc(env(safe-area-inset-right) + 16px)
+         calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px); }
+  .wrap { max-width: 620px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  h1 { font-size: 21px; margin: 0; letter-spacing: .2px; }
+  .ver { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .lead { color: var(--muted); margin: 0 0 14px; font-size: 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin: 10px 0 5px; }
+  input { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2);
+          color: var(--text); font-size: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { margin-top: 16px; width: 100%; padding: 13px; border: 0; border-radius: 12px; background: var(--accent);
+           color: #04101f; font-size: 16px; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; padding-top: 2px; }
+  .chip { font-size: 12px; font-weight: 800; text-align: center; padding: 4px 0; border-radius: 7px; background: var(--wait); color: #0b1222; }
+  .pass .chip { background: var(--go); } .fail .chip { background: var(--nogo); } .run .chip { background: var(--accent); }
+  .t { font-weight: 600; } .d { color: var(--muted); font-size: 13px; margin-top: 2px; word-break: break-word; }
+  .verdict { text-align: center; font-size: 19px; font-weight: 800; padding: 14px; border-radius: 12px; margin-top: 14px; display: none; }
+  .verdict.ok { display: block; background: rgba(47,207,134,.15); color: var(--go); border: 1px solid var(--go); }
+  .verdict.bad { display: block; background: rgba(239,93,104,.13); color: var(--nogo); border: 1px solid var(--nogo); }
+  .note { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Caught Sync Test</h1><span class="ver" title="Version of this test page">Test v1 · SkyWatch v4.00</span></header>
+
+  <div class="card">
+    <p class="lead">Checks that SkyWatch can keep your Caught log in a private GitHub repo. The token stays in this page only: it isn't saved and goes nowhere except GitHub.</p>
+    <div class="row">
+      <div><label for="owner">Owner</label><input id="owner" value="voodoovid" autocomplete="off" autocapitalize="off" spellcheck="false" title="Your GitHub user name"></div>
+      <div><label for="repo">Private repo</label><input id="repo" value="SkyWatch-Log" autocomplete="off" autocapitalize="off" spellcheck="false" title="The private repo that will hold the Caught log"></div>
+    </div>
+    <label for="token">Fine-grained token</label>
+    <input id="token" type="password" placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck="false" title="Paste the fine-grained token limited to the log repo">
+    <button id="go" type="button" title="Run all six checks against GitHub">Run tests</button>
+    <p class="note">The test writes a small file (sync-test.json) to the repo, reads it back, then deletes it.</p>
+  </div>
+
+  <div class="card">
+    <ul id="list"></ul>
+    <div class="verdict" id="verdict"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://api.github.com';
+const TESTS = [
+  ['token',  'Token looks right',       'Fine-grained tokens start with github_pat_'],
+  ['reach',  'Repo reachable',          'GitHub answers for this repo with this token'],
+  ['priv',   'Repo is private',         'Nobody else can see your log'],
+  ['write',  'Can write',               'Creates sync-test.json'],
+  ['read',   'Can read it back',        'Content matches what was written'],
+  ['clean',  'Can delete',              'Removes the test file']
+];
+const $ = (s) => document.querySelector(s);
+const list = $('#list');
+list.innerHTML = TESTS.map(([k, t, d]) => `<li id="t-${k}" title="${d}"><span class="chip">WAIT</span><div><div class="t">${t}</div><div class="d">${d}</div></div></li>`).join('');
+
+function mark(k, state, detail) {
+  const li = $('#t-' + k);
+  li.className = state;
+  li.querySelector('.chip').textContent = { pass: 'PASS', fail: 'FAIL', run: '…', '': 'WAIT' }[state];
+  if (detail) li.querySelector('.d').textContent = detail;
+}
+const b64 = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+const unb64 = (s) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g, '')), (c) => c.charCodeAt(0)));
+
+async function gh(token, path, opts = {}) {
+  const r = await fetch(API + path, { cache: 'no-store', ...opts,
+    headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + token,
+               'X-GitHub-Api-Version': '2022-11-28', ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } });
+  let j = null; try { j = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, j };
+}
+const why = (r) => `HTTP ${r.status}${r.j && r.j.message ? ' · ' + r.j.message : ''}`;
+
+$('#go').addEventListener('click', async () => {
+  const owner = $('#owner').value.trim(), repo = $('#repo').value.trim(), token = $('#token').value.trim();
+  const v = $('#verdict'); v.className = 'verdict'; v.textContent = '';
+  TESTS.forEach(([k, , d]) => mark(k, '', d));
+  const btn = $('#go'); btn.disabled = true;
+  const fail = (k, msg) => { mark(k, 'fail', msg); v.className = 'verdict bad'; v.textContent = 'NO GO · fix the red item and run again'; btn.disabled = false; };
+  try {
+    mark('token', 'run');
+    if (!token) return fail('token', 'Paste a token first.');
+    if (!owner || !repo) return fail('token', 'Fill in owner and repo.');
+    if (!token.startsWith('github_pat_')) return fail('token', 'This isn’t a fine-grained token. Make a fine-grained one limited to this repo.');
+    mark('token', 'pass', 'Fine-grained token');
+
+    mark('reach', 'run');
+    const R = await gh(token, `/repos/${owner}/${repo}`);
+    if (!R.ok) return fail('reach', why(R) + (R.status === 404 ? ' · check the repo name, and that the token is given access to it' : ''));
+    mark('reach', 'pass', R.j.full_name);
+
+    mark('priv', 'run');
+    if (!R.j.private) return fail('priv', 'This repo is PUBLIC. Make it private in its Settings first.');
+    mark('priv', 'pass', 'Private');
+
+    const path = `/repos/${owner}/${repo}/contents/sync-test.json`;
+    const stamp = JSON.stringify({ test: 'SkyWatch Caught sync', at: new Date().toISOString(), check: 'Pleiades ✓' });
+    mark('write', 'run');
+    const old = await gh(token, path);                       // left over from an earlier run?
+    const W = await gh(token, path, { method: 'PUT', body: JSON.stringify({ message: 'SkyWatch sync test', content: b64(stamp), ...(old.ok ? { sha: old.j.sha } : {}) }) });
+    if (!W.ok) return fail('write', why(W) + (W.status === 403 ? ' · give the token Contents: Read and write' : ''));
+    mark('write', 'pass', 'Wrote sync-test.json');
+
+    mark('read', 'run');
+    const G = await gh(token, path);
+    if (!G.ok) return fail('read', why(G));
+    if (unb64(G.j.content) !== stamp) return fail('read', 'Read back different content.');
+    mark('read', 'pass', 'Matches');
+
+    mark('clean', 'run');
+    const D = await gh(token, path, { method: 'DELETE', body: JSON.stringify({ message: 'SkyWatch sync test cleanup', sha: G.j.sha }) });
+    if (!D.ok) return fail('clean', why(D));
+    mark('clean', 'pass', 'Test file removed');
+
+    v.className = 'verdict ok'; v.textContent = 'GO · all 6 passed';
+  } catch (e) {
+    const k = (TESTS.find(([k]) => $('#t-' + k).className === 'run') || TESTS[0])[0];
+    fail(k, 'Network error: ' + (e.message || e));
+  }
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
